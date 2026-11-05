@@ -1,0 +1,81 @@
+{% extends "base.html" %}
+{% block title %}Dashboard{% endblock %}
+{% block content %}
+<h1 style="margin:4px 0 16px;font-size:22px"><i class="fa-solid fa-gauge-high" style="color:#1877f2"></i> Dashboard</h1>
+
+<div class="stat-grid">
+  <div class="stat"><i class="fa-solid fa-box-open i-blue"></i>
+    <div><div class="num">{{ stats['items_active'] }}</div><div class="lbl">Active Items</div></div></div>
+  <div class="stat"><i class="fa-solid fa-box-archive i-amber"></i>
+    <div><div class="num">{{ stats['items_inactive'] }}</div><div class="lbl">Inactive Items</div></div></div>
+  <div class="stat"><i class="fa-solid fa-layer-group i-green"></i>
+    <div><div class="num">{{ stats['batches'] }}</div><div class="lbl">Item Batches</div></div></div>
+  <div class="stat"><i class="fa-solid fa-truck-fast i-blue"></i>
+    <div><div class="num">{{ stats['depots_active'] }}</div><div class="lbl">Active Distributors</div></div></div>
+  <div class="stat"><i class="fa-solid fa-truck-ramp-box i-amber"></i>
+    <div><div class="num">{{ stats['depots_inactive'] }}</div><div class="lbl">Inactive Distributors</div></div></div>
+  <div class="stat"><i class="fa-solid fa-store i-green"></i>
+    <div><div class="num">{{ stats['stores'] }}</div><div class="lbl">Distributor Stores</div></div></div>
+  <div class="stat"><i class="fa-solid fa-users i-blue"></i>
+    <div><div class="num">{{ stats['users'] }}</div><div class="lbl">System Users</div></div></div>
+  <div class="stat"><i class="fa-solid fa-user-shield i-red"></i>
+    <div><div class="num">{{ stats['roles'] }}</div><div class="lbl">Roles</div></div></div>
+</div>
+
+<div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:16px;margin-top:16px">
+  <div class="card">
+    <div class="card-head"><h2><i class="fa-solid fa-sitemap"></i> Item Hierarchy (active)</h2>
+      <span class="spacer"></span><a class="btn btn-sm" href="/brand">Open</a></div>
+    <div class="card-body">
+      {% if hierarchy %}
+        {% for name, count in hierarchy %}
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px">
+          <b style="width:90px;font-size:13px">{{ name }}s</b>
+          <div style="flex:1;background:#eef0f3;border-radius:6px;height:10px">
+            <div style="width:{{ (count / max_level_count * 100) if max_level_count else 0 }}%;height:10px;border-radius:6px;background:#1877f2"></div>
+          </div>
+          <span style="font-weight:700">{{ count }}</span>
+        </div>
+        {% endfor %}
+      {% else %}
+        <div class="empty">No hierarchy records yet.</div>
+      {% endif %}
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-head"><h2><i class="fa-solid fa-clock-rotate-left"></i> Recent Changes (audit log)</h2>
+      <span class="spacer"></span><a class="btn btn-sm" href="/audit-log">Open</a></div>
+    <div class="table-wrap">
+      {% if recent_audit %}
+      <table class="list">
+        <thead><tr><th>Time</th><th>Table</th><th>Record</th><th>Action</th><th>By</th></tr></thead>
+        <tbody>
+          {% for r in recent_audit %}
+          <tr>
+            <td class="mono">{{ r['created_on'] or '' }}</td>
+            <td class="mono">{{ r['table_name'] }}</td>
+            <td class="mono">{{ r['record_key'] }}</td>
+            <td><span class="badge {{ 'active' if r['action'] in ('CREATE','RESTORE','LOGIN') else 'inactive' }}">{{ r['action'] }}</span></td>
+            <td>{{ r['changed_by'] }}</td>
+          </tr>
+          {% endfor %}
+        </tbody>
+      </table>
+      {% else %}<div class="empty">No activity recorded yet.</div>{% endif %}
+    </div>
+  </div>
+</div>
+
+<div class="card">
+  <div class="card-head"><h2><i class="fa-solid fa-bolt"></i> Quick Actions</h2></div>
+  <div class="card-body" style="display:flex;gap:10px;flex-wrap:wrap">
+    <a class="btn btn-green" href="/brand/create"><i class="fa-solid fa-plus"></i> New Level</a>
+    <a class="btn btn-primary" href="/item/create"><i class="fa-solid fa-plus"></i> New Item</a>
+    <a class="btn btn-primary" href="/item-batch/create"><i class="fa-solid fa-plus"></i> New Batch</a>
+    <a class="btn btn-primary" href="/distributor/create"><i class="fa-solid fa-plus"></i> New Distributor</a>
+    <a class="btn" href="/item/template"><i class="fa-solid fa-file-excel"></i> Item Template (xlsx)</a>
+    <a class="btn" href="/distributor/template"><i class="fa-solid fa-file-excel"></i> Distributor Template</a>
+  </div>
+</div>
+{% endblock %}

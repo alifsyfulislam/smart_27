@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% block title %}Users{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2><i class="fa-solid fa-users"></i> Access Control — Users</h2>
+    <span class="spacer"></span>
+    <form method="get" class="search-bar">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Search user id / name / email...">
+      <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </form>
+  </div>
+
+  <div class="card-body">
+    {% if can_manage %}
+    <h3 style="margin:0 0 10px;font-size:14px"><i class="fa-solid fa-user-plus"></i> Create User</h3>
+    <form method="post" action="/users/create" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px;align-items:end">
+      <div class="field"><label>User ID <span class="req">*</span></label><input name="user_id" required></div>
+      <div class="field"><label>Name <span class="req">*</span></label><input name="name" required></div>
+      <div class="field"><label>Email</label><input name="email" type="email"></div>
+      <div class="field"><label>Password <span class="req">*</span></label><input name="password" type="password" required></div>
+      <div class="field"><label>Super Admin (bypass)</label><select name="is_super"><option value="0">No</option><option value="1">Yes</option></select></div>
+      <div class="field"><label>Status</label><select name="status">{% for s in statuses %}<option>{{ s[1] }}</option>{% endfor %}</select></div>
+      <div class="field full">
+        <label>Roles</label>
+        <div style="display:flex;gap:14px;flex-wrap:wrap">
+          {% for r in all_roles %}<label style="font-weight:400"><input type="checkbox" name="roles" value="{{ r['role_id'] }}" style="width:auto"> {{ r['role_id'] }} ({{ r['role_name'] }})</label>{% endfor %}
+        </div>
+      </div>
+      <div class="field full" style="display:flex;gap:10px">
+        <button class="btn btn-green" type="submit"><i class="fa-solid fa-plus"></i> Create User</button>
+      </div>
+    </form>
+    {% else %}<div class="hint">Read-only view — you need the <code>acl.manage</code> permission to manage users.</div>{% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table class="list">
+      <thead><tr><th>User ID</th><th>Name</th><th>Email</th><th>Roles</th><th>Super</th><th>Status</th>
+        {% if can_manage %}<th style="text-align:right">Actions</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for u in rows %}
+        <tr>
+          <td class="mono"><b>{{ u['user_id'] }}</b></td>
+          <td>{{ u['name'] }}</td>
+          <td>{{ u['email'] }}</td>
+          <td>{{ u['roles'] or '—' }}</td>
+          <td>{{ '✔' if u['is_super'] else '' }}</td>
+          <td><span class="badge {{ 'active' if u['status']=='ACTIVE' else 'inactive' }}">{{ u['status'] }}</span></td>
+          {% if can_manage %}
+          <td class="acts" style="text-align:right">
+            <button class="btn btn-sm" onclick="toggleEdit('{{ u['user_id'] }}')" title="Edit"><i class="fa-solid fa-pen"></i></button>
+            {% if u['status'] == 'ACTIVE' and u['user_id'] != user['user_id'] %}
+            <form method="post" action="/users/delete/{{ u['user_id'] }}" style="display:inline">
+              <button class="btn btn-sm btn-danger" data-confirm="Deactivate user {{ u['user_id'] }}?"><i class="fa-solid fa-trash"></i></button>
+            </form>
+            {% elif u['status'] != 'ACTIVE' %}
+            <form method="post" action="/users/delete/{{ u['user_id'] }}" style="display:inline">
+              <input type="hidden" name="restore" value="1">
+              <button class="btn btn-sm btn-green" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% if can_manage %}
+        <tr id="edit-{{ u['user_id'] }}" style="display:none;background:#fafbfc">
+          <td colspan="7">
+            <form method="post" action="/users/edit/{{ u['user_id'] }}" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+              <div class="field"><label>Name</label><input name="name" value="{{ u['name'] }}"></div>
+              <div class="field"><label>Email</label><input name="email" value="{{ u['email'] }}"></div>
+              <div class="field"><label>New Password (optional)</label><input name="password" type="password"></div>
+              <div class="field"><label>Super Admin</label>
+                <select name="is_super"><option value="0" {{ 'selected' if not u['is_super'] }}>No</option>
+                <option value="1" {{ 'selected' if u['is_super'] }}>Yes</option></select></div>
+              <div class="field"><label>Status</label>
+                <select name="status">{% for s in statuses %}<option {{ 'selected' if u['status']==s }}>{{ s }}</option>{% endfor %}</select></div>
+              <div class="field full">
+                <label>Roles</label>
+                {% set uroles = (u['roles'] or '')|map('trim')|list %}
+                <div style="display:flex;gap:14px;flex-wrap:wrap;padding:4px">
+                  {% set role_ids = u['user_id'] %}{% for r in all_roles %}
+                  <label style="font-weight:400"><input type="checkbox" name="roles" value="{{ r['role_id'] }}" style="width:auto"
+                    {% if (u['roles'] or '') and r['role_id'] in u['roles'] %}checked{% endif %}> {{ r['role_id'] }}</label>
+                  {% endfor %}
+                </div>
+              </div>
+              <div class="field full"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Update User</button></div>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleEdit(id) {
+    var row = document.getElementById("edit-" + id);
+    row.style.display = row.style.display === "none" ? "" : "none";
+  }
+</script>
+{% endblock %}

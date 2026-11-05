@@ -1,0 +1,108 @@
+{% extends "base.html" %}
+{% block title %}{{ m.title }}{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2><i class="fa-solid {{ m.icon }}"></i> {{ m.title }}</h2>
+    <span class="spacer"></span>
+    {% if perms.get('import') %}
+      <a class="btn" href="/{{ slug }}/template"><i class="fa-solid fa-file-excel"></i> Template</a>
+    {% endif %}
+    {% if perms.get('create') %}
+      <a class="btn btn-green" href="/{{ slug }}/create"><i class="fa-solid fa-plus"></i> Create</a>
+    {% endif %}
+  </div>
+  <div class="card-body">
+    <form method="get" action="/{{ slug }}" class="search-bar">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Search {{ m.search_cols|join(', ') }}..." style="min-width:230px">
+      {% for fo in filters %}
+      <select name="{{ fo.name }}">
+        <option value="">All {{ fo.label }}</option>
+        {% for opt in fo.options %}
+        {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
+        <option value="{{ ov }}" {{ 'selected' if filt_vals.get(fo.name) == ov }}>{{ opt[1] if opt is iterable and opt is not string else opt }}</option>
+        {% endfor %}
+      </select>
+      {% endfor %}
+      <select name="page_size">
+        {% for ps in (10, 25, 50, 100) %}<option value="{{ ps }}" {{ 'selected' if page_size == ps }}>show {{ ps }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Filter</button>
+      {% if qk or filt_vals %}<a class="btn" href="/{{ slug }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>{% endif %}
+    </form>
+  </div>
+
+  {% if perms.get('import') %}
+  <details style="padding:0 16px 14px">
+    <summary style="cursor:pointer;color:#1877f2;font-size:13px;font-weight:600"><i class="fa-solid fa-upload"></i> Batch Upload (template based Excel)</summary>
+    <form method="post" action="/{{ slug }}/upload" enctype="multipart/form-data" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+      <input type="file" name="file" accept=".xlsx" required>
+      <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-upload"></i> Upload &amp; Import</button>
+      <span style="color:#65676b;font-size:12px">Download the template first, fill rows, then upload the .xlsx.</span>
+    </form>
+  </details>
+  {% endif %}
+
+  <div class="table-wrap">
+    {% if rows %}
+    <table class="list">
+      <thead>
+        <tr>
+          {% for cname, clabel in fcols %}<th>{{ clabel }}</th>{% endfor %}
+          <th style="text-align:right">Actions</th>
+        </tr>
+      </thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          {% for cname, clabel in fcols %}
+          {% if slug == 'brand' and cname == 'level_name' %}
+          <td><span class="hier-pad" style="padding-left:calc({{ r['depth'] or 0 }} * 22px)">
+              <i class="fa-solid {{ 'fa-leaf is' if r['is_leaf'] == '1' else 'fa-folder' }}" style="color:{{ '#2c7d13' if r['is_leaf'] == '1' else '#1877f2' }}"></i>
+              <b>{{ r[cname] }}</b></span></td>
+          {% elif cname == 'status' %}
+          <td><span class="badge {{ 'active' if r[cname] == 'ACTIVE' else 'inactive' }}">{{ r[cname] }}</span></td>
+          {% elif cname in ('mrp','price','dist_price','invoice_price','weight') %}
+          <td class="mono">{{ r[cname] }}</td>
+          {% else %}
+          <td>{{ r[cname] }}</td>
+          {% endif %}
+          {% endfor %}
+          <td class="acts" style="text-align:right">
+            {% if perms.get('view') %}
+              <a class="btn btn-sm" href="/{{ slug }}/view/{{ r['id'] }}" title="View"><i class="fa-solid fa-eye"></i></a>
+            {% endif %}
+            {% if perms.get('edit') %}
+              <a class="btn btn-sm" href="/{{ slug }}/edit/{{ r['id'] }}" title="Edit"><i class="fa-solid fa-pen"></i></a>
+            {% endif %}
+            {% if r['status'] == 'ACTIVE' %}
+              {% if perms.get('delete') %}
+              <form method="post" action="/{{ slug }}/delete/{{ r['id'] }}" style="display:inline">
+                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Soft delete (INACTIVE) this record{{ ' and its sub-levels' if slug == 'brand' }}?"><i class="fa-solid fa-trash"></i></button>
+              </form>
+              {% endif %}
+            {% elif perms.get('delete') %}
+              <form method="post" action="/{{ slug }}/restore/{{ r['id'] }}" style="display:inline">
+                <button class="btn btn-sm btn-green" type="submit" title="Restore to ACTIVE"><i class="fa-solid fa-rotate-left"></i></button>
+              </form>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty"><i class="fa-solid fa-inbox" style="font-size:30px"></i><br>No records found.</div>
+    {% endif %}
+  </div>
+
+  <div class="pager">
+    {% if page > 1 %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
+    {% for p in range(max(1, page - 2), min(pages, page + 2) + 1) %}
+      {% if p == page %}<span class="cur">{{ p }}</span>{% else %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if page < pages %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+    <span class="info">Page {{ page }} of {{ pages }} — {{ total }} record(s)</span>
+  </div>
+</div>
+{% endblock %}

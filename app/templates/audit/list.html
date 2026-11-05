@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Audit Log{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2><i class="fa-solid fa-clipboard-list"></i> Central Audit Log</h2>
+    <span class="spacer"></span>
+    <form method="get" action="/audit-log" class="search-bar">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Record / note / user...">
+      <select name="f_table">
+        <option value="">All tables</option>
+        {% for t in tables %}<option value="{{ t }}" {{ 'selected' if f_table == t }}>{{ t }}</option>{% endfor %}
+      </select>
+      <select name="f_action">
+        <option value="">All actions</option>
+        {% for a in actions %}<option value="{{ a }}" {{ 'selected' if f_action == a }}>{{ a }}</option>{% endfor %}
+      </select>
+      <select name="f_user">
+        <option value="">All users</option>
+        {% for u in users %}<option value="{{ u }}" {{ 'selected' if f_user == u }}>{{ u }}</option>{% endfor %}
+      </select>
+      <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </form>
+  </div>
+
+  <div class="table-wrap">
+    {% if rows %}
+    <table class="list">
+      <thead><tr><th>ID</th><th>Time</th><th>Table</th><th>Record</th><th>Action</th><th>By</th><th>IP</th><th></th></tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="mono">{{ r['id'] }}</td>
+          <td class="mono">{{ r['created_on'] or '' }}</td>
+          <td class="mono">{{ r['table_name'] }}</td>
+          <td class="mono">{{ r['record_key'] }}</td>
+          <td><span class="badge {{ 'active' if r['action'] in ('CREATE','RESTORE','LOGIN') else 'inactive' }}">{{ r['action'] }}</span></td>
+          <td>{{ r['changed_by'] }}</td>
+          <td class="mono">{{ r['user_ip'] }}</td>
+          <td>
+            {% if r['old_values'] or r['new_values'] or r['note'] %}
+            <details>
+              <summary style="cursor:pointer"><i class="fa-solid fa-magnifying-glass-plus"></i></summary>
+              <div style="margin-top:6px;font-size:11px">
+                {% if r['note'] %}<p style="margin:4px 0"><b>Note:</b> {{ r['note'] }}</p>{% endif %}
+                {% if r['old_values'] %}<b>Old:</b><pre style="white-space:pre-wrap;margin:2px 0">{{ r['old_values'] }}</pre>{% endif %}
+                {% if r['new_values'] %}<b>New:</b><pre style="white-space:pre-wrap;margin:2px 0">{{ r['new_values'] }}</pre>{% endif %}
+              </div>
+            </details>
+            {% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+    {% else %}
+    <div class="empty"><i class="fa-solid fa-inbox" style="font-size:30px"></i><br>No audit entries found.</div>
+    {% endif %}
+  </div>
+
+  <div class="pager">
+    {% set qs = [] %}
+    {% set qs = qs + ['qk=' ~ qk if qk else ''] + ['f_table=' ~ f_table if f_table else ''] + ['f_action=' ~ f_action if f_action else ''] + ['f_user=' ~ f_user if f_user else ''] %}
+    {% set query = qs|reject('equalto','')|join('&') %}
+    {% if page > 1 %}<a href="/audit-log?{{ query }}{{ '&' if query else '' }}page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
+    {% for p in range(max(1, page - 2), min(pages, page + 2) + 1) %}
+      {% if p == page %}<span class="cur">{{ p }}</span>{% else %}<a href="/audit-log?{{ query }}{{ '&' if query else '' }}page={{ p }}">{{ p }}</a>{% endif %}
+    {% endfor %}
+    {% if page < pages %}<a href="/audit-log?{{ query }}{{ '&' if query else '' }}page={{ page + 1 }}">Next &raquo;</a>{% endif %}
+    <span class="info">Page {{ page }} of {{ pages }} — {{ total }} entry(ies)</span>
+  </div>
+</div>
+{% endblock %}

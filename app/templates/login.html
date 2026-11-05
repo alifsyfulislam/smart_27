@@ -1,0 +1,29 @@
+{% extends "base.html" %}
+{% block title %}Login{% endblock %}
+{% block content %}
+<div class="login-wrap" style="min-height:calc(100vh - 0px)">
+  <div class="login-box">
+    <div class="login-logo">
+      <i class="fa-solid fa-cubes-stacked"></i>
+      <h1>{{ APP_NAME }} — {{ APP_FULL_NAME }}</h1>
+      <p>Sign in to continue</p>
+    </div>
+    {% if flash %}<div class="error-box">{{ flash[1] }}</div>{% endif %}
+    {% if error %}<div class="error-box"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <div class="field" style="margin-bottom:12px">
+        <label>User ID</label>
+        <input type="text" name="user_id" autofocus required placeholder="e.g. admin">
+      </div>
+      <div class="field" style="margin-bottom:16px">
+        <label>Password</label>
+        <input type="password" name="password" required placeholder="••••••••">
+      </div>
+      <button type="submit" class="btn btn-primary btn-block"><i class="fa-solid fa-right-to-bracket"></i> Log In</button>
+    </form>
+    <p style="text-align:center;color:#65676b;font-size:12px;margin-top:16px">
+      Default: <b>admin</b> / <b>admin123</b> — change it after first login.
+    </p>
+  </div>
+</div>
+{% endblock %}

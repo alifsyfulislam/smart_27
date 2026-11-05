@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}{{ app_full_name }}{% endblock %} | {{ APP_NAME }}</title>
+  <link rel="stylesheet" href="/static/vendor/fontawesome/css/all.min.css">
+  <link rel="stylesheet" href="/static/css/style.css">
+  <link rel="icon" href="/static/img/favicon.svg" type="image/svg+xml">
+</head>
+<body>
+
+  {% if user %}
+  <aside id="sidebar">
+    <div class="brand">
+      <i class="fa-solid fa-cubes-stacked"></i>
+      <div>
+        <b>SSMS</b>
+        <!-- <span>{{ APP_FULL_NAME }}</span> -->
+      </div>
+    </div>
+    {% for g in menu %}
+    <div class="nav-group" data-key="{{ g.title }}">
+      <button type="button">
+        <i class="fa-solid {{ g.icon }}"></i><span>{{ g.title }}</span>
+        <i class="fa-solid fa-chevron-right chev"></i>
+      </button>
+      <ul>
+        {% for it in g.entries %}
+        <li>
+          <a href="{{ it.url }}" class="{{ 'active' if (path == it.url or (it.url != '/' and path.startswith(it.url))) }}">
+            <i class="fa-solid {{ it.icon }}"></i><span>{{ it.title }}</span>
+          </a>
+        </li>
+        {% endfor %}
+      </ul>
+    </div>
+    {% endfor %}
+  </aside>
+  {% endif %}
+
+  <div id="main" class="{{ 'shift' if user and request.cookies.get('ssms_sidebar') == 'c' else '' }}">
+    {% if user %}
+    <header id="topbar">
+      <button id="sidebar-toggle" class="btn btn-sm" title="Toggle sidebar"><i class="fa-solid fa-bars"></i></button>
+      <strong>{{ APP_NAME }} <small style="color:#65676b">v{{ VERSION }}</small></strong>
+      <div class="who">
+        <span class="avatar">{{ (user['name'] or user['user_id'])[:2]|upper }}</span>
+        <div>
+          <div style="font-weight:600">{{ user['name'] or user['user_id'] }}</div>
+          <small style="color:#65676b">{{ user['user_id'] }}</small>
+        </div>
+        <a class="btn btn-sm" href="/logout" title="Logout"><i class="fa-solid fa-right-from-bracket"></i> Logout</a>
+      </div>
+    </header>
+    {% endif %}
+
+    <div id="content">
+      {% block content %}{% endblock %}
+    </div>
+    {% if user %}
+    <footer style="padding:10px 18px 20px;color:#65676b;font-size:12px">
+      © {{ now_year }} {{ APP_FULL_NAME }} ({{ APP_NAME }}) v{{ VERSION }}
+    </footer>
+    {% endif %}
+  </div>
+
+  {% if flash %}
+  <div class="flash {{ flash[0] }}"><i class="fa-solid {{ 'fa-circle-check' if flash[0]=='success' else 'fa-circle-xmark' if flash[0]=='danger' else 'fa-circle-info' }}"></i><span>{{ flash[1] }}</span></div>
+  {% endif %}
+
+  <script src="/static/js/app.js"></script>
+  {% block scripts %}{% endblock %}
+</body>
+</html>

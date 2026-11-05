@@ -1,0 +1,42 @@
+{% extends "base.html" %}
+{% block title %}Permissions{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2><i class="fa-solid fa-key"></i> Access Control — Permissions</h2>
+    <span class="spacer"></span>
+    <form method="get" class="search-bar">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Search permission...">
+      <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </form>
+  </div>
+
+  <div class="card-body">
+    {% if can_manage %}
+    <h3 style="margin:0 0 10px;font-size:14px"><i class="fa-solid fa-plus"></i> Create Permission</h3>
+    <form method="post" action="/permissions/create" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px">
+      <div class="field"><label>Permission ID <span class="req">*</span></label><input name="perm_id" required placeholder="e.g. item.view"></div>
+      <div class="field"><label>Permission Name <span class="req">*</span></label><input name="perm_name" required></div>
+      <div class="field"><label>Module</label><input name="module" placeholder="e.g. item"></div>
+      <div class="field" style="align-self:end"><button class="btn btn-green" type="submit"><i class="fa-solid fa-plus"></i> Create</button></div>
+    </form>
+    {% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table class="list">
+      <thead><tr><th>Permission ID</th><th>Name</th><th>Module</th><th>Status</th></tr></thead>
+      <tbody>
+        {% for p in rows %}
+        <tr>
+          <td class="mono"><b>{{ p['perm_id'] }}</b></td>
+          <td>{{ p['perm_name'] }}</td>
+          <td><span class="badge active">{{ p['module'] }}</span></td>
+          <td><span class="badge {{ 'active' if p['status']=='ACTIVE' else 'inactive' }}">{{ p['status'] }}</span></td>
+        </tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}

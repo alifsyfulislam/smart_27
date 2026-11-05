@@ -1,0 +1,96 @@
+{% extends "base.html" %}
+{% block title %}Roles{% endblock %}
+{% block content %}
+<div class="card">
+  <div class="card-head">
+    <h2><i class="fa-solid fa-user-shield"></i> Access Control — Roles</h2>
+    <span class="spacer"></span>
+    <form method="get" class="search-bar">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Search role id / name...">
+      <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-magnifying-glass"></i></button>
+    </form>
+  </div>
+
+  <div class="card-body">
+    {% if can_manage %}
+    <h3 style="margin:0 0 10px;font-size:14px"><i class="fa-solid fa-plus"></i> Create Role</h3>
+    <form method="post" action="/roles/create" style="display:grid;grid-template-columns:220px 260px;gap:10px">
+      <div class="field"><label>Role ID <span class="req">*</span></label><input name="role_id" required placeholder="e.g. AUDITOR"></div>
+      <div class="field"><label>Role Name <span class="req">*</span></label><input name="role_name" required></div>
+      <div class="field full">
+        <label>Permissions</label>
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;padding:6px">
+          {% for module, plist in perms_by_module.items() %}
+          <b style="font-size:12px">{{ module }}</b>
+          {% for p in plist %}
+          <label style="font-weight:400"><input type="checkbox" name="perms" value="{{ p['perm_id'] }}" style="width:auto"> {{ p['perm_id'] }}</label>
+          {% endfor %}
+          {% endfor %}
+        </div>
+      </div>
+      <div class="field full"><button class="btn btn-green" type="submit"><i class="fa-solid fa-plus"></i> Create Role</button></div>
+    </form>
+    {% else %}<div class="hint">Read-only view — you need the <code>acl.manage</code> permission to manage roles.</div>{% endif %}
+  </div>
+
+  <div class="table-wrap">
+    <table class="list">
+      <thead><tr><th>Role ID</th><th>Role Name</th><th>Users Assigned</th><th>Status</th>
+        {% if can_manage %}<th style="text-align:right">Actions</th>{% endif %}</tr></thead>
+      <tbody>
+        {% for r in rows %}
+        <tr>
+          <td class="mono"><b>{{ r['role_id'] }}</b></td>
+          <td>{{ r['role_name'] }}</td>
+          <td>{{ r['n_users'] }}</td>
+          <td><span class="badge {{ 'active' if r['status']=='ACTIVE' else 'inactive' }}">{{ r['status'] }}</span></td>
+          {% if can_manage %}
+          <td class="acts" style="text-align:right">
+            <button class="btn btn-sm" onclick="toggleEdit('{{ r['role_id'] }}')"><i class="fa-solid fa-pen"></i></button>
+            {% if r['status'] == 'ACTIVE' %}
+            <form method="post" action="/roles/delete/{{ r['role_id'] }}" style="display:inline">
+              <button class="btn btn-sm btn-danger" data-confirm="Deactivate role {{ r['role_id'] }}?"><i class="fa-solid fa-trash"></i></button>
+            </form>
+            {% endif %}
+          </td>
+          {% endif %}
+        </tr>
+        {% if can_manage %}
+        <tr id="edit-{{ r['role_id'] }}" style="display:none;background:#fafbfc">
+          <td colspan="5">
+            <form method="post" action="/roles/edit/{{ r['role_id'] }}">
+              <div style="display:grid;grid-template-columns:260px 1fr;gap:10px">
+                <div class="field"><label>Role Name</label><input name="role_name" value="{{ r['role_name'] }}"></div>
+                <div class="field">
+                  <label>Permissions</label>
+                  <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px;padding:4px">
+                    {% for module, plist in perms_by_module.items() %}
+                    <b style="font-size:12px">{{ module }}</b>
+                    {% for p in plist %}
+                    <label style="font-weight:400"><input type="checkbox" name="perms" value="{{ p['perm_id'] }}" style="width:auto"
+                      {{ 'checked' if p['perm_id'] in role_perms.get(r['role_id'], []) }}> {{ p['perm_id'] }}</label>
+                    {% endfor %}
+                    {% endfor %}
+                  </div>
+                </div>
+                <div class="field full"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Update Role</button></div>
+              </div>
+            </form>
+          </td>
+        </tr>
+        {% endif %}
+        {% endfor %}
+      </tbody>
+    </table>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script>
+  function toggleEdit(id) {
+    var row = document.getElementById("edit-" + id);
+    row.style.display = row.style.display === "none" ? "" : "none";
+  }
+</script>
+{% endblock %}

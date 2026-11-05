@@ -1,0 +1,195 @@
+{% extends "base.html" %}
+{% block title %}{{ title }}{% endblock %}
+{% block content %}
+<div class="card" style="max-width:1000px">
+  <div class="card-head">
+    <h2><i class="fa-solid {{ 'fa-circle-plus' if a == 'Create' else 'fa-pen' if a == 'Edit' else 'fa-eye' }}"></i>
+      {{ a }} — {{ m.title }}</h2>
+    <span class="spacer"></span>
+    <a class="btn" href="/{{ slug }}"><i class="fa-solid fa-arrow-left"></i> Back to list</a>
+  </div>
+  <div class="card-body">
+    {% if error %}<div class="error-box"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>{% endif %}
+
+    <form method="post" action="{{ '/%s/create' % slug if a == 'Create' else '/%s/edit/%s' % (slug, row['id']) }}">
+      <div class="form-grid">
+        {% for s in m.form_fields %}
+          {% if s.type == 'hier_root_select' %}
+          <div class="field">
+            <label>Parent Level</label>
+            {% if a == 'Edit' %}
+              <input type="text" value="{{ (data.get('parent_level_id') or '0') ~ (data.get('parent_level_name') or '') }}" disabled>
+            {% else %}
+            <select name="parent_level_id" id="f-parent_level_id">
+              <option value="0">— Root — (new Company)</option>
+              {% for p in parent_opts %}
+              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>
+                {'&nbsp;' * p['depth']|int * 4}{{ '· ' * p['depth']|int }}{{ p['level_id'] }} — {{ p['level_name'] }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'hier_cascade' %}
+          <div class="field full">
+            <label>{{ s.label }}</label>
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
+              <select id="h0"><option value="">-- Company --</option></select>
+              <select id="h1"><option value="">-- Brand --</option></select>
+              <select id="h2"><option value="">-- Type --</option></select>
+              <select id="h3"><option value="">-- Flavor --</option></select>
+            </div>
+            <input type="hidden" name="company_id" id="company_id" value="{{ data.get('company_id') or '' }}">
+            <input type="hidden" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
+            <input type="hidden" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
+            <input type="hidden" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
+            <div class="hint">{{ s.help }}</div>
+          </div>
+          {% elif s.type == 'item_select' %}
+          <div class="field {{ 'full' if not s.in_list }}">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}<div>{{ data.get('item_id') }}</div>
+            {% else %}
+            <input list="dl-items" name="item_id" value="{{ data.get('item_id') or '' }}" autocomplete="off" {{ 'required' if s.required and a == 'Create' }}>
+            <datalist id="dl-items">
+              {% for o in item_opts %}<option value="{{ o['item_id'] }}">{{ o['item_id'] }} — {{ o['name'] }}</option>{% endfor %}
+            </datalist>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'depot_select' %}
+          <div class="field">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}<div>{{ data.get('depot_id') }}</div>
+            {% else %}
+            <input list="dl-depots" name="depot_id" value="{{ data.get('depot_id') or '' }}" autocomplete="off" {{ 'required' if s.required and a == 'Create' }}>
+            <datalist id="dl-depots">
+              {% for o in depot_opts %}<option value="{{ o['depot_id'] }}">{{ o['depot_id'] }} — {{ o['name'] }}</option>{% endfor %}
+            </datalist>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'select' %}
+          <div class="field">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
+            {% else %}
+            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.name != 'status' }}>
+              {% for o in (field_opts.get(s.name) or s.options or []) %}
+              <option value="{{ o[1] }}" {{ 'selected' if (data.get(s.name)|string) == (o[0]|string) }}>{{ o[1] }}</option>
+              {% endfor %}
+            </select>
+            {% if a == 'Edit' and s.name != 'status' %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'textarea' %}
+          <div class="field full">
+            <label>{{ s.label }}</label>
+            {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
+            {% else %}<textarea name="{{ s.name }}">{{ data.get(s.name) or '' }}</textarea>{% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% else %}
+          <div class="field">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}
+              <div>{{ data.get(s.name) }}</div>
+            {% else %}
+              <input type="{{ 'number' if s.type in ('int','float') else 'date' if s.type == 'date' else 'text' }}"
+                     name="{{ s.name }}" value="{{ data.get(s.name) or '' }}"
+                     {{ 'step="0.01"' if s.type == 'float' }}
+                     {{ 'readonly' if a == 'Edit' and s.readonly_on_edit }}
+                     {{ 'required' if s.required and a == 'Create' }}>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% endif %}
+        {% endfor %}
+      </div>
+
+      {% if a != 'View' %}
+      <div style="margin-top:16px;display:flex;gap:10px">
+        <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> {{ 'Save' if a == 'Create' else 'Update' }}</button>
+        <a class="btn" href="/{{ slug }}"><i class="fa-solid fa-xmark"></i> Cancel</a>
+      </div>
+      {% else %}
+      <div style="margin-top:16px;display:flex;gap:10px">
+        {% if data.get('status') == 'INACTIVE' and perms.get('delete') %}
+        <form method="post" action="/{{ slug }}/restore/{{ row['id'] }}">
+          <button class="btn btn-green" type="submit"><i class="fa-solid fa-rotate-left"></i> Restore to ACTIVE</button>
+        </form>
+        {% endif %}
+        {% if perms.get('edit') %}<a class="btn btn-primary" href="/{{ slug }}/edit/{{ row['id'] }}"><i class="fa-solid fa-pen"></i> Edit</a>{% endif %}
+        <a class="btn" href="/{{ slug }}"><i class="fa-solid fa-arrow-left"></i> Back to list</a>
+      </div>
+      {% endif %}
+    </form>
+  </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+{% if 'Create' in a or 'Edit' in a %}
+  {% if not (m.form_fields and m.form_fields is defined and false) %}
+  <script>
+    // hierarchy cascade (item module): Company > Brand > Type > Flavor
+    (function () {
+      var PRE = { h0: "company_id", h1: "brand_id", h2: "type_id", h3: "flavor_id" };
+      var selects = ["h0", "h1", "h2", "h3"].map(id => document.getElementById(id));
+      if (!selects[0]) return;
+
+      function fill(select, items, placeholder) {
+        select.innerHTML = "";
+        var opt = document.createElement("option");
+        opt.value = ""; opt.textContent = placeholder;
+        select.appendChild(opt);
+        items.forEach(function (it) {
+          var o = document.createElement("option");
+          o.value = it.level_id;
+          o.textContent = it.level_id + " — " + it.level_name;
+          select.appendChild(o);
+        });
+      }
+
+      function load(parentId, select, placeholder, chosen) {
+        fetch("/api/hierarchy/children?parent=" + encodeURIComponent(parentId || "0"))
+          .then(r => r.json()).then(function (res) {
+            fill(select, res.items || [], placeholder);
+            if (chosen) { select.value = chosen; }
+            sync(); loadNext(select, placeholder, null);
+          });
+      }
+
+      function loadNext(select, placeholder, chosen) {
+        var i = selects.indexOf(select);
+        if (i >= 0 && i < 3) {
+          load(select.value, selects[i + 1], ["-- Brand --", "-- Type --", "-- Flavor --"][i], chosen);
+        }
+      }
+
+      function sync() {
+        ["company_id", "brand_id", "type_id", "flavor_id"].forEach(function (k) {
+          document.getElementById(k).value = "";
+        });
+        selects.forEach(function (sel, idx) {
+          if (sel.value) document.getElementById(PRE["h" + idx]).value = sel.value;
+          if (idx > 0 && !selects[idx - 1].value) sel.value = "";
+        });
+      }
+
+      selects.forEach(function (sel, idx) {
+        sel.addEventListener("change", function () {
+          sync();
+          if (idx < 3) load(sel.value, selects[idx + 1], ["-- Brand --", "-- Type --", "-- Flavor --"][idx], null);
+        });
+      });
+
+      var pre = ["{{ data.get('company_id') or '' }}", "{{ data.get('brand_id') or '' }}",
+                 "{{ data.get('type_id') or '' }}", "{{ data.get('flavor_id') or '' }}"];
+      load("", selects[0], "-- Company --", pre[0]);
+    })();
+  </script>
+  {% endif %}
+{% endif %}
+{% endblock %}

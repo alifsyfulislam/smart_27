@@ -1,0 +1,294 @@
+
+
+
+Secondary Sales Management System (SSMS)
+
+STEP 1:
+
+-> Item hierarchy, user will create this manually it will not come via integration
+
+Somthing below this table: sm_item_hierarchy
+
+CREATE TABLE `sm_item_hierarchy` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) DEFAULT NULL,
+  `level_id` varchar(50) DEFAULT NULL,
+  `level_name` varchar(200) DEFAULT NULL,
+  `parent_level_id` varchar(50) DEFAULT NULL,
+  `parent_level_name` varchar(200) DEFAULT NULL,
+  `level0` varchar(50) DEFAULT NULL,
+  `level0_name` varchar(200) DEFAULT NULL,
+  `level1` varchar(50) DEFAULT NULL,
+  `level1_name` varchar(200) DEFAULT NULL,
+  `level2` varchar(50) DEFAULT NULL,
+  `level2_name` varchar(200) DEFAULT NULL,
+  `level3` varchar(50) DEFAULT NULL,
+  `level3_name` varchar(200) DEFAULT NULL,
+  `is_leaf` varchar(2) DEFAULT NULL,
+  `depth` int DEFAULT NULL,
+  `image_path` varchar(200) DEFAULT NULL,
+  `field1` varchar(200) DEFAULT NULL,
+  `field2` int DEFAULT NULL,
+  `note` varchar(200) DEFAULT NULL,
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id` DESC)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+
+check table desc if update needed on type do it
+Ex: 
+
+CG001 | TCPL Brands (here MG is prefix of level and last part is auto increment, level0 == Company, depth = 0, is_leaf = 0)
+		BG001 | Kurkure (here BG is prefix of level and last part is auto increment, level1 == Brand, depth = 1, is_leaf = 0) 
+				TG001 | Collet (here TG is prefix of level and last part is auto increment, level2 == Type, depth = 2, is_leaf = 0)
+						FG003 | American Style Cream & Onion (here FG is prefix of level and last part is auto increment, level3 == Flavor, depth = 3, is_leaf = 1)
+
+here it will insert into table 4 rows, this the sample approach to insert the data into this table 
+"id"	"cid"	"level_id"	"level_name"	"parent_level_id"	"parent_level_name"	"level0"	"level0_name"	"level1"	"level1_name"	"level2"	"level2_name"	"level3"	"level3_name"	"is_leaf"	"depth"	"image_path"	"field1"	"field2"	"note"	"created_on"	"created_by"	"updated_on"	"updated_by"
+"1"	"SMART"	"CG001"	"TCPL Products"	"0"	"-"	"CG001"	"TCPL Products"	"-"	"-"	"-"	"-"	"-"	"-"	"0"	"0"	\N	\N	\N	\N	"2025-05-18 09:50:06"	"ADMIN"	"2025-05-18 09:50:06"	"ADMIN"
+"2"	"SMART"	"BG001"	"Kurkure"	"CG001"	"TCPL Products"	"CG001"	"TCPL Products"	"BG001"	"Kurkure"	""	""	""	""	"0"	"1"	"sm_item_hierarchy.image_path.86de9bdd0cb530f5.a2stcmVtb3ZlYmctcHJldmlldy5wbmc=.png"	""	"0"	""	"2023-11-15 22:04:46"	"ADMIN"	"2023-11-15 22:04:46"	"ADMIN"
+"3"	"SMART"	"TG001"	"Collet"	"BG001"	"Kurkure"	"CG001"	"TCPL Products"	"BG001"	"Kurkure"	"TG001"	"Collet"	"-"	"-"	"0"	"2"	\N	\N	\N	\N	"2025-05-18 09:50:06"	"ADMIN"	"2025-05-18 09:50:06"	"ADMIN"
+"9"	"SMART"	"FG003"	"Masala Munch"	"TG001"	"Collet"	"CG001"	"TCPL Products"	"BG001"	"Kurkure"	"TG001"	"Collet"	"FG003"	"Masala Munch"	"1"	"3"	\N	\N	\N	\N	"2025-05-18 09:50:06"	"ADMIN"	"2025-05-18 09:50:06"	"ADMIN"
+
+
+-> Item comes from integration or user can manually create table: sm_item, each item has one or multiple batch 
+
+Ex: 1101 item_id comes from integration or create so basically auto create a default batch which default value 1 and expiary_date 2100-12-31 in table: sm_item_batch
+
+user later tagged with siquentially company > brand > type > flavor (sm_item_hierarchy)
+
+***** so build a software login page after login sidebar with dashboard modern and optimize layout user responsive search filter and pagination 
+
+sidebar section there will be following module
+
+Item Info
+ -> Brand
+ -> Item
+ -> Item Batch
+
+each has 6 features; create, view, edit , soft delete (status INACTIVE), batch upload template base excel
+
+
+
+CREATE TABLE `sm_item` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT 'SMART',
+  `detail_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `item_category` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT 'REGULAR',
+  `status` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT 'INACTIVE',
+  `item_id` varchar(50) DEFAULT NULL,
+  `old_item_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `name_bn` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `short_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `des` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `image_path` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `pack_size` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `unit_type` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT 'PCS',
+  `weight` double DEFAULT '0',
+  `company_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `company_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `brand_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `brand_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `type_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `type_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `flavor_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `flavor_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `category_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `category_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `ctn_pcs_ratio` int DEFAULT '1',
+  `item_carton` int DEFAULT '1',
+  `item_chain` int DEFAULT '1',
+  `sequence_no` int DEFAULT '1',
+  `stock_cover_days` int DEFAULT '7',
+  `dist_price` double DEFAULT '0',
+  `invoice_price` double DEFAULT '0',
+  `mrp` double DEFAULT '0',
+  `price` double DEFAULT '0',
+  `vat_amt` double DEFAULT '0',
+  `total_amt` double DEFAULT '0',
+  `intr_flag` int DEFAULT '1',
+  `manufacturer` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `category_id_sp` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `sub_category_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `sub_category_name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `field1` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `field2` int DEFAULT '0',
+  `note` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  PRIMARY KEY (`id` DESC),
+  UNIQUE KEY `cid_item_id` (`cid` DESC,`item_id` DESC),
+  KEY `cid_item_category` (`cid` DESC,`item_category` DESC),
+  KEY `cid_item_id_status` (`cid` DESC,`item_id` DESC,`status` DESC)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+
+
+CREATE TABLE `sm_item_batch` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT 'SMART',
+  `item_id` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `name` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `batch_id` varchar(20) DEFAULT NULL,
+  `expiary_date` date DEFAULT NULL,
+  `field1` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `field2` int DEFAULT '0',
+  `note` varchar(200) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT '-',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) CHARACTER SET utf8mb3 COLLATE utf8mb3_general_ci DEFAULT NULL,
+  PRIMARY KEY (`id` DESC),
+  KEY `cid_item_id_batch_id` (`cid` DESC,`item_id` DESC,`batch_id` DESC)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+
+check table desc if update needed on type do it
+
+
+STEP 2:
+
+Distributor Info
+ -> Distributor
+ -> Distributor Store
+
+-> Distributor comes from integration or user can manually create table: sm_distributor, each item has one or multiple store 
+
+Ex: 131313 depot_id comes from integration or create so basically auto create two default store which default 
+i. (depot_id concat 140) store_id , Commercial store_name 
+ii. (depot_id concat 170) store_id , Damage store_name 
+
+in table: sm_depot_store
+
+CREATE TABLE `sm_depot` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `sup_depot_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `sup_depot_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `depot_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `old_depot_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `name_bn` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `short_name` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `depot_category` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT 'DISTRIBUTOR',
+  `email` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `contact` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `contact_2` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '0',
+  `address` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `address_bn` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `wh_address` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `wh_address_bn` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `bin` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `owner_name` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `owner_name_bn` varchar(100) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `tin` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `town_id` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `town_name` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `latitude` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '0.0',
+  `longitude` varchar(20) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '0.0',
+  `requisition_sl` int DEFAULT '1000',
+  `issue_sl` int DEFAULT '1000',
+  `receive_sl` int DEFAULT '1000',
+  `damage_sl` int DEFAULT '1000',
+  `order_sl` int DEFAULT '0',
+  `del_sl` int DEFAULT '1000',
+  `return_sl` int DEFAULT '1000',
+  `client_payment_sl` int DEFAULT '1000',
+  `depot_payment_sl` int DEFAULT '1000',
+  `stock_in_sl` int DEFAULT '1000',
+  `dm_pass` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT '1234',
+  `sequence_no` int DEFAULT '1',
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'ACTIVE',
+  `field1` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `field2` int DEFAULT '0',
+  `approval_flag` int DEFAULT '0' COMMENT '0 PSR, 1 DEPOT, 2 OPERATOR',
+  `auto_del_cron_flag` int DEFAULT '0',
+  `intr_flag` int DEFAULT '0',
+  `sync_code` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT '1234',
+  `sync_count` int DEFAULT '0',
+  `note` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id` DESC),
+  KEY `cid_depot_id_status` (`cid` DESC,`depot_id` DESC,`status` DESC),
+  KEY `cid_depot_id` (`cid` DESC,`depot_id` DESC)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+
+CREATE TABLE `sm_depot_store` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `depot_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `store_id` varchar(75) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `store_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `store_type` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `field1` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `field2` int DEFAULT '0',
+  `note` varchar(200) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id` DESC),
+  UNIQUE KEY `unique_store` (`cid` DESC,`depot_id` DESC,`store_id` DESC),
+  KEY `cid_depot_id_store_id` (`cid` DESC,`depot_id` DESC,`store_id` DESC)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+check table desc if update needed on type do it
+
+Step 1 & 2: Here few columns i mentioned please review before than check below
+
+CREATE TABLE `sm_category_type` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `type_name` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cat_type_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `cat_type_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `field1` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `field2` int DEFAULT NULL,
+  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `cid_typename` (`cid`,`type_name`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+check table desc if update needed on type do it
+
+
+This table keep above table few column data definition columns are
+
+sm_depot: depot_category, approval_flag, intr_flag
+sm_depot_store: store_type
+sm_item: pack_size, unit_type, item_category
+
+Ex: 
+
+"id"	"cid"	"type_name"	"cat_type_id"	"cat_type_name"	"field1"	"field2"	"note"	"created_on"	"created_by"	"updated_on"	"updated_by"
+"825"	"SMART"	"DEPOT_CATEGORY"	"DISTRIBUTOR"	\N	""	"0"	""	"2024-02-27 16:55:13"	"ADMIN"	"2024-02-27 16:55:13"	"ADMIN"
+"941"	"SMART"	"DEPOT_CATEGORY"	"SUP DISTRIBUTOR"	\N	""	"0"	""	"2024-02-27 16:55:13"	"ADMIN"	"2024-02-27 16:55:13"	"ADMIN"
+
+--- later module will be added here
+
+
+
+----------------
+LAST PARAGRAPH (MUST FOLLOW)
+DB_Connection
+host: localhost, username: root, password: NULL, database: smart_27
+Build a powerful access control list (USER, ROLE, PERMISSION) to restrict user based on give module
+table: sm_acl_user, sm_acl_role, sm_acl_permission
+mapping_table: sm_acl_user_role, sm_acl_user_permission, sm_acl_role_permission
+and keep any change in master table keep it in a central log table and it will made by you only.
+So Every time i change here update BRD(Business Requirements Document), PRD(Business Requirements Document), SRS(Software Requirements Specification), readme, brain, skills, agent, prompt and necessary files accordingly
+Build this software FASTAPI(WEB) in virtual env we will build flutter app later
+Don't linked and cdn if required download and linked locally and use  ui as simple eye comfort color and responsiveness 
+Font color, bg color follow facebook and build a collapsable siderbar once sidebar open other nav_menu auto collapse and add a beautiful transtion use fontawsome icon as well 
+
