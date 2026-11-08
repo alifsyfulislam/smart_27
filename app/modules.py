@@ -35,7 +35,7 @@ MODULES = {
         "perm": "brand",
         "table": "sm_item_hierarchy",
         "group": "Item Info",
-        "order": "depth ASC, id DESC",
+        "order": "depth ASC, level_id ASC",
         "indent_col": "depth",
         "list_cols": [
             ("level_id", "Level ID"), ("level_name", "Level Name"),
@@ -46,7 +46,7 @@ MODULES = {
         "filters": [("status", "Status", "status")],
         "form_fields": [
             f("parent_level_id", "Parent Level", "hier_root_select", in_form=True,
-              help="Leave '- Root -' to create a new Company (level 0). Levels: Company > Brand > Type > Flavor."),
+              help="Leave '- Root -' to create a new Company (level 0). Levels: Company > Brand > Type > Flavor — a Flavor (depth 3) cannot have children."),
             f("level_name", "Level Name", "text", required=True, in_list=True),
             f("image_path", "Image Path", "text", help="Optional image file path/URL."),
             f("note", "Note", "textarea"),

@@ -35,7 +35,7 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
 | Create | Form with validation + business-code generation (see hooks) |
 | View | Read-only record page |
 | Edit | Edit form (business IDs editable where allowed; hierarchy parent fixed after create) |
-| Soft delete | status → INACTIVE (for brand: subtree INACTIVE); restore reverses with parent-active check |
+| Soft delete | status → PENDING (for brand: subtree PENDING); restore reverses with parent-active check |
 | Excel import | Template download (xlsx) + upload panel; row-by-row insert reusing form hooks; per-row error report |
 | Search/filter | Free-text search over configured columns + dropdown filters (status, category selects) |
 | Pagination | Configurable page size (10/25/50/100), page window, record counts |
@@ -71,5 +71,5 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 - Creating a flavor under TG001 auto-codes `FG003` and flips TG001 `is_leaf` to 0.
 - Creating item `1101` creates default batch `1` (2100-12-31); audit rows `CREATE sm_item`, `CREATE sm_item_batch` written.
 - Creating distributor `131313` auto-creates stores `131313140` (Commercial) and `131313170` (Damage).
-- Excel template download 200; upload creates rows and reports errors; soft delete → INACTIVE; restore → ACTIVE; each logged in `sm_audit_log`.
+- Excel template download 200; upload creates rows and reports errors; soft delete → PENDING; restore → ACTIVE; each logged in `sm_audit_log`.
 - VIEWER can browse but every write action is blocked; unknown modules redirect to the dashboard.

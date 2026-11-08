@@ -68,7 +68,7 @@ Item Info
  -> Item
  -> Item Batch
 
-each has 6 features; create, view, edit , soft delete (status INACTIVE), batch upload template base excel
+each has 6 features; create, view, edit , soft delete (status PENDING), batch upload template base excel
 
 
 

@@ -172,6 +172,29 @@ table.list td.acts .btn { margin-right: 4px; }
 
 .empty { text-align: center; padding: 34px 10px; color: var(--fb-muted); }
 
+/* ------------------------------- tree (brand hierarchy) --------------- */
+.tree { }
+.tree-row {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  padding: 8px 10px; border-bottom: 1px solid #edeff2; font-size: 13px;
+}
+.tree-row:hover { background: var(--fb-hover); }
+.tree-row .tw {
+  width: 22px; height: 22px; border: 0; background: none; cursor: pointer;
+  color: var(--fb-muted); flex: none; display: inline-flex; align-items: center; justify-content: center;
+}
+.tree-row .tw .fa-chevron-right { font-size: 11px; transition: transform .2s ease; }
+.tree-node.open > .tree-row .tw .fa-chevron-right { transform: rotate(90deg); }
+.tree-node > .tree-children {
+  display: none; margin-left: 26px; border-left: 1px dashed var(--fb-divider);
+}
+.tree-node.open > .tree-children { display: block; }
+.tree-row .tcode { font-family: Consolas, Menlo, monospace; font-size: 12px; color: var(--fb-muted); }
+.tree-row .tname { font-weight: 600; }
+.tree-row .tmeta { color: var(--fb-muted); font-size: 12px; }
+.tree-row .tacts { margin-left: auto; white-space: nowrap; }
+.tree-row .tacts .btn { margin-right: 4px; }
+
 /* ---------------------------- pagination ------------------------------ */
 .pager { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; padding: 12px 16px; }
 .pager a, .pager span.cur {

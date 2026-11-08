@@ -32,7 +32,7 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 | BR3 | Items come from integration or manual creation; every item automatically gets a **default batch `1` with expiry 2100-12-31** (`sm_item_batch`). |
 | BR4 | Items are tagged sequentially with Company > Brand > Type > Flavor from the hierarchy. |
 | BR5 | Distributors come from integration or manual creation; every distributor automatically gets two default stores: `{depot_id}140` = **Commercial** and `{depot_id}170` = **Damage** (`sm_depot_store`). |
-| BR6 | All master modules support: create, view, edit, **soft delete (status → INACTIVE)**, restore, and **template-based Excel batch upload**. |
+| BR6 | All master modules support: create, view, edit, **soft delete (status → PENDING)**, restore, and **template-based Excel batch upload**. |
 | BR7 | Every master-table change (create/update/delete/restore) is recorded in the central log `sm_audit_log` **by the application only** — no DB triggers. |
 | BR8 | Users are restricted by ACL: permissions like `item.view`, `item.create`, `item.edit`, `item.delete`, `item.import`, grouped under modules; roles bundle permissions; users get roles and/or direct permissions; a super-admin bypasses checks. |
 | BR9 | `sm_category_type` feeds the value lists used by other modules (depot category, store type, item category, unit type). |

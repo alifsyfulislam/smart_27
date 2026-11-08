@@ -38,7 +38,7 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR3.2 `GET/POST /{slug}/create` — form → `values_from_form` → hook prepare → insert (`touch` stamps cid/created_on/by) → hook after_create → audit CREATE.
 - FR3.3 `GET/POST /{slug}/edit/{id}` — existing merged with submitted values → hook prepare (dup checks) → update → after_update/hook → audit UPDATE (old+new snapshots).
 - FR3.4 `GET /{slug}/view/{id}` — read-only render.
-- FR3.5 `POST /{slug}/delete/{id}` — soft delete to INACTIVE (hierarchy: subtree cascade) → audit DELETE.
+- FR3.5 `POST /{slug}/delete/{id}` — soft delete to PENDING (hierarchy: subtree cascade) → audit DELETE.
 - FR3.6 `POST /{slug}/restore/{id}` — back to ACTIVE (hierarchy: parent-active check) → audit RESTORE.
 - FR3.7 `GET /{slug}/template` — xlsx template (uppercase headers + code row + example row).
 - FR3.8 `POST /{slug}/upload` — openpyxl parse, header→column mapping, per-row insert through the same hooks; summary flash + row errors; template mismatch and empty files rejected.

@@ -19,14 +19,16 @@
       <select name="{{ fo.name }}">
         <option value="">All {{ fo.label }}</option>
         {% for opt in fo.options %}
-        {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
+        {% set ov = opt[1] if opt is iterable and opt is not string else opt %}
         <option value="{{ ov }}" {{ 'selected' if filt_vals.get(fo.name) == ov }}>{{ opt[1] if opt is iterable and opt is not string else opt }}</option>
         {% endfor %}
       </select>
       {% endfor %}
+      {% if slug != 'brand' %}
       <select name="page_size">
         {% for ps in (10, 25, 50, 100) %}<option value="{{ ps }}" {{ 'selected' if page_size == ps }}>show {{ ps }}</option>{% endfor %}
       </select>
+      {% endif %}
       <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Filter</button>
       {% if qk or filt_vals %}<a class="btn" href="/{{ slug }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>{% endif %}
     </form>
@@ -44,7 +46,49 @@
   {% endif %}
 
   <div class="table-wrap">
-    {% if rows %}
+    {% if slug == 'brand' %}
+    {% if tree %}
+    <div class="tree">
+      {% for node in tree recursive %}
+      <div class="tree-node{{ ' open' if node['children'] }}">
+        <div class="tree-row">
+          {% if node['children'] %}
+          <button type="button" class="tw" title="Expand / collapse"><i class="fa-solid fa-chevron-right"></i></button>
+          {% else %}<span class="tw"></span>{% endif %}
+          <i class="fa-solid {{ 'fa-leaf' if node['is_leaf'] == '1' else 'fa-folder' }}"
+             style="color:{{ '#2c7d13' if node['is_leaf'] == '1' else '#1877f2' }};flex:none"></i>
+          <span class="tcode">{{ node['level_id'] }}</span>
+          <span class="tname">{{ node['level_name'] }}</span>
+          <span class="tmeta">Parent: {{ node['parent_level_id'] }} &middot; Depth: {{ node['depth'] }}</span>
+          <span class="badge {{ 'active' if node['status'] == 'ACTIVE' else 'inactive' }}">{{ node['status'] }}</span>
+          <span class="tacts">
+            {% if perms.get('view') %}
+              <a class="btn btn-sm" href="/{{ slug }}/view/{{ node['id'] }}" title="View"><i class="fa-solid fa-eye"></i></a>
+            {% endif %}
+            {% if perms.get('edit') %}
+              <a class="btn btn-sm" href="/{{ slug }}/edit/{{ node['id'] }}" title="Edit"><i class="fa-solid fa-pen"></i></a>
+            {% endif %}
+            {% if node['status'] == 'ACTIVE' %}
+              {% if perms.get('delete') %}
+              <form method="post" action="/{{ slug }}/delete/{{ node['id'] }}" style="display:inline">
+                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Soft delete (PENDING) this level?"><i class="fa-solid fa-trash"></i></button>
+              </form>
+              {% endif %}
+            {% elif perms.get('delete') %}
+              <form method="post" action="/{{ slug }}/restore/{{ node['id'] }}" style="display:inline">
+                <button class="btn btn-sm btn-green" type="submit" title="Restore to ACTIVE"><i class="fa-solid fa-rotate-left"></i></button>
+              </form>
+            {% endif %}
+          </span>
+        </div>
+        {% if node['children'] %}<div class="tree-children">{{ loop(node['children']) }}</div>{% endif %}
+      </div>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty"><i class="fa-solid fa-inbox" style="font-size:30px"></i><br>No records found.</div>
+    {% endif %}
+    {% elif rows %}
     <table class="list">
       <thead>
         <tr>
@@ -78,7 +122,7 @@
             {% if r['status'] == 'ACTIVE' %}
               {% if perms.get('delete') %}
               <form method="post" action="/{{ slug }}/delete/{{ r['id'] }}" style="display:inline">
-                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Soft delete (INACTIVE) this record{{ ' and its sub-levels' if slug == 'brand' }}?"><i class="fa-solid fa-trash"></i></button>
+                <button class="btn btn-sm btn-danger" type="submit" data-confirm="Soft delete (PENDING) this record?"><i class="fa-solid fa-trash"></i></button>
               </form>
               {% endif %}
             {% elif perms.get('delete') %}
@@ -96,6 +140,9 @@
     {% endif %}
   </div>
 
+  {% if slug == 'brand' %}
+  <div class="pager"><span class="info">{{ total }} node(s) — full hierarchy tree</span></div>
+  {% else %}
   <div class="pager">
     {% if page > 1 %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
     {% for p in range(max(1, page - 2), min(pages, page + 2) + 1) %}
@@ -104,5 +151,6 @@
     {% if page < pages %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page + 1 }}">Next &raquo;</a>{% endif %}
     <span class="info">Page {{ page }} of {{ pages }} — {{ total }} record(s)</span>
   </div>
+  {% endif %}
 </div>
 {% endblock %}

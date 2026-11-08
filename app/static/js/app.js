@@ -64,6 +64,14 @@
   }
   // on phone the sidebar starts hidden and needs the hamburger to open
 
+  // --- hierarchy tree (brand module): expand / collapse -------------------
+  document.querySelectorAll(".tree-row button.tw").forEach(function (btn) {
+    btn.addEventListener("click", function (ev) {
+      ev.preventDefault();
+      btn.closest(".tree-node").classList.toggle("open");
+    });
+  });
+
   // --- confirm dialogs --------------------------------------------------
   document.querySelectorAll("[data-confirm]").forEach(function (el) {
     el.addEventListener("click", function (ev) {

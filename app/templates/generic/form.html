@@ -24,7 +24,7 @@
               <option value="0">— Root — (new Company)</option>
               {% for p in parent_opts %}
               <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>
-                {'&nbsp;' * p['depth']|int * 4}{{ '· ' * p['depth']|int }}{{ p['level_id'] }} — {{ p['level_name'] }}</option>
+                {{ p['level_id'] }} — {{ p['level_name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}

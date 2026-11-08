@@ -116,22 +116,19 @@ def hierarchy_after_update(cid, old, new, user=None):
           (new["level_name"], cid, new["level_id"]))
 
 
-def hierarchy_subtree_where(cid, row):
-    """WHERE fragment matching the node and ALL its active descendants."""
-    conds, params = ["cid=%s"], [cid]
-    for i in range(int(row["depth"] or 0) + 1):
-        conds.append(f"(level{i}=%s)")
-        params.append(row[f"level{i}"] or "")
-    return " AND ".join(conds), params
-
-
 def hierarchy_soft_delete(cid, rid, user=None):
+    """Leaf-only delete: a level with at least one ACTIVE child cannot be
+    soft deleted — the user must delete (deactivate) the children first."""
     row = q("SELECT * FROM sm_item_hierarchy WHERE cid=%s AND id=%s", (cid, rid), one=True)
     if not row:
         return None, "Record not found."
-    where, params = hierarchy_subtree_where(cid, row)
-    _, n = x(f"UPDATE sm_item_hierarchy SET status='INACTIVE', updated_on=NOW(), updated_by=%s WHERE {where} AND status='ACTIVE'",
-             [user] + params)
+    nchild = scalar("SELECT COUNT(*) c FROM sm_item_hierarchy WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+                    (cid, row["level_id"]), 0)
+    if nchild:
+        return None, (f"Cannot delete '{row['level_name']}' ({row['level_id']}) — it has "
+                      f"{nchild} active child level(s). Delete the child levels first.")
+    _, n = x("UPDATE sm_item_hierarchy SET status='PENDING', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status='ACTIVE'", (user, cid, rid))
     return n, None
 
 
@@ -145,9 +142,8 @@ def hierarchy_restore(cid, rid, user=None):
                    (cid, pid), one=True)
         if not parent or parent["status"] != "ACTIVE":
             return None, "Parent level is inactive — restore the parent first."
-    where, params = hierarchy_subtree_where(cid, row)
-    _, n = x(f"UPDATE sm_item_hierarchy SET status='ACTIVE', updated_on=NOW(), updated_by=%s WHERE {where} AND status='INACTIVE'",
-             [user] + params)
+    _, n = x("UPDATE sm_item_hierarchy SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status='INACTIVE'", (user, cid, rid))
     return n, None
 
 

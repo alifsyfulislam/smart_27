@@ -1,6 +1,6 @@
 """Generic CRUD for every master-data module in app/modules.py.
 
-Features per module: create, view, edit, soft delete (status INACTIVE),
+Features per module: create, view, edit, soft delete (status PENDING),
 restore, template-based Excel batch upload + template download, search,
 filters and pagination.
 """
@@ -84,6 +84,28 @@ def _update(m, rid, data, user):
     x(f"UPDATE `{m['table']}` SET {', '.join(sets)} WHERE id=%s", params)
 
 
+def _hierarchy_parent_opts():
+    """Parent choices for the brand form — ACTIVE nodes at depth < 3 only
+    (a Flavor level can never become a parent)."""
+    return q("""SELECT id, level_id, level_name, depth FROM sm_item_hierarchy
+                WHERE cid=%s AND status='ACTIVE' AND depth < 3
+                ORDER BY depth, level_id""", (config.CID,))
+
+
+def _build_tree(rows):
+    """Nest flat hierarchy rows under their parents (brand tree view)."""
+    nodes = {r["level_id"]: {**r, "children": []} for r in rows}
+    roots = []
+    for r in rows:
+        node = nodes[r["level_id"]]
+        pid = r.get("parent_level_id") or "0"
+        if pid in nodes and pid != r["level_id"]:
+            nodes[pid]["children"].append(node)
+        else:
+            roots.append(node)
+    return roots
+
+
 def _cat_options(type_name):
     return [(r["cat_type_id"], r["cat_type_name"] or r["cat_type_id"])
             for r in q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
@@ -153,12 +175,27 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
                  ORDER BY {order} LIMIT %s OFFSET %s""",
              params + [page_size, (page - 1) * page_size])
 
-    # parent select options (brand module only): all ACTIVE nodes, indented
-    parent_opts = None
+    # brand renders a parent->child tree (full result set, no pagination);
+    # when searching/filtering, pull in the ancestor chain so matches keep
+    # their tree context
+    tree = None
     if slug == "brand":
-        parent_opts = q("""SELECT id, level_id, level_name, depth FROM sm_item_hierarchy
-                           WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_name""",
-                        (config.CID,))
+        rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
+                     ORDER BY depth ASC, level_id ASC""", params)
+        if qk or any(filt_vals.values()):
+            seen = {r["level_id"] for r in rows}
+            for r in list(rows):
+                pid = r.get("parent_level_id") or "0"
+                while pid and pid != "0" and pid not in seen:
+                    anc = q("SELECT * FROM sm_item_hierarchy WHERE cid=%s AND level_id=%s",
+                            (config.CID, pid), one=True)
+                    if not anc:
+                        break
+                    rows.append(anc)
+                    seen.add(pid)
+                    pid = anc.get("parent_level_id") or "0"
+            rows.sort(key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
+        tree = _build_tree(rows)
     item_opts = None
     if slug == "item-batch":
         item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
@@ -176,7 +213,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         "m": m, "slug": slug, "title": m["title"], "rows": rows, "fcols": m["list_cols"],
         "total": total, "page": page, "pages": pages, "page_size": page_size,
         "qk": qk, "filters": _filter_options(m), "filt_vals": filt_vals,
-        "query": query, "parent_opts": parent_opts,
+        "query": query, "tree": tree,
         "item_opts": item_opts or [], "depot_opts": depot_opts or [],
     })
     from ..main import templates
@@ -206,8 +243,7 @@ async def module_create_form(request: Request, slug: str):
         return context
     parent_opts, item_opts, depot_opts = [], [], []
     if slug == "brand":
-        parent_opts = q("""SELECT id, level_id, level_name, depth FROM sm_item_hierarchy
-                           WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_name""", (config.CID,))
+        parent_opts = _hierarchy_parent_opts()
     if slug == "item-batch":
         item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
                          ORDER BY name LIMIT 300""", (config.CID,))
@@ -260,8 +296,7 @@ async def module_create(request: Request, slug: str):
         context["error"] = err
         parent_opts = item_opts = depot_opts = []
         if slug == "brand":
-            parent_opts = q("""SELECT id, level_id, level_name, depth FROM sm_item_hierarchy
-                               WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_name""", (config.CID,))
+            parent_opts = _hierarchy_parent_opts()
         elif slug == "item-batch":
             item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
                              ORDER BY name LIMIT 300""", (config.CID,))
@@ -363,7 +398,7 @@ async def module_delete(request: Request, slug: str, rid: int):
         log_change(config.CID, m["table"], str(old.get(key_col_of(m), rid)), "DELETE",
                    old=old, new=None, changed_by=user["user_id"],
                    user_ip=client_ip(request), note=f"{n} row(s) affected")
-        set_flash(request, "success", f"{m['title']} set to INACTIVE (soft deleted).")
+        set_flash(request, "success", f"{m['title']} set to PENDING (soft deleted).")
     return RedirectResponse(f"/{slug}", status_code=303)
 
 
@@ -371,7 +406,7 @@ def _soft_delete(m, cid, rid, user_id):
     hook = HOOKS.get(m["create_hook"], {})
     if hook.get("soft_delete"):
         return hook["soft_delete"](cid, rid, user_id)
-    _, n = x(f"UPDATE `{m['table']}` SET status='INACTIVE', updated_on=NOW(), updated_by=%s "
+    _, n = x(f"UPDATE `{m['table']}` SET status='PENDING', updated_on=NOW(), updated_by=%s "
              f"WHERE cid=%s AND id=%s", (user_id, cid, rid))
     return n, None
 

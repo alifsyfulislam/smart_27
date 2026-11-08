@@ -15,7 +15,7 @@ python -m venv venv
 ./venv/Scripts/python scripts/setup_database.py   # creates smart_27 + schema + seed
 
 # 3) run
-./venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8027
+./venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8027 --reload
 # open http://127.0.0.1:8027
 ```
 
@@ -37,7 +37,7 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Users / Roles / Permissions | `/users` `/roles` `/permissions` | full ACL management |
 | Audit Log | `/audit-log` | app-written central change log with filters |
 
-Every master module has: **create · view · edit · soft delete (→ INACTIVE) · restore · Excel template download + batch upload**, plus search, filters and pagination on the list.
+Every master module has: **create · view · edit · soft delete (→ PENDING) · restore · Excel template download + batch upload**, plus search, filters and pagination on the list.
 Sidebar is a smooth accordion (one group open at a time), collapses to an icon rail on desktop and a drawer on mobile; Facebook-like colors; Font Awesome served locally from `app/static/vendor` (no CDN).
 
 ## Project layout
