@@ -21,7 +21,7 @@
               <input type="text" value="{{ (data.get('parent_level_id') or '0') ~ (data.get('parent_level_name') or '') }}" disabled>
             {% else %}
             <select name="parent_level_id" id="f-parent_level_id">
-              <option value="0">— Root — (new Company)</option>
+              <!-- <option value="0">— Root — (new Company)</option> -->
               {% for p in parent_opts %}
               <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>
                 {{ p['level_id'] }} — {{ p['level_name'] }}</option>

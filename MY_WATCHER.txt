@@ -1,0 +1,22 @@
+
+
+-> Under Menu
+
+Item Info > Brand 
+
+Here Parent Level 
+single sleect okay by i want to type search as well
+
+image path here i want to input file and preview image and save to my static folder with table_name_slug_image_timestamp and genarates a 
+link and that link will store brand image path
+
+
+update your required file accordingly
+
+
+
+under brand edit 
+
+image will preview and ther will be input option as well user can change if wants and here i want add option child
+
+update your required file accordingly

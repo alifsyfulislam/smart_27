@@ -3,7 +3,7 @@ from . import config
 from .database import q, x, scalar
 
 MAX_DEPTH = 3  # company(0) > brand(1) > type(2) > flavor(3)
-LEVEL_PREFIX = {0: "CG", 1: "BG", 2: "TG", 3: "FG"}
+LEVEL_PREFIX = {0: "MG", 1: "BG", 2: "CG", 3: "FG"}
 
 
 # ----------------------------------------------------------------- hierarchy
@@ -141,9 +141,9 @@ def hierarchy_restore(cid, rid, user=None):
         parent = q("SELECT status FROM sm_item_hierarchy WHERE cid=%s AND level_id=%s",
                    (cid, pid), one=True)
         if not parent or parent["status"] != "ACTIVE":
-            return None, "Parent level is inactive — restore the parent first."
+            return None, "Parent level is pending — restore the parent first."
     _, n = x("UPDATE sm_item_hierarchy SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
-             "WHERE cid=%s AND id=%s AND status='INACTIVE'", (user, cid, rid))
+             "WHERE cid=%s AND id=%s AND status='PENDING'", (user, cid, rid))
     return n, None
 
 
@@ -304,7 +304,7 @@ HOOKS = {
 
 
 def generic_soft_delete(m, cid, rid, user=None):
-    _, n = x(f"UPDATE `{m['table']}` SET status='INACTIVE', updated_on=NOW(), updated_by=%s WHERE cid=%s AND id=%s",
+    _, n = x(f"UPDATE `{m['table']}` SET status='PENDING', updated_on=NOW(), updated_by=%s WHERE cid=%s AND id=%s",
              (user, cid, rid))
     return n, None
 

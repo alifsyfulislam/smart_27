@@ -87,8 +87,8 @@ def _update(m, rid, data, user):
 def _hierarchy_parent_opts():
     """Parent choices for the brand form — ACTIVE nodes at depth < 3 only
     (a Flavor level can never become a parent)."""
-    return q("""SELECT id, level_id, level_name, depth FROM sm_item_hierarchy
-                WHERE cid=%s AND status='ACTIVE' AND depth < 3
+    return q("""SELECT id, level_id, level_name, level1_name, depth FROM sm_item_hierarchy
+                WHERE cid=%s AND status='ACTIVE' AND depth < 1
                 ORDER BY depth, level_id""", (config.CID,))
 
 
@@ -148,6 +148,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         return RedirectResponse("/", status_code=303)
 
     where, params = [f"t.cid=%s"], [config.CID]
+
     if qk:
         likes = []
         for c in m["search_cols"]:
@@ -171,6 +172,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
     pages = max(1, (total + page_size - 1) // page_size)
     page = min(max(1, page), pages)
     order = sort if (sort and "{" not in sort) else m["order"]
+
     rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
                  ORDER BY {order} LIMIT %s OFFSET %s""",
              params + [page_size, (page - 1) * page_size])
@@ -182,19 +184,25 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
     if slug == "brand":
         rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
                      ORDER BY depth ASC, level_id ASC""", params)
+        
         if qk or any(filt_vals.values()):
-            seen = {r["level_id"] for r in rows}
-            for r in list(rows):
-                pid = r.get("parent_level_id") or "0"
-                while pid and pid != "0" and pid not in seen:
-                    anc = q("SELECT * FROM sm_item_hierarchy WHERE cid=%s AND level_id=%s",
-                            (config.CID, pid), one=True)
-                    if not anc:
-                        break
-                    rows.append(anc)
-                    seen.add(pid)
-                    pid = anc.get("parent_level_id") or "0"
-            rows.sort(key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
+            seen = list(set([r["level_id"] for r in rows]))
+            seen_str = str(seen).strip().replace('[','(').replace(']',')')
+            # return seen
+
+            anc = q(f"""SELECT * FROM sm_item_hierarchy WHERE cid=%s AND level_id=%s""",
+                    (config.CID, seen_str))
+            if anc:
+                rows = anc
+
+            rows = sorted(
+                rows,
+                key=lambda r: (
+                    int(r["depth"] or 0),
+                    r["level_id"] or ""
+                )
+            )
+            # rows.sort(key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
         tree = _build_tree(rows)
     item_opts = None
     if slug == "item-batch":
