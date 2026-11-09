@@ -35,7 +35,7 @@ MODULES = {
         "perm": "brand",
         "table": "sm_item_hierarchy",
         "group": "Item Info",
-        "order": "depth ASC, level_id ASC",
+        "order": "level1 ASC, depth ASC",
         "indent_col": "depth",
         "list_cols": [
             ("level_id", "Level ID"), ("level_name", "Level Name"),
@@ -43,12 +43,17 @@ MODULES = {
             ("is_leaf", "Leaf"), ("status", "Status"),
         ],
         "search_cols": ["level_id", "level_name", "parent_level_id", "parent_level_name"],
-        "filters": [("status", "Status", "status")],
+        "filters": [
+            # ("level1_name", "Brand", "cat", "BRAND_CATEGORY"),
+            ("status", "Status", "status"),
+        ],
         "form_fields": [
             f("parent_level_id", "Parent Level", "hier_root_select", in_form=True,
               help="Leave '- Root -' to create a new Company (level 0). Levels: Company > Brand > Type > Flavor — a Flavor (depth 3) cannot have children."),
             f("level_name", "Level Name", "text", required=True, in_list=True),
-            f("image_path", "Image Path", "text", help="Optional image file path/URL."),
+            f("image_path", "Image", "image",
+              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
+                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
             f("note", "Note", "textarea"),
         ],
         "create_hook": "hierarchy",
@@ -79,24 +84,19 @@ MODULES = {
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("short_name", "Short Name", "text"),
+            f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE", readonly_on_edit=False, in_list=True),
             f("item_category", "Item Category", "select", cat="ITEM_CATEGORY", default="REGULAR"),
             f("unit_type", "Unit Type", "select", cat="ITEM_UNIT", default="PCS"),
             f("pack_size", "Pack Size", "select", cat="ITEM_PACK", default="SMALL"),
+            f("hierarchy", "Hierarchy Tagging", "hier_cascade", help="Tag the item sequentially with Company > Brand > Type > Flavor."),
             f("weight", "Weight", "float"),
-            f("hierarchy", "Hierarchy Tagging", "hier_cascade",
-              help="Tag the item sequentially with Company > Brand > Type > Flavor."),
-            f("ctn_pcs_ratio", "CTN PCS Ratio", "int", default=1),
             f("sequence_no", "Sequence No", "int", default=1),
             f("stock_cover_days", "Stock Cover Days", "int", default=7),
-            f("dist_price", "Distributor Price", "float"),
             f("invoice_price", "Invoice Price", "float"),
-            f("mrp", "MRP", "float", in_list=True),
             f("price", "Price", "float", in_list=True),
-            f("vat_amt", "VAT Amount", "float"),
+            f("vat_amt", "VAT Amount", "float", default=0.0),
             f("total_amt", "Total Amount", "float"),
-            f("manufacturer", "Manufacturer", "text"),
-            f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE",
-              readonly_on_edit=False, in_list=True),
+            f("mrp", "MRP", "float", in_list=True),
             f("note", "Note", "textarea"),
         ],
         "create_hook": "item",
@@ -257,6 +257,8 @@ def values_from_form(m, form, existing=None, is_create=True):
             continue
         if name == "parent_level_id" and existing is None:
             pass                          # handled by hook but keep submitted value
+        if spec["type"] == "image":
+            continue                      # file input <name>_file handled by the router
         if not spec["in_form"]:
             continue
         if (not is_create) and spec["readonly_on_edit"]:

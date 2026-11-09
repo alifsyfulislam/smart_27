@@ -17,6 +17,9 @@ update your required file accordingly
 
 under brand edit 
 
-image will preview and ther will be input option as well user can change if wants and here i want add option child
+image will preview and ther will be input option as well user can change if wants and 
+
+
+here i want add his child if i wants on or multiple 
 
 update your required file accordingly

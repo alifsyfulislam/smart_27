@@ -98,12 +98,22 @@ def _next_code(cid, prefix):
     return f"{prefix}{max_no + 1:03d}"
 
 
+def _recompute_is_leaf(cid, level_id):
+    """Maintain the is_leaf invariant: '1' when the level has no ACTIVE child,
+    '0' when it has at least one. Called on create, update, soft delete and
+    restore of hierarchy rows."""
+    if not level_id or level_id == "0":
+        return
+    n = scalar("SELECT COUNT(*) c FROM sm_item_hierarchy "
+               "WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+               (cid, level_id), 0)
+    x("UPDATE sm_item_hierarchy SET is_leaf=%s WHERE cid=%s AND level_id=%s",
+      ("0" if n else "1", cid, level_id))
+
+
 def hierarchy_after_create(cid, row, user=None):
     # a parent that now has a child is no longer a leaf
-    pid = row.get("parent_level_id")
-    if pid and pid != "0":
-        x("UPDATE sm_item_hierarchy SET is_leaf='0' WHERE cid=%s AND level_id=%s",
-          (cid, pid))
+    _recompute_is_leaf(cid, row.get("parent_level_id"))
 
 
 def hierarchy_after_update(cid, old, new, user=None):
@@ -114,6 +124,10 @@ def hierarchy_after_update(cid, old, new, user=None):
         depth = int(new.get("depth") or 0)
         x(f"UPDATE sm_item_hierarchy SET level{depth}_name=%s WHERE cid=%s AND level{depth}=%s",
           (new["level_name"], cid, new["level_id"]))
+    # re-derive leaf flag from the current ACTIVE children (and the parent,
+    # which cannot change on edit but is recomputed for safety)
+    _recompute_is_leaf(cid, new.get("level_id"))
+    _recompute_is_leaf(cid, new.get("parent_level_id"))
 
 
 def hierarchy_soft_delete(cid, rid, user=None):
@@ -129,6 +143,8 @@ def hierarchy_soft_delete(cid, rid, user=None):
                       f"{nchild} active child level(s). Delete the child levels first.")
     _, n = x("UPDATE sm_item_hierarchy SET status='PENDING', updated_on=NOW(), updated_by=%s "
              "WHERE cid=%s AND id=%s AND status='ACTIVE'", (user, cid, rid))
+    # with this child gone the parent may become a leaf again
+    _recompute_is_leaf(cid, row.get("parent_level_id"))
     return n, None
 
 
@@ -144,6 +160,9 @@ def hierarchy_restore(cid, rid, user=None):
             return None, "Parent level is pending — restore the parent first."
     _, n = x("UPDATE sm_item_hierarchy SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
              "WHERE cid=%s AND id=%s AND status='PENDING'", (user, cid, rid))
+    # the parent gains an ACTIVE child again; the restored row is also re-derived
+    _recompute_is_leaf(cid, pid)
+    _recompute_is_leaf(cid, row.get("level_id"))
     return n, None
 
 

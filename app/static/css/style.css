@@ -205,6 +205,46 @@ table.list td.acts .btn { margin-right: 4px; }
 .pager span.cur { background: var(--fb-primary); color: #fff; }
 .pager .info { margin-left: auto; color: var(--fb-muted); font-size: 12px; }
 
+/* ------------------- searchable select (type to search) ---------------- */
+.searchselect { position: relative; }
+.searchselect-input {
+  width: 100%; padding: 8px 10px; border: 1px solid var(--fb-divider);
+  border-radius: 6px; font-size: 13px; font-family: inherit; background: var(--fb-card);
+}
+.searchselect-input:focus {
+  outline: none; border-color: var(--fb-primary);
+  box-shadow: 0 0 0 2px rgba(24,119,242,.2);
+}
+.searchselect-list {
+  display: none; position: absolute; z-index: 30; top: calc(100% + 2px);
+  left: 0; right: 0; max-height: 240px; overflow-y: auto;
+  background: var(--fb-card); border: 1px solid var(--fb-divider);
+  border-radius: 6px; box-shadow: 0 4px 14px rgba(0,0,0,.12);
+}
+.searchselect-list.open { display: block; }
+.searchselect-item { padding: 8px 10px; font-size: 13px; cursor: pointer; }
+.searchselect-item:hover, .searchselect-item.active { background: #e7f0fd; }
+.searchselect-item.selected { font-weight: 600; color: var(--fb-primary); }
+.searchselect-item.muted { color: var(--fb-muted); cursor: default; }
+
+/* ----------------------------- image upload ----------------------------- */
+.img-preview {
+  max-width: 130px; max-height: 130px; display: block; margin-bottom: 6px;
+  border: 1px solid var(--fb-divider); border-radius: 8px; background: #fafbfc;
+}
+.img-preview.hidden { display: none; }
+
+/* -------------------------- child rows (brand edit) --------------------- */
+.child-row { display: flex; gap: 8px; margin-bottom: 8px; }
+.child-row input {
+  flex: 1; padding: 8px 10px; border: 1px solid var(--fb-divider);
+  border-radius: 6px; font-size: 13px; font-family: inherit;
+}
+.child-row input:focus {
+  outline: none; border-color: var(--fb-primary);
+  box-shadow: 0 0 0 2px rgba(24,119,242,.2);
+}
+
 /* ------------------------------- misc --------------------------------- */
 .flash {
   position: fixed; top: 12px; right: 14px; z-index: 100;

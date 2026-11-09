@@ -28,7 +28,7 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 | # | Rule |
 |---|------|
 | BR1 | Item hierarchy levels are created manually (no integration). Levels: Company(C*) → Brand(B*) → Type(T*) → Flavor(F*), auto-coded `CG001/BG001/TG001/FGnNN` per level with parent path columns `level0..level3`. |
-| BR2 | A node becomes non-leaf (`is_leaf=0`) as soon as it has a child; renaming a level propagates through descendant path columns. |
+| BR2 | Leaf flag invariant: a hierarchy node has `is_leaf=1` **iff it has no ACTIVE child** — recomputed automatically on create, update, soft delete and restore; renaming a level propagates through descendant path columns. |
 | BR3 | Items come from integration or manual creation; every item automatically gets a **default batch `1` with expiry 2100-12-31** (`sm_item_batch`). |
 | BR4 | Items are tagged sequentially with Company > Brand > Type > Flavor from the hierarchy. |
 | BR5 | Distributors come from integration or manual creation; every distributor automatically gets two default stores: `{depot_id}140` = **Commercial** and `{depot_id}170` = **Damage** (`sm_depot_store`). |
@@ -36,6 +36,8 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 | BR7 | Every master-table change (create/update/delete/restore) is recorded in the central log `sm_audit_log` **by the application only** — no DB triggers. |
 | BR8 | Users are restricted by ACL: permissions like `item.view`, `item.create`, `item.edit`, `item.delete`, `item.import`, grouped under modules; roles bundle permissions; users get roles and/or direct permissions; a super-admin bypasses checks. |
 | BR9 | `sm_category_type` feeds the value lists used by other modules (depot category, store type, item category, unit type). |
+| BR10 | A brand (hierarchy) level may carry an **image**: uploaded files are stored under `app/static/uploads` as `{table}_{name-slug}_image_{timestamp}.{ext}` (PNG/JPG/GIF/WEBP, max 5 MB) and the generated link is saved in `image_path`. Editing can preview and replace the image; leaving the file input empty keeps the current one. |
+| BR11 | From the Brand **edit page** a user can add one or many **child levels** in a single submit (names deduped; each child flows through the normal auto-code/path/audit pipeline). A Flavor (depth 3) cannot have children. |
 
 ## 4. Users
 

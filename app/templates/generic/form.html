@@ -11,20 +11,23 @@
   <div class="card-body">
     {% if error %}<div class="error-box"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>{% endif %}
 
-    <form method="post" action="{{ '/%s/create' % slug if a == 'Create' else '/%s/edit/%s' % (slug, row['id']) }}">
+    {% set has_image = m.form_fields | selectattr('type', 'equalto', 'image') | list %}
+    <form method="post" {% if has_image %}enctype="multipart/form-data"{% endif %} action="{{ '/%s/create' % slug if a == 'Create' else '/%s/edit/%s' % (slug, row['id']) }}">
       <div class="form-grid">
         {% for s in m.form_fields %}
           {% if s.type == 'hier_root_select' %}
           <div class="field">
             <label>Parent Level</label>
-            {% if a == 'Edit' %}
-              <input type="text" value="{{ (data.get('parent_level_id') or '0') ~ (data.get('parent_level_name') or '') }}" disabled>
+            {% if a in ['Edit','View'] %}
+              <input type="hidden" name="parent_level_id" id="parent_level_id" value="{{ data.get('parent_level_id') or 'MG001' }}">
+              <input type="hidden" name="parent_level_name" id="parent_level_name" value="{{ data.get('parent_level_name') or 'N/A' }}">
+              <input type="text" value="{{ (data.get('parent_level_id') or '0')}} — {{ 'Root' if data.get('parent_level_name') == '-' else (data.get('parent_level_name')) }}" disabled>
             {% else %}
-            <select name="parent_level_id" id="f-parent_level_id">
+            <select name="parent_level_id" id="f-parent_level_id" data-searchable
+                    data-search-placeholder="Type to search parent level…">
               <!-- <option value="0">— Root — (new Company)</option> -->
               {% for p in parent_opts %}
-              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>
-                {{ p['level_id'] }} — {{ p['level_name'] }}</option>
+              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} — {{ p['level_name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -39,10 +42,11 @@
               <select id="h2"><option value="">-- Type --</option></select>
               <select id="h3"><option value="">-- Flavor --</option></select>
             </div>
-            <input type="hidden" name="company_id" id="company_id" value="{{ data.get('company_id') or '' }}">
-            <input type="hidden" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
-            <input type="hidden" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
-            <input type="hidden" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
+            <!-- AJAX REPLACE -->
+            <input type="text" name="company_id" id="company_id" value="{{ data.get('company_id') or '' }}">
+            <input type="text" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
+            <input type="text" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
+            <input type="text" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
             <div class="hint">{{ s.help }}</div>
           </div>
           {% elif s.type == 'item_select' %}
@@ -68,6 +72,29 @@
             </datalist>
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'image' %}
+          <div class="field">
+            <label>{{ s.label }}</label>
+            {% if a == 'View' %}
+              {% if data.get(s.name) %}
+              <a href="{{ data.get(s.name) }}" target="_blank" rel="noopener" title="Open full image">
+                <img class="img-preview" src="{{ data.get(s.name) }}" alt="{{ s.label }}"
+                     onerror="this.classList.add('hidden')">
+              </a>
+              <div class="hint mono">{{ data.get(s.name) }}</div>
+              {% else %}<div>—</div>{% endif %}
+            {% else %}
+              <img id="prev-{{ s.name }}" class="img-preview {{ 'hidden' if not data.get(s.name) }}"
+                   src="{{ data.get(s.name) or '' }}" alt=""
+                   onerror="this.classList.add('hidden')">
+              <input type="file" name="{{ s.name }}_file" id="file-{{ s.name }}"
+                     accept=".png,.jpg,.jpeg,.gif,.webp">
+              {% if a == 'Edit' and data.get(s.name) %}
+              <div class="hint">Pick a new file to replace the current image, or leave empty to keep it.</div>
+              {% endif %}
+              {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+            {% endif %}
           </div>
           {% elif s.type == 'select' %}
           <div class="field">
@@ -115,7 +142,7 @@
       </div>
       {% else %}
       <div style="margin-top:16px;display:flex;gap:10px">
-        {% if data.get('status') == 'INACTIVE' and perms.get('delete') %}
+        {% if data.get('status') == 'PENDING' and perms.get('delete') %}
         <form method="post" action="/{{ slug }}/restore/{{ row['id'] }}">
           <button class="btn btn-green" type="submit"><i class="fa-solid fa-rotate-left"></i> Restore to ACTIVE</button>
         </form>
@@ -127,6 +154,65 @@
     </form>
   </div>
 </div>
+
+{% if slug == 'brand' and a in ('Edit', 'View') and row %}
+<div class="card" style="max-width:1000px">
+  <div class="card-head">
+    <h2><i class="fa-solid fa-sitemap"></i>
+      Child Levels — under {{ row['level_id'] }} · {{ row['level_name'] }}</h2>
+    <span class="spacer"></span>
+    {% if next_level %}<span class="hint">Next level: {{ next_level }}</span>{% endif %}
+  </div>
+  <div class="card-body">
+    {% if children %}
+    <div class="table-wrap">
+      <table class="list">
+        <tr><th>Level ID</th><th>Level Name</th><th>Depth</th><th>Status</th><th></th></tr>
+        {% for c in children %}
+        <tr>
+          <td class="mono">{{ c['level_id'] }}</td>
+          <td>{{ c['level_name'] }}</td>
+          <td>{{ c['depth'] }}</td>
+          <td><span class="badge {{ 'active' if c['status'] == 'ACTIVE' else 'inactive' }}">{{ c['status'] }}</span></td>
+          <td class="acts">
+            <a class="btn btn-sm" href="/{{ slug }}/view/{{ c['id'] }}" title="View"><i class="fa-solid fa-eye"></i></a>
+            {% if perms.get('edit') %}<a class="btn btn-sm" href="/{{ slug }}/edit/{{ c['id'] }}" title="Edit"><i class="fa-solid fa-pen"></i></a>{% endif %}
+          </td>
+        </tr>
+        {% endfor %}
+      </table>
+    </div>
+    {% else %}
+    <p style="color:var(--fb-muted);margin:0 0 8px">No child levels yet.</p>
+    {% endif %}
+
+    {% if a == 'Edit' and perms.get('create') %}
+      {% if (row['depth'] or 0) < 3 %}
+      <hr style="border:0;border-top:1px solid var(--fb-divider);margin:14px 0">
+      <form method="post" action="/{{ slug }}/add-children/{{ row['id'] }}" id="child-form">
+        <div style="font-size:12px;font-weight:600;margin-bottom:8px">
+          <i class="fa-solid fa-plus"></i> Add {{ next_level or 'child' }} level(s) under {{ row['level_name'] }}
+          — one name per box, or add more boxes for multiple</div>
+        <div id="child-rows">
+          <div class="child-row">
+            <input type="text" name="child_names" placeholder="{{ next_level or 'Child' }} name" maxlength="200" required>
+            <button type="button" class="btn child-remove" title="Remove this row"><i class="fa-solid fa-xmark"></i></button>
+          </div>
+        </div>
+        <div style="margin-top:10px;display:flex;gap:8px">
+          <button type="button" class="btn" id="child-add"><i class="fa-solid fa-plus"></i> Add another</button>
+          <button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Save Child Level(s)</button>
+        </div>
+        <div class="hint" style="margin-top:6px">
+          Each name creates a new {{ next_level or 'child' }} level (auto-coded, audited) under {{ row['level_id'] }}.</div>
+      </form>
+      {% else %}
+      <div class="hint">This is a Flavor — the deepest level (Company &gt; Brand &gt; Type &gt; Flavor) — it cannot have children.</div>
+      {% endif %}
+    {% endif %}
+  </div>
+</div>
+{% endif %}
 {% endblock %}
 
 {% block scripts %}
@@ -188,6 +274,40 @@
       var pre = ["{{ data.get('company_id') or '' }}", "{{ data.get('brand_id') or '' }}",
                  "{{ data.get('type_id') or '' }}", "{{ data.get('flavor_id') or '' }}"];
       load("", selects[0], "-- Company --", pre[0]);
+    })();
+
+    // image upload: live preview of the picked file (create + edit replace)
+    (function () {
+      document.querySelectorAll("input[type=file][id^='file-']").forEach(function (inp) {
+        var img = document.getElementById("prev-" + inp.id.slice(5));
+        if (!img) return;
+        inp.addEventListener("change", function () {
+          var f = inp.files && inp.files[0];
+          if (!f) return;
+          var url = URL.createObjectURL(f);
+          img.src = url;
+          img.classList.remove("hidden");
+          img.onload = function () { URL.revokeObjectURL(url); };
+        });
+      });
+    })();
+
+    // child levels (brand edit): add / remove name boxes before submitting
+    (function () {
+      var wrap = document.getElementById("child-rows");
+      var add = document.getElementById("child-add");
+      if (!wrap || !add) return;
+      add.addEventListener("click", function () {
+        var clone = wrap.querySelector(".child-row").cloneNode(true);
+        clone.querySelector("input").value = "";
+        wrap.appendChild(clone);
+        clone.querySelector("input").focus();
+      });
+      wrap.addEventListener("click", function (ev) {
+        var btn = ev.target.closest(".child-remove");
+        if (!btn) return;
+        if (wrap.querySelectorAll(".child-row").length > 1) btn.closest(".child-row").remove();
+      });
     })();
   </script>
   {% endif %}

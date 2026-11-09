@@ -6,6 +6,9 @@ filters and pagination.
 """
 import io
 import json
+import os
+import re
+from datetime import datetime
 from urllib.parse import urlencode
 
 from fastapi import APIRouter, Request
@@ -30,6 +33,62 @@ _GROUP_BY_MODULE = {
 }
 
 _COL_CACHE: dict = {}
+
+# ------------------------------------------------------------- image uploads
+_STATIC_DIR = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), "static")
+UPLOAD_DIR = os.path.join(_STATIC_DIR, "uploads")
+ALLOWED_IMAGE_EXT = ("png", "jpg", "jpeg", "gif", "webp")
+MAX_IMAGE_MB = 5
+
+# hierarchy depth -> label of the level that can be added as a child
+_NEXT_LEVEL = {0: "Brand", 1: "Type", 2: "Flavor"}
+
+
+def _slugify(text):
+    slug = re.sub(r"[^a-z0-9]+", "-", (text or "").lower()).strip("-")
+    return slug or "item"
+
+
+async def _collect_image_uploads(m, form, data, existing=None):
+    """Read new image files from the multipart form (inputs named <col>_file).
+
+    Returns (updates, writes, error): updates maps column -> /static/uploads
+    URL, writes is [(filename, bytes)]. Files are written to disk only AFTER
+    the row was created/updated successfully, so failed validations leave no
+    orphan uploads behind. Naming: {table}_{slug}_image_{timestamp}.{ext}."""
+    updates, writes = {}, []
+    for spec in m["form_fields"]:
+        if spec["type"] != "image":
+            continue
+        col = spec["name"]
+        up = form.get(col + "_file")
+        if up is None or not getattr(up, "filename", ""):
+            continue
+        ext = os.path.splitext(up.filename)[1].lower().lstrip(".")
+        if ext not in ALLOWED_IMAGE_EXT:
+            return None, None, (f"{spec['label']}: only {', '.join(ALLOWED_IMAGE_EXT)} "
+                                "files are allowed.")
+        blob = await up.read()
+        if len(blob) > MAX_IMAGE_MB * 1024 * 1024:
+            return None, None, f"{spec['label']}: file is larger than {MAX_IMAGE_MB} MB."
+        slug_src = ((data.get("level_name") or "").strip()
+                    or ((existing or {}).get("level_name") or "").strip()
+                    or (data.get("name") or "").strip()
+                    or ((existing or {}).get("name") or "").strip())
+        ts = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]  # ms precision -> unique
+        fname = f"{m['table']}_{_slugify(slug_src)}_image_{ts}.{ext}"
+        updates[col] = f"/static/uploads/{fname}"
+        writes.append((fname, blob))
+    return updates, writes, None
+
+
+def _write_image_uploads(writes):
+    if not writes:
+        return
+    os.makedirs(UPLOAD_DIR, exist_ok=True)
+    for fname, blob in writes:
+        with open(os.path.join(UPLOAD_DIR, fname), "wb") as fh:
+            fh.write(blob)
 
 
 def table_cols(m):
@@ -85,11 +144,19 @@ def _update(m, rid, data, user):
 
 
 def _hierarchy_parent_opts():
-    """Parent choices for the brand form — ACTIVE nodes at depth < 3 only
-    (a Flavor level can never become a parent)."""
+    """Parent choices for the brand create form — ACTIVE Company nodes only
+    (depth < 1); deeper levels are created as children from the edit page."""
     return q("""SELECT id, level_id, level_name, level1_name, depth FROM sm_item_hierarchy
                 WHERE cid=%s AND status='ACTIVE' AND depth < 1
                 ORDER BY depth, level_id""", (config.CID,))
+
+
+def _hierarchy_children(level_id):
+    """Direct child levels of a hierarchy node (brand edit page section)."""
+    return q("""SELECT id, level_id, level_name, depth, is_leaf, status
+                FROM sm_item_hierarchy
+                WHERE cid=%s AND parent_level_id=%s
+                ORDER BY level_id""", (config.CID, level_id))
 
 
 def _build_tree(rows):
@@ -229,7 +296,8 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
 
 
 # ---------------------------------------------------------------- create
-def _form_context(m, context, action, row=None, data=None, error=None, parent_opts=None, item_opts=None, depot_opts=None):
+def _form_context(m, context, action, row=None, data=None, error=None, parent_opts=None,
+                  item_opts=None, depot_opts=None, children=None, next_level=None):
     field_opts = {}
     for spec in m["form_fields"]:
         if spec["cat"]:
@@ -239,6 +307,8 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         "title": f"{m['title']} — {action}", "row": row, "data": data or {},
         "error": error, "a": action, "field_opts": field_opts,
         "parent_opts": parent_opts or [], "item_opts": item_opts or [], "depot_opts": depot_opts or [],
+        "children": children if children is not None else [],
+        "next_level": next_level or "",
     })
     return context
 
@@ -299,7 +369,14 @@ async def module_create(request: Request, slug: str):
     if slug == "item" or (m.get("create_hook") == "item"):
         for fkey in ("company_id", "brand_id", "type_id", "flavor_id"):
             data[fkey] = (form.get(fkey) or "").strip()
-    err = await _do_create(request, slug, data, user, source="Manual create")
+    img_updates, img_writes, img_err = await _collect_image_uploads(m, form, data)
+    if img_err:
+        err = img_err
+    else:
+        data.update(img_updates)
+        err = await _do_create(request, slug, data, user, source="Manual create")
+    if not err:
+        _write_image_uploads(img_writes)   # persist files only after the row exists
     if err:
         context["error"] = err
         parent_opts = item_opts = depot_opts = []
@@ -331,10 +408,16 @@ async def module_view(request: Request, slug: str, rid: int):
     if not row:
         set_flash(request, "danger", "Record not found.")
         return RedirectResponse(f"/{slug}", status_code=303)
+    children, next_level = [], ""
+    if slug == "brand":
+        children = _hierarchy_children(row["level_id"])
+        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
-        _form_context(m, context, "View", row=row, data={k: ("" if v is None else v) for k, v in row.items()}))
+        _form_context(m, context, "View", row=row,
+                      data={k: ("" if v is None else v) for k, v in row.items()},
+                      children=children, next_level=next_level))
 
 
 @router.get("/{slug}/edit/{rid}")
@@ -347,15 +430,21 @@ async def module_edit_form(request: Request, slug: str, rid: int):
     if not row:
         set_flash(request, "danger", "Record not found.")
         return RedirectResponse(f"/{slug}", status_code=303)
+    children, next_level = [], ""
+    if slug == "brand":
+        children = _hierarchy_children(row["level_id"])
+        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
         _form_context(m, context, "Edit", row=row,
-                      data={k: ("" if v is None else v) for k, v in row.items()}))
+                      data={k: ("" if v is None else v) for k, v in row.items()},
+                      children=children, next_level=next_level))
 
 
 @router.post("/{slug}/edit/{rid}")
 async def module_edit(request: Request, slug: str, rid: int):
+    # return response.json(request)
     result = _access(request, slug, "edit")
     m, user, context = result[0], result[1], result[2]
     if isinstance(context, RedirectResponse):
@@ -370,15 +459,23 @@ async def module_edit(request: Request, slug: str, rid: int):
     if m["create_hook"] == "item":
         for fkey in ("company_id", "brand_id", "type_id", "flavor_id"):
             data[fkey] = (form.get(fkey) or (row.get(fkey) or "-")).strip()
+    img_updates, img_writes, img_err = await _collect_image_uploads(m, form, data, existing=row)
+    children, next_level = [], ""
+    if slug == "brand":
+        children = _hierarchy_children(row["level_id"])
+        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
     hook = HOOKS.get(m["create_hook"], {})
-    err = hook["prepare"](config.CID, data, row, user["user_id"]) if hook.get("prepare") else None
+    err = img_err or (hook["prepare"](config.CID, data, row, user["user_id"]) if hook.get("prepare") else None)
     if err:
         from ..main import templates
         return templates.TemplateResponse(
             request, "generic/form.html",
             _form_context(m, context, "Edit", row=row, data={k: ("" if v is None else v) for k, v in data.items()},
-                          error=err))
+                          error=err, children=children, next_level=next_level))
+    if img_updates:                      # no new file -> keep the existing image_path
+        data.update(img_updates)
     _update(m, rid, data, user["user_id"])
+    _write_image_uploads(img_writes)     # persist files only after the update succeeded
     new = q(f"SELECT * FROM `{m['table']}` WHERE id=%s", (rid,), one=True)
     if hook.get("after_update"):
         hook["after_update"](config.CID, row, new, user["user_id"])
@@ -386,6 +483,54 @@ async def module_edit(request: Request, slug: str, rid: int):
                old=row, new=new, changed_by=user["user_id"], user_ip=client_ip(request))
     set_flash(request, "success", f"{m['title']} updated successfully.")
     return RedirectResponse(f"/{slug}", status_code=303)
+
+
+# ---------------------------------------------------------- add child levels
+@router.post("/{slug}/add-children/{rid}")
+async def module_add_children(request: Request, slug: str, rid: int):
+    """Brand edit page: create one or many child levels under this node in a
+    single submit. Each child flows through _do_create -> hierarchy hook
+    (auto-code, path fill, is_leaf) + central audit log."""
+    result = _access(request, slug, "create")
+    m, user, context = result[0], result[1], result[2]
+    if isinstance(context, RedirectResponse):
+        return context
+    row = q(f"SELECT * FROM `{m['table']}` WHERE cid=%s AND id=%s", (config.CID, rid), one=True)
+    if not row:
+        set_flash(request, "danger", "Record not found.")
+        return RedirectResponse(f"/{slug}", status_code=303)
+    form = await request.form()
+    names, seen = [], set()
+    for raw in form.getlist("child_names"):
+        n = (raw or "").strip()
+        if n and n.lower() not in seen:
+            names.append(n)
+            seen.add(n.lower())
+    if not names:
+        set_flash(request, "danger", "Enter at least one child level name.")
+        return RedirectResponse(f"/{slug}/edit/{rid}", status_code=303)
+    ok, errors = 0, []
+    for name in names:
+        data = {"parent_level_id": row["level_id"], "level_name": name}
+        try:
+            err = await _do_create(request, slug, data, user,
+                                   source=f"Child level of {row['level_id']} (edit page)")
+        except Exception as e:  # malformed row
+            err = str(e)[:200]
+        if err:
+            errors.append(f"{name}: {err}")
+        else:
+            ok += 1
+    if ok and not errors:
+        set_flash(request, "success",
+                  f"{ok} child level(s) added under '{row['level_name']}' ({row['level_id']}).")
+    elif ok:
+        set_flash(request, "success",
+                  f"{ok} child level(s) added under '{row['level_name']}' ({row['level_id']}). "
+                  "Not added: " + " | ".join(errors[:5]))
+    else:
+        set_flash(request, "danger", "No child level added. " + " | ".join(errors[:5]))
+    return RedirectResponse(f"/{slug}/edit/{rid}", status_code=303)
 
 
 # ------------------------------------------------------- delete / restore

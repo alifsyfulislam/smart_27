@@ -65,10 +65,20 @@
   // on phone the sidebar starts hidden and needs the hamburger to open
 
   // --- hierarchy tree (brand module): expand / collapse -------------------
+  // depth-0 nodes start open (server-side class); expanding a node collapses
+  // the other open nodes in the SAME level (accordion per level)
   document.querySelectorAll(".tree-row button.tw").forEach(function (btn) {
     btn.addEventListener("click", function (ev) {
       ev.preventDefault();
-      btn.closest(".tree-node").classList.toggle("open");
+      var node = btn.closest(".tree-node");
+      if (node.classList.contains("open")) {
+        node.classList.remove("open");
+        return;
+      }
+      node.parentElement.querySelectorAll(":scope > .tree-node.open").forEach(function (sib) {
+        if (sib !== node) sib.classList.remove("open");
+      });
+      node.classList.add("open");
     });
   });
 
@@ -82,5 +92,94 @@
   // --- keep per-page size selection --------------------------------------
   document.querySelectorAll("select[name=page_size]").forEach(function (sel) {
     sel.addEventListener("change", function () { sel.form && sel.form.submit(); });
+  });
+
+  // --- searchable single-select (any <select data-searchable>) ------------
+  // Keeps the native select as the value holder; a text input + filtered
+  // dropdown is injected in front of it so the user can type to search.
+  document.querySelectorAll("select[data-searchable]").forEach(function (sel) {
+    sel.style.display = "none";
+    var box = document.createElement("div");
+    box.className = "searchselect";
+    var input = document.createElement("input");
+    input.type = "text";
+    input.className = "searchselect-input";
+    input.autocomplete = "off";
+    input.placeholder = sel.getAttribute("data-search-placeholder") || "Type to search…";
+    var list = document.createElement("div");
+    list.className = "searchselect-list";
+    box.appendChild(input);
+    box.appendChild(list);
+    sel.parentNode.insertBefore(box, sel);
+
+    function opts() { return Array.prototype.slice.call(sel.options); }
+    function currentLabel() {
+      var o = sel.options[sel.selectedIndex];
+      return o ? o.textContent : "";
+    }
+    function close() { list.classList.remove("open"); }
+    function choose(o) {
+      sel.value = o.value;
+      input.value = o.textContent;
+      close();
+      sel.dispatchEvent(new Event("change", { bubbles: true }));
+    }
+    function render(filter) {
+      list.innerHTML = "";
+      var f = (filter || "").trim().toLowerCase();
+      var shown = 0;
+      opts().forEach(function (o) {
+        var hay = (o.textContent + " " + o.value).toLowerCase();
+        if (f && hay.indexOf(f) === -1) return;
+        var item = document.createElement("div");
+        item.className = "searchselect-item" + (sel.value === o.value ? " selected" : "");
+        item.textContent = o.textContent;
+        item.dataset.value = o.value;
+        item.addEventListener("mousedown", function (ev) {  // before input blur
+          ev.preventDefault();
+          choose(o);
+        });
+        list.appendChild(item);
+        shown++;
+      });
+      if (!shown) {
+        var none = document.createElement("div");
+        none.className = "searchselect-item muted";
+        none.textContent = "No match found";
+        list.appendChild(none);
+      }
+    }
+    function open() { render(input.value); list.classList.add("open"); }
+
+    input.value = currentLabel();
+    input.addEventListener("focus", open);
+    input.addEventListener("input", open);
+    input.addEventListener("blur", function () { setTimeout(close, 130); });
+    input.addEventListener("keydown", function (ev) {
+      var items = Array.prototype.slice.call(list.querySelectorAll(".searchselect-item:not(.muted)"));
+      var active = list.querySelector(".searchselect-item.active");
+      var idx = items.indexOf(active);
+      if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
+        ev.preventDefault();
+        if (!list.classList.contains("open")) open();
+        if (!items.length) return;
+        idx = ev.key === "ArrowDown" ? Math.min(idx + 1, items.length - 1)
+                                     : Math.max(idx - 1, 0);
+        items.forEach(function (i) { i.classList.remove("active"); });
+        items[idx].classList.add("active");
+        items[idx].scrollIntoView({ block: "nearest" });
+      } else if (ev.key === "Enter") {
+        ev.preventDefault();                       // never submit the form from here
+        if (list.classList.contains("open") && active) {
+          var o = opts().filter(function (op) { return op.value === active.dataset.value; })[0];
+          if (o) choose(o); else close();
+        } else {
+          close();
+        }
+      } else if (ev.key === "Escape") {
+        close();
+        input.value = currentLabel();
+      }
+    });
   });
 })();

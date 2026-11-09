@@ -28,7 +28,7 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Area | Routes | Notes |
 |---|---|---|
 | Dashboard | `/` | stats, hierarchy bars, recent audit, quick actions |
-| Brand (hierarchy) | `/brand` | auto codes CG/BG/TG/FG, path columns, subtree soft delete, rename propagation |
+| Brand (hierarchy) | `/brand` | auto codes CG/BG/TG/FG, path columns, subtree soft delete, rename propagation; tree list opens depth-0 by default with per-level accordion; type-to-search parent picker, image upload+preview (`/static/uploads`, link in `image_path`), add one/many child levels from the edit page (`POST /brand/add-children/{id}`); `is_leaf` kept = "no ACTIVE child" on create/update/delete/restore |
 | Item | `/item` | hierarchy tagging, prices; auto default batch `1` (2100-12-31) |
 | Item Batch | `/item-batch` | per-item batches, datalist item picker |
 | Distributor | `/distributor` | auto default stores `{id}140` Commercial, `{id}170` Damage |
@@ -54,7 +54,7 @@ app/
   hooks.py           business rules (codes, default batch/stores…)
   routers/           core.py · crud.py · acl_admin.py
   templates/         base, login, dashboard, generic/, acl/, audit/
-  static/            css, js, vendor/fontawesome (local)
+  static/            css, js, vendor/fontawesome (local); uploads/ = brand images
 scripts/
   ddl.sql            full schema (reviewed + status columns + ACL + audit)
   setup_database.py  create DB + seed (roles/permissions/admin/category types/sample hierarchy)

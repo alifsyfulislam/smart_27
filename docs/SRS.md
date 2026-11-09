@@ -34,7 +34,7 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR2.3 Unauthenticated access to any page redirects to `/login`; unknown module slugs redirect to `/`.
 
 ### FR3 Master modules (per module M of `app/modules.py`)
-- FR3.1 `GET /{slug}` — list: cid-filtered, free-text search (configurable `search_cols`), dropdown filters, ORDER, LIMIT/OFFSET pagination, page-size select.
+- FR3.1 `GET /{slug}` — list: cid-filtered, free-text search (configurable `search_cols`), dropdown filters, ORDER, LIMIT/OFFSET pagination, page-size select. Brand renders the full hierarchy as a tree instead: nodes at depth 0 start expanded (server-side `open` class), deeper nodes collapsed; `app/static/js/app.js` toggles nodes with a per-level accordion — expanding a node collapses the other open nodes under the same parent.
 - FR3.2 `GET/POST /{slug}/create` — form → `values_from_form` → hook prepare → insert (`touch` stamps cid/created_on/by) → hook after_create → audit CREATE.
 - FR3.3 `GET/POST /{slug}/edit/{id}` — existing merged with submitted values → hook prepare (dup checks) → update → after_update/hook → audit UPDATE (old+new snapshots).
 - FR3.4 `GET /{slug}/view/{id}` — read-only render.
@@ -43,9 +43,12 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR3.7 `GET /{slug}/template` — xlsx template (uppercase headers + code row + example row).
 - FR3.8 `POST /{slug}/upload` — openpyxl parse, header→column mapping, per-row insert through the same hooks; summary flash + row errors; template mismatch and empty files rejected.
 - FR3.9 `GET /api/hierarchy/children?parent=X` — JSON children for cascade selects (used by the item form and API consumers).
+- FR3.10 `POST /{slug}/add-children/{id}` (brand) — create one or many child levels under a node from the edit page: `child_names[]` form list, deduped, each routed through the same hook + audit pipeline; per-name error report in the flash; requires `brand.create`.
+- FR3.11 Image fields (`type: "image"` in the module registry, brand `image_path`): multipart form (`enctype=multipart/form-data`), input named `{col}_file`; validation = extension whitelist (png/jpg/jpeg/gif/webp) + 5 MB cap; stored under `app/static/uploads` as `{table}_{name-slug}_image_{timestamp}.{ext}`; `image_path` gets the `/static/uploads/...` link; file written only after the DB write succeeds (no orphans on validation failure); edit with an empty input keeps the existing image.
 
 ### FR4 Business rules (hooks)
-- FR4.1 Hierarchy codes: `{CG,BG,TG,FG}{seq:03d}` continuing per prefix; depth = parent.depth+1; full path `level0..level3`; leaf of origin `1`.
+- FR4.1 Hierarchy codes: `{CG,BG,TG,FG}{seq:03d}` continuing per prefix; depth = parent.depth+1; full path `level0..level3`; new rows start `is_leaf=1`.
+- FR4.1a Leaf invariant: `is_leaf='1'` iff the node has no ACTIVE child — recomputed by `_recompute_is_leaf` on create (parent), update (node + parent), soft delete (parent) and restore (parent + node).
 - FR4.2 Depth cap: cannot create below flavor (max depth 3).
 - FR4.3 Rename propagates to descendants; soft-delete/restore cascade the subtree.
 - FR4.4 Item create → default batch `1` / 2100-12-31 (ON DUPLICATE-safe).
@@ -69,7 +72,7 @@ Tables (scripts/ddl.sql, exact names/columns from requirements):
 
 | Table | Purpose / changes vs. provided DDL |
 |---|---|
-| `sm_item_hierarchy` | + `status` (soft delete) |
+| `sm_item_hierarchy` | + `status` (soft delete); `image_path` now stores a generated `/static/uploads/...` link written by the upload handler (files on disk under `app/static/uploads/`) |
 | `sm_item`, `sm_item_batch` | provided; `sm_item_batch` + `status` |
 | `sm_depot`, `sm_depot_store` | provided; `sm_depot_store` + `status` |
 | `sm_category_type` | + `status` |

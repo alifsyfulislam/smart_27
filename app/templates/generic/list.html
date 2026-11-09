@@ -50,12 +50,12 @@
     {% if tree %}
     <div class="tree">
       {% for node in tree recursive %}
-      <div class="tree-node{{ ' open' if node['children'] }}">
+      <div class="tree-node{{ ' open' if node['children'] and (node['depth'] or 0) == 0 }}">
         <div class="tree-row">
           {% if node['children'] %}
           <button type="button" class="tw" title="Expand / collapse"><i class="fa-solid fa-chevron-right"></i></button>
           {% else %}<span class="tw"></span>{% endif %}
-          <i class="fa-solid {{ 'fa-leaf' if node['is_leaf'] == '1' else 'fa-folder' }}"
+          <i class="fa-solid {{ 'fa-file' if node['is_leaf'] == '1' else 'fa-folder' }}"
              style="color:{{ '#2c7d13' if node['is_leaf'] == '1' else '#1877f2' }};flex:none"></i>
           <span class="tcode">{{ node['level_id'] }}</span>
           <span class="tname">{{ node['level_name'] }}</span>
