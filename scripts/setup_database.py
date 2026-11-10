@@ -67,8 +67,6 @@ SEED_USER = ("admin", "Administrator", "admin@ssms.local", config.DEFAULT_ADMIN_
 
 SEED_CATEGORY_TYPES = [
     # type_name, cat_type_id, cat_type_name
-    ("DEPOT_CATEGORY", "DISTRIBUTOR", "Distributor"),
-    ("DEPOT_CATEGORY", "SUP DISTRIBUTOR", "Sup Distributor"),
     ("DISTRIBUTOR_CATEGORY", "DISTRIBUTOR", "Distributor"),
     ("DISTRIBUTOR_CATEGORY", "SUP DISTRIBUTOR", "Sup Distributor"),
     ("STORE_TYPE", "COMMERCIAL", "Commercial"),

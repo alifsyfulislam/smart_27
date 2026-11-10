@@ -163,7 +163,7 @@ MODULES = {
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("short_name", "Short Name", "text"),
-            f("depot_category", "Depot Category", "select", cat="DEPOT_CATEGORY",
+            f("depot_category", "Depot Category", "select", cat="DISTRIBUTOR_CATEGORY",
               default="DISTRIBUTOR", in_list=True),
             f("owner_name", "Owner Name", "text", in_list=True),
             f("owner_name_bn", "Owner Name (BN)", "text"),
