@@ -12,6 +12,9 @@
 --                         sm_acl_user_role / sm_acl_user_permission /
 --                         sm_acl_role_permission
 --   * central change log: sm_audit_log (written automatically by the app)
+--   * outlet master      : sm_client (Outlet module, exact columns from
+--                          requirements, DESC index markers normalized like the
+--                          other tables for MariaDB 10.4 compatibility)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS `smart_27`.`sm_item_hierarchy` (
@@ -213,6 +216,73 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_category_type` (
   UNIQUE KEY `cid_type_cid` (`cid`, `type_name`, `cat_type_id`),
   KEY `cid_typename` (`cid`, `type_name`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8;
+
+CREATE TABLE IF NOT EXISTS `smart_27`.`sm_client` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(10) DEFAULT 'SMART',
+  `client_id` varchar(100) DEFAULT NULL,
+  `client_old_id` varchar(100) DEFAULT NULL,
+  `name` varchar(200) DEFAULT NULL,
+  `name_bn` varchar(200) DEFAULT NULL,
+  `short_name` varchar(200) DEFAULT NULL,
+  `owner_name` varchar(200) DEFAULT NULL,
+  `owner_name_bn` varchar(200) DEFAULT NULL,
+  `area_id` varchar(50) DEFAULT NULL,
+  `area_name` varchar(100) DEFAULT NULL,
+  `category_id` varchar(50) DEFAULT NULL,
+  `category_name` varchar(100) DEFAULT NULL,
+  `sub_category_id` varchar(50) DEFAULT NULL,
+  `sub_category_name` varchar(100) DEFAULT NULL,
+  `status` varchar(20) DEFAULT 'ACTIVE',
+  `address` varchar(200) DEFAULT NULL,
+  `address_bn` varchar(200) DEFAULT NULL,
+  `nid` varchar(200) DEFAULT NULL,
+  `passport` varchar(200) DEFAULT NULL,
+  `trade_license_no` varchar(100) DEFAULT NULL,
+  `vat_registration_no` varchar(100) DEFAULT NULL,
+  `bin_no` varchar(100) DEFAULT NULL,
+  `drug_registration_num` varchar(100) DEFAULT NULL,
+  `customer_grade` varchar(10) DEFAULT NULL,
+  `location` varchar(200) DEFAULT NULL,
+  `latitude` varchar(20) DEFAULT '0',
+  `longitude` varchar(20) DEFAULT '0',
+  `depot_id` varchar(50) DEFAULT NULL,
+  `depot_name` varchar(200) DEFAULT NULL,
+  `store_id` varchar(50) DEFAULT NULL,
+  `store_name` varchar(200) DEFAULT NULL,
+  `customer_type` varchar(100) DEFAULT NULL COMMENT 'auto: CATEGORY_ID|CATEGORY_NAME',
+  `contact_no1` varchar(50) DEFAULT NULL,
+  `contact_no2` varchar(50) DEFAULT NULL,
+  `dob` date NOT NULL DEFAULT '2026-01-01',
+  `doj` date NOT NULL DEFAULT '2026-01-01',
+  `starting_year` int DEFAULT '2026',
+  `monthly_sales_capacity` int DEFAULT NULL,
+  `monthly_sales` int DEFAULT NULL,
+  `shop_owner_status` varchar(20) DEFAULT '-',
+  `warehouse_capacity` int DEFAULT NULL,
+  `shop_size` int DEFAULT NULL,
+  `shop_front_size` int DEFAULT NULL,
+  `image_path` varchar(200) DEFAULT NULL,
+  `field1` varchar(20) DEFAULT NULL,
+  `field2` int DEFAULT NULL,
+  `note` varchar(200) DEFAULT NULL,
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) DEFAULT NULL,
+  `district` varchar(50) DEFAULT NULL,
+  `market_id` varchar(50) DEFAULT NULL,
+  `market_name` varchar(200) DEFAULT NULL,
+  `client_posm` int DEFAULT '0',
+  `client_rak` varchar(200) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `CID_CLIENT_ID` (`cid`, `client_id`),
+  KEY `cid_area_id_depot_id` (`cid`, `area_id`, `depot_id`),
+  KEY `cid_area_id_status` (`cid`, `area_id`, `status`),
+  KEY `cid_mobile_no` (`cid`, `contact_no1`),
+  KEY `CID_CLIENT_ID_STATUS` (`cid`, `client_id`, `status`),
+  KEY `CID_CLIENT_NAME_STATUS` (`cid`, `name`, `status`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ------------------------------------------------------------------
 -- Access Control List

@@ -29,9 +29,10 @@ GROUP_META = [
     ("Top", "fa-house", 0),
     ("Item Info", "fa-boxes-stacked", 1),
     ("Distributor Info", "fa-truck-ramp-box", 2),
-    ("Settings", "fa-cogs", 3),
-    ("Administration", "fa-gear", 4),
-    ("Records", "fa-clock-rotate-left", 5),
+    ("Outlet Info", "fa-shop", 3),
+    ("Settings", "fa-cogs", 4),
+    ("Administration", "fa-gear", 5),
+    ("Records", "fa-clock-rotate-left", 6),
 ]
 
 
@@ -99,13 +100,15 @@ def build_menu(user):
         groups["Top"]["entries"].append(
             {"title": "Dashboard", "url": "/", "icon": "fa-gauge-high", "key": "dashboard"})
     # master modules
-    for slug in ("brand", "item", "item-batch", "distributor", "distributor-store", "category-type"):
+    for slug in ("brand", "item", "item-batch", "distributor", "distributor-store",
+                 "outlet", "category-type"):
         m = MODULES.get(slug)
         if not m:
             continue
         if user and (has_perm(user, f"{m['perm']}.view") or int(user.get("is_super") or 0)):
-            target_group = {"Item Info": "Item Info", "Distributor Info": "Distributor Info",
-                            "Settings": "Settings"}[m["group"]]
+            target_group = m["group"]
+            if target_group not in groups:
+                target_group = "Settings"
             groups[target_group]["entries"].append(
                 {"title": m["title"], "url": f"/{slug}", "icon": m["icon"], "key": slug})
     # custom admin/records entries

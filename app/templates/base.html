@@ -28,7 +28,7 @@
       <ul>
         {% for it in g.entries %}
         <li>
-          <a href="{{ it.url }}" class="{{ 'active' if (path == it.url or (it.url != '/' and path.startswith(it.url))) }}">
+          <a href="{{ it.url }}" class="{{ 'active' if (path == it.url or (it.url != '/' and path.startswith(it.url ~ '/'))) }}">
             <i class="fa-solid {{ it.icon }}"></i><span>{{ it.title }}</span>
           </a>
         </li>

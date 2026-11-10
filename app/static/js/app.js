@@ -152,6 +152,9 @@
     function open() { render(input.value); list.classList.add("open"); }
 
     input.value = currentLabel();
+    // external code (hierarchy cascade AJAX, dependent store dropdown) may
+    // rebuild the select's options — re-sync the visible label when told to
+    sel.addEventListener("ssms-refresh", function () { input.value = currentLabel(); });
     input.addEventListener("focus", open);
     input.addEventListener("input", open);
     input.addEventListener("blur", function () { setTimeout(close, 130); });

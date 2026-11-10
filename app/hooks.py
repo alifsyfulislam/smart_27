@@ -180,6 +180,24 @@ def item_prepare(cid, data, existing=None, user=None):
     if q(dup_sql, dup_params, one=True):
         return "An item with this Item ID already exists."
 
+    # value-list codes are stored canonically (uppercase) — keeps filters and
+    # edit preselects exact even when legacy rows hold display names
+    for k in ("item_category", "unit_type"):
+        if (data.get(k) or "").strip():
+            data[k] = data[k].strip().upper()
+
+    # total_amount = price + VAT when the form did not send one (JS normally
+    # computes it live; this covers no-JS / API / excel paths)
+    try:
+        total = float(data.get("total_amt") or 0)
+    except (TypeError, ValueError):
+        total = 0.0
+    if not total:
+        try:
+            data["total_amt"] = round(float(data.get("price") or 0) + float(data.get("vat_amt") or 0), 2)
+        except (TypeError, ValueError):
+            data["total_amt"] = 0.0
+
     # resolve hierarchy names from the ids collected by the cascade form
     from .modules import MODULES
     for fid in ("company", "brand", "type", "flavor"):
@@ -198,12 +216,50 @@ def item_prepare(cid, data, existing=None, user=None):
 
 def item_after_create(cid, row, user=None):
     """Every item automatically gets a default batch: batch_id '1',
-    expiary_date 2100-12-31 (per requirements)."""
+    expiary_date 2100-12-31 (per requirements). The batch mirrors the
+    item's own status."""
     x("""INSERT INTO sm_item_batch
          (cid, item_id, name, batch_id, expiary_date, status, note, created_on, created_by)
-         VALUES (%s,%s,%s,'1','2100-12-31','ACTIVE','Default batch (auto)',NOW(),%s)
+         VALUES (%s,%s,%s,'1','2100-12-31',%s,'Default batch (auto)',NOW(),%s)
          ON DUPLICATE KEY UPDATE name=VALUES(name)""",
-      (cid, row["item_id"], row["name"], user or "SYSTEM"))
+      (cid, row["item_id"], row["name"], (row.get("status") or "ACTIVE"), user or "SYSTEM"))
+
+
+def _cascade_item_status(cid, item_id, status, user=None):
+    """An item's status is always reflected on its batches: whatever status the
+    item carries (INACTIVE/PENDING/REJECTED/...) is pushed to every batch row."""
+    if not item_id or not status:
+        return
+    x("""UPDATE sm_item_batch SET status=%s, updated_on=NOW(), updated_by=%s
+         WHERE cid=%s AND item_id=%s AND status<>%s""",
+      (status, user or "SYSTEM", cid, item_id, status))
+
+
+def item_after_update(cid, old, new, user=None):
+    if (old.get("status") or "") != (new.get("status") or ""):
+        _cascade_item_status(cid, new.get("item_id"), new.get("status"), user)
+
+
+def item_soft_delete(cid, rid, user=None):
+    row = q("SELECT * FROM sm_item WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    _, n = x("UPDATE sm_item SET status='PENDING', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status='ACTIVE'", (user, cid, rid))
+    if n:
+        _cascade_item_status(cid, row["item_id"], "PENDING", user)
+    return n, None
+
+
+def item_restore(cid, rid, user=None):
+    row = q("SELECT * FROM sm_item WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    _, n = x("UPDATE sm_item SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status<>'ACTIVE'", (user, cid, rid))
+    if n:
+        _cascade_item_status(cid, row["item_id"], "ACTIVE", user)
+    return n, None
 
 
 # ----------------------------------------------------------------- batch
@@ -299,6 +355,74 @@ def category_type_prepare(cid, data, existing=None, user=None):
     return None
 
 
+# ----------------------------------------------------------------- outlet
+OUTLET_CAT_TYPE = "OUTLET_CATEGORY"        # e.g. OC001 — KR0
+OUTLET_SUBCAT_TYPE = "OUTLET_SUB_CATEGORY"  # e.g. OSC001 — KR0-1
+
+
+def _cat_type_name(cid, type_name, cat_type_id):
+    node = q("SELECT cat_type_name FROM sm_category_type "
+             "WHERE cid=%s AND type_name=%s AND cat_type_id=%s",
+             (cid, type_name, cat_type_id), one=True)
+    return (node["cat_type_name"] if node else "-") or "-"
+
+
+def outlet_prepare(cid, data, existing=None, user=None):
+    """Create/edit an sm_client (Outlet) row.
+
+    Auto-fill rules: category/sub-category names resolve from sm_category_type,
+    customer_type is generated as 'CATEGORY_ID|CATEGORY_NAME', depot/store names
+    resolve from sm_depot / sm_depot_store, and (cid, client_id) is unique."""
+    client_id = (data.get("client_id") or "").strip()
+    name = (data.get("name") or "").strip()
+    if not client_id or not name:
+        return "Outlet ID and Outlet Name are required."
+    dup_sql = "SELECT id FROM sm_client WHERE cid=%s AND client_id=%s"
+    dup_params = [cid, client_id]
+    if existing is not None:
+        dup_sql += " AND id<>%s"
+        dup_params.append(existing["id"])
+    if q(dup_sql, dup_params, one=True):
+        return "An outlet with this Outlet ID already exists."
+
+    cat_id = (data.get("category_id") or "").strip()
+    data["category_id"] = cat_id or "-"
+    data["category_name"] = _cat_type_name(cid, OUTLET_CAT_TYPE, cat_id) if cat_id else "-"
+    sub_id = (data.get("sub_category_id") or "").strip()
+    data["sub_category_id"] = sub_id or "-"
+    data["sub_category_name"] = _cat_type_name(cid, OUTLET_SUBCAT_TYPE, sub_id) if sub_id else "-"
+    # customer_type is auto-generated, never typed by the user
+    data["customer_type"] = f"{data['category_id']}|{data['category_name']}" if cat_id else "-"
+
+    depot_id = (data.get("depot_id") or "").strip()
+    data["depot_id"] = depot_id or "-"
+    if depot_id and depot_id != "-":
+        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s",
+                  (cid, depot_id), one=True)
+        if not depot:
+            return f"Distributor '{depot_id}' not found."
+        data["depot_name"] = (depot["name"] or "-") or "-"
+    else:
+        data["depot_name"] = "-"
+
+    store_id = (data.get("store_id") or "").strip()
+    data["store_id"] = store_id or "-"
+    if store_id and store_id != "-":
+        if not (depot_id and depot_id != "-"):
+            return "Select a distributor before choosing a store."
+        store = q("SELECT store_name FROM sm_depot_store WHERE cid=%s AND depot_id=%s AND store_id=%s",
+                  (cid, depot_id, store_id), one=True)
+        if not store:
+            return f"Store '{store_id}' not found under distributor '{depot_id}'."
+        data["store_name"] = (store["store_name"] or "-") or "-"
+    else:
+        data["store_name"] = "-"
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
 # ----------------------------------------------------------------- registry
 HOOKS = {
     "hierarchy": {
@@ -311,6 +435,9 @@ HOOKS = {
     "item": {
         "prepare": item_prepare,
         "after_create": item_after_create,
+        "after_update": item_after_update,
+        "soft_delete": item_soft_delete,
+        "restore": item_restore,
     },
     "item_batch": {"prepare": item_batch_prepare},
     "depot": {
@@ -318,6 +445,7 @@ HOOKS = {
         "after_create": depot_after_create,
     },
     "depot_store": {"prepare": depot_store_prepare},
+    "outlet": {"prepare": outlet_prepare},
     "category_type": {"prepare": category_type_prepare},
 }
 

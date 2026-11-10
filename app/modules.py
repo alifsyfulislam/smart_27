@@ -7,10 +7,11 @@ router and templates render everything from this registry.
 from . import config
 
 STATUS_OPTIONS = [
-    ('S001','ACTIVE'),
-    ('S002','INACTIVE'),
-    ('S003','PENDING'),
-    ('S004','REJECTED'),
+    # (value, label) — values are stored verbatim in the `status` columns
+    ('ACTIVE', 'ACTIVE'),
+    ('INACTIVE', 'INACTIVE'),
+    ('PENDING', 'PENDING'),
+    ('REJECTED', 'REJECTED'),
 ]
 
 
@@ -75,8 +76,9 @@ MODULES = {
         "search_cols": ["item_id", "name", "name_bn", "short_name", "brand_name", "type_name", "flavor_name"],
         "filters": [
             ("status", "Status", "status"),
+            ("brand_id", "Brand", "hier_brand"),
             ("item_category", "Item Category", "cat", "ITEM_CATEGORY"),
-            ("unit_type", "Unit Type", "cat", "UNIT_TYPE"),
+            ("unit_type", "Unit Type", "cat", "ITEM_UNIT"),
         ],
         "form_fields": [
             f("item_id", "Item ID", "text", required=True, in_list=True,
@@ -95,7 +97,8 @@ MODULES = {
             f("invoice_price", "Invoice Price", "float"),
             f("price", "Price", "float", in_list=True),
             f("vat_amt", "VAT Amount", "float", default=0.0),
-            f("total_amt", "Total Amount", "float"),
+            f("total_amt", "Total Amount", "float",
+              help="Auto-calculated as Price + VAT Amount while you type; you can still type over it."),
             f("mrp", "MRP", "float", in_list=True),
             f("note", "Note", "textarea"),
         ],
@@ -119,13 +122,18 @@ MODULES = {
             ("expiary_date", "Expiary Date"), ("status", "Status"),
         ],
         "search_cols": ["item_id", "batch_id", "name", "note"],
-        "filters": [("status", "Status", "status")],
+        "filters": [
+            ("status", "Status", "status"),
+            ("brand_id", "Brand", "item_brand"),
+        ],
         "form_fields": [
-            f("item_id", "Item", "item_select", required=True, in_list=True),
+            f("item_id", "Item", "item_select", required=True, in_list=True,
+              help="Active items only — type to search by item id or name."),
             f("batch_id", "Batch ID", "text", required=True, in_list=True,
               help="When an item is created manually/integration, a default batch '1' valid till 2100-12-31 is generated automatically."),
             f("name", "Name", "text"),
-            f("expiary_date", "Expiary Date", "date", required=True, in_list=True),
+            f("expiary_date", "Expiary Date", "date", required=True, in_list=True, default="2100-12-31",
+              help="Defaults to 2100-12-31 (no expiry)."),
             f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE", in_list=True),
             f("note", "Note", "textarea"),
         ],
@@ -148,7 +156,7 @@ MODULES = {
         ],
         "search_cols": ["depot_id", "name", "contact", "owner_name", "town_name", "email"],
         "filters": [("status", "Status", "status"),
-                    ("depot_category", "Depot Category", "cat", "DEPOT_CATEGORY")],
+                    ("depot_category", "Depot Category", "cat", "DISTRIBUTOR_CATEGORY")],
         "form_fields": [
             f("depot_id", "Distributor ID (Depot)", "text", required=True, in_list=True,
               help="Comes from integration or manual. On create, default stores {id}140 (Commercial) and {id}170 (Damage) are generated automatically."),
@@ -209,6 +217,56 @@ MODULES = {
         "excel_cols": ["depot_id", "store_id", "store_name", "store_type", "note"],
         "unique_msg": "This store already exists for the distributor.",
     },
+    # ================= OUTLET INFO =================
+    "outlet": {
+        "title": "Outlet",
+        "icon": "fa-shop",
+        "perm": "outlet",
+        "table": "sm_client",
+        "group": "Outlet Info",
+        "order": "id DESC",
+        "list_cols": [
+            ("client_id", "Outlet ID"), ("name", "Outlet Name"),
+            ("category_name", "Category"), ("sub_category_name", "Sub Category"),
+            ("customer_type", "Customer Type"), ("depot_id", "Distributor"),
+            ("store_name", "Store"), ("contact_no1", "Contact"), ("status", "Status"),
+        ],
+        "search_cols": ["client_id", "client_old_id", "name", "name_bn", "short_name",
+                        "owner_name", "contact_no1", "contact_no2", "category_name",
+                        "depot_id", "depot_name", "store_id", "store_name"],
+        "filters": [
+            ("status", "Status", "status"),
+            ("category_id", "Outlet Category", "cat", "OUTLET_CATEGORY"),
+        ],
+        "form_fields": [
+            f("client_id", "Outlet ID", "text", required=True, in_list=True,
+              help="Unique per company; comes from integration or is created manually here."),
+            f("client_old_id", "Old Outlet ID", "text"),
+            f("name", "Outlet Name", "text", required=True, in_list=True),
+            f("name_bn", "Name (BN)", "text"),
+            f("short_name", "Short Name", "text"),
+            f("owner_name", "Owner Name", "text"),
+            f("owner_name_bn", "Owner Name (BN)", "text"),
+            f("category_id", "Outlet Category", "select", cat="OUTLET_CATEGORY", in_list=True,
+              help="Values from Settings › Category Type, type OUTLET_CATEGORY (e.g. OC001 — KR0)."),
+            f("sub_category_id", "Outlet Sub Category", "select", cat="OUTLET_SUB_CATEGORY",
+              help="Values from type OUTLET_SUB_CATEGORY (e.g. OSC001 — KR0-1)."),
+            f("depot_id", "Distributor", "depot_select", required=True, in_list=True,
+              help="Active distributors (sm_depot) only."),
+            f("store_id", "Store", "store_select",
+              help="Stores of the selected distributor (sm_depot_store); pick the distributor first."),
+            f("contact_no1", "Contact 1", "text"),
+            f("contact_no2", "Contact 2", "text"),
+            f("address", "Address", "textarea"),
+            f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE", in_list=True),
+            f("note", "Note", "textarea"),
+        ],
+        "create_hook": "outlet",
+        "excel_cols": ["client_id", "client_old_id", "name", "name_bn", "short_name",
+                       "owner_name", "category_id", "sub_category_id", "depot_id",
+                       "store_id", "contact_no1", "contact_no2", "address", "note"],
+        "unique_msg": "An outlet with this Outlet ID already exists.",
+    },
     # ================= Settings =================
     "category-type": {
         "title": "Category Type",
@@ -237,11 +295,12 @@ MODULES = {
     },
 }
 
-MODULE_ORDER = ["brand", "item", "item-batch", "distributor", "distributor-store", "category-type"]
+MODULE_ORDER = ["brand", "item", "item-batch", "distributor", "distributor-store",
+                "outlet", "category-type"]
 
 PERM2SLUG = {"brand": "brand", "item": "item", "item_batch": "item-batch",
              "distributor": "distributor", "depot_store": "distributor-store",
-             "category_type": "category-type"}
+             "outlet": "outlet", "category_type": "category-type"}
 
 
 def get(slug):

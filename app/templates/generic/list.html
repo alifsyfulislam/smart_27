@@ -6,7 +6,7 @@
     <h2><i class="fa-solid {{ m.icon }}"></i> {{ m.title }}</h2>
     <span class="spacer"></span>
     {% if perms.get('import') %}
-      <a class="btn" href="/{{ slug }}/template"><i class="fa-solid fa-file-excel"></i> Template</a>
+      <a class="btn" href="/{{ slug }}/template"><i class="fa-solid fa-file-excel"></i> Download Template</a>
     {% endif %}
     {% if perms.get('create') %}
       <a class="btn btn-green" href="/{{ slug }}/create"><i class="fa-solid fa-plus"></i> Create</a>
@@ -19,7 +19,7 @@
       <select name="{{ fo.name }}">
         <option value="">All {{ fo.label }}</option>
         {% for opt in fo.options %}
-        {% set ov = opt[1] if opt is iterable and opt is not string else opt %}
+        {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
         <option value="{{ ov }}" {{ 'selected' if filt_vals.get(fo.name) == ov }}>{{ opt[1] if opt is iterable and opt is not string else opt }}</option>
         {% endfor %}
       </select>
@@ -69,7 +69,7 @@
               <a class="btn btn-sm" href="/{{ slug }}/edit/{{ node['id'] }}" title="Edit"><i class="fa-solid fa-pen"></i></a>
             {% endif %}
             {% if node['status'] == 'ACTIVE' %}
-              {% if perms.get('delete') %}
+              {% if perms.get('delete') and node['is_leaf'] == '1' %}
               <form method="post" action="/{{ slug }}/delete/{{ node['id'] }}" style="display:inline">
                 <button class="btn btn-sm btn-danger" type="submit" data-confirm="Soft delete (PENDING) this level?"><i class="fa-solid fa-trash"></i></button>
               </form>

@@ -42,6 +42,11 @@ SEED_PERMISSIONS = [
     ("depot_store.edit", "Edit distributor stores", "depot_store"),
     ("depot_store.delete", "Soft delete distributor stores", "depot_store"),
     ("depot_store.import", "Excel upload distributor stores", "depot_store"),
+    ("outlet.view", "View outlets", "outlet"),
+    ("outlet.create", "Create outlets", "outlet"),
+    ("outlet.edit", "Edit outlets", "outlet"),
+    ("outlet.delete", "Soft delete outlets", "outlet"),
+    ("outlet.import", "Excel upload outlets", "outlet"),
     ("category_type.view", "View category types", "category_type"),
     ("category_type.create", "Create category types", "category_type"),
     ("category_type.edit", "Edit category types", "category_type"),
@@ -64,16 +69,23 @@ SEED_CATEGORY_TYPES = [
     # type_name, cat_type_id, cat_type_name
     ("DEPOT_CATEGORY", "DISTRIBUTOR", "Distributor"),
     ("DEPOT_CATEGORY", "SUP DISTRIBUTOR", "Sup Distributor"),
+    ("DISTRIBUTOR_CATEGORY", "DISTRIBUTOR", "Distributor"),
+    ("DISTRIBUTOR_CATEGORY", "SUP DISTRIBUTOR", "Sup Distributor"),
     ("STORE_TYPE", "COMMERCIAL", "Commercial"),
     ("STORE_TYPE", "DAMAGE", "Damage"),
     ("ITEM_CATEGORY", "REGULAR", "Regular"),
     ("ITEM_CATEGORY", "SPECIAL", "Special"),
     ("ITEM_CATEGORY", "FOCUS", "Focus"),
-    ("UNIT_TYPE", "PCS", "Pieces"),
-    ("UNIT_TYPE", "KG", "Kilogram"),
-    ("UNIT_TYPE", "LTR", "Litre"),
-    ("UNIT_TYPE", "BOX", "Box"),
-    ("UNIT_TYPE", "PACK", "Pack"),
+    ("ITEM_UNIT", "PCS", "Pieces"),
+    ("ITEM_UNIT", "KG", "Kilogram"),
+    ("ITEM_UNIT", "LTR", "Litre"),
+    ("ITEM_UNIT", "BOX", "Box"),
+    ("ITEM_UNIT", "PACK", "Pack"),
+    ("ITEM_PACK", "SMALL", "Small"),
+    ("ITEM_PACK", "MEDIUM", "Medium"),
+    ("ITEM_PACK", "LARGE", "Large"),
+    ("OUTLET_CATEGORY", "OC001", "KR0"),
+    ("OUTLET_SUB_CATEGORY", "OSC001", "KR0-1"),
 ]
 
 SEED_HIERARCHY = [
@@ -89,7 +101,7 @@ ROLE_PERM_MATRIX = {
     "SUPER_ADMIN": None,  # None => every permission (is_super also set)
     "MANAGER": [p[0] for p in SEED_PERMISSIONS if p[2] in
                 ("dashboard", "brand", "item", "item_batch", "distributor",
-                 "depot_store", "category_type", "audit") and p[0].split(".")[-1] != "import"],
+                 "depot_store", "outlet", "category_type", "audit") and p[0].split(".")[-1] != "import"],
     "VIEWER": [p[0] for p in SEED_PERMISSIONS if p[0].endswith(".view")],
 }
 
@@ -128,9 +140,11 @@ def seed():
     now = "NOW()"
     cid = config.CID
 
-    # ---- permissions
-    if is_empty("sm_acl_permission"):
-        for pid, pname, module in SEED_PERMISSIONS:
+    # ---- permissions (idempotent per row: new module permissions such as
+    # outlet.* reach already-seeded databases on re-run)
+    for pid, pname, module in SEED_PERMISSIONS:
+        if not q("SELECT id FROM sm_acl_permission WHERE cid=%s AND perm_id=%s",
+                 (cid, pid), one=True):
             x("INSERT INTO sm_acl_permission (cid, perm_id, perm_name, module, status, created_on, created_by)"
               f" VALUES (%s,%s,%s,%s,'ACTIVE',{now},'SYSTEM')", (cid, pid, pname, module))
 
@@ -157,9 +171,11 @@ def seed():
         x("INSERT INTO sm_acl_user_role (cid, user_id, role_id, created_on, created_by)"
           f" VALUES (%s,%s,'SUPER_ADMIN',{now},'SYSTEM')", (cid, uid))
 
-    # ---- category types
-    if is_empty("sm_category_type"):
-        for tname, ctid, ctname in SEED_CATEGORY_TYPES:
+    # ---- category types (idempotent per row: adds missing value definitions
+    # even when the table already has data, so new groups reach existing DBs)
+    for tname, ctid, ctname in SEED_CATEGORY_TYPES:
+        if not q("SELECT id FROM sm_category_type WHERE cid=%s AND type_name=%s AND cat_type_id=%s",
+                 (cid, tname, ctid), one=True):
             x("INSERT INTO sm_category_type (cid, type_name, cat_type_id, cat_type_name, status, created_on, created_by)"
               f" VALUES (%s,%s,%s,%s,'ACTIVE',{now},'SYSTEM')", (cid, tname, ctid, ctname))
 

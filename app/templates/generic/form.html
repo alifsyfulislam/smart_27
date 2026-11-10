@@ -37,16 +37,16 @@
           <div class="field full">
             <label>{{ s.label }}</label>
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
-              <select id="h0"><option value="">-- Company --</option></select>
-              <select id="h1"><option value="">-- Brand --</option></select>
-              <select id="h2"><option value="">-- Type --</option></select>
-              <select id="h3"><option value="">-- Flavor --</option></select>
+              <select id="h0" data-searchable data-search-placeholder="Type to search company…"><option value="">-- Company --</option></select>
+              <select id="h1" data-searchable data-search-placeholder="Type to search brand…"><option value="">-- Brand --</option></select>
+              <select id="h2" data-searchable data-search-placeholder="Type to search type…"><option value="">-- Type --</option></select>
+              <select id="h3" data-searchable data-search-placeholder="Type to search flavor…"><option value="">-- Flavor --</option></select>
             </div>
             <!-- AJAX REPLACE -->
-            <input type="text" name="company_id" id="company_id" value="{{ data.get('company_id') or '' }}">
-            <input type="text" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
-            <input type="text" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
-            <input type="text" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
+            <input type="hidden" name="company_id" id="company_id" value="{{ data.get('company_id') or '' }}">
+            <input type="hidden" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
+            <input type="hidden" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
+            <input type="hidden" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
             <div class="hint">{{ s.help }}</div>
           </div>
           {% elif s.type == 'item_select' %}
@@ -54,10 +54,13 @@
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get('item_id') }}</div>
             {% else %}
-            <input list="dl-items" name="item_id" value="{{ data.get('item_id') or '' }}" autocomplete="off" {{ 'required' if s.required and a == 'Create' }}>
-            <datalist id="dl-items">
-              {% for o in item_opts %}<option value="{{ o['item_id'] }}">{{ o['item_id'] }} — {{ o['name'] }}</option>{% endfor %}
-            </datalist>
+            <select name="item_id" data-searchable data-search-placeholder="Type to search item (id / name / brand)…"
+                    {{ 'required' if s.required and a == 'Create' }}>
+              <option value="">-- Select item --</option>
+              {% for o in item_opts %}
+              <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} — {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}){% endif %}</option>
+              {% endfor %}
+            </select>
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -66,10 +69,28 @@
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get('depot_id') }}</div>
             {% else %}
-            <input list="dl-depots" name="depot_id" value="{{ data.get('depot_id') or '' }}" autocomplete="off" {{ 'required' if s.required and a == 'Create' }}>
-            <datalist id="dl-depots">
-              {% for o in depot_opts %}<option value="{{ o['depot_id'] }}">{{ o['depot_id'] }} — {{ o['name'] }}</option>{% endfor %}
-            </datalist>
+            <select name="depot_id" data-searchable data-search-placeholder="Type to search distributor…"
+                    {{ 'required' if s.required and a == 'Create' }}>
+              <option value="">-- Select distributor --</option>
+              {% for o in depot_opts %}
+              <option value="{{ o['depot_id'] }}" {{ 'selected' if data.get('depot_id') == o['depot_id'] }}>{{ o['depot_id'] }} — {{ o['name'] }}</option>
+              {% endfor %}
+            </select>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'store_select' %}
+          <div class="field">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}<div>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} — {{ data.get('store_name') }}{% endif %}</div>
+            {% else %}
+            <select name="store_id" id="f-store_id" data-store-depends="depot_id" data-searchable
+                    data-search-placeholder="Type to search store…"
+                    {{ 'required' if s.required and a == 'Create' }}>
+              {% if data.get('store_id') %}
+              <option value="{{ data.get('store_id') }}" selected>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} — {{ data.get('store_name') }}{% endif %}</option>
+              {% endif %}
+            </select>
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -103,7 +124,7 @@
             {% else %}
             <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.name != 'status' }}>
               {% for o in (field_opts.get(s.name) or s.options or []) %}
-              <option value="{{ o[1] }}" {{ 'selected' if (data.get(s.name)|string) == (o[0]|string) }}>{{ o[1] }}</option>
+              <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
               {% endfor %}
             </select>
             {% if a == 'Edit' and s.name != 'status' %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
@@ -159,7 +180,7 @@
 <div class="card" style="max-width:1000px">
   <div class="card-head">
     <h2><i class="fa-solid fa-sitemap"></i>
-      Child Levels — under {{ row['level_id'] }} · {{ row['level_name'] }}</h2>
+      Child Levels — under {{ row['level_id'] }} — {{ row['level_name'] }}</h2>
     <span class="spacer"></span>
     {% if next_level %}<span class="hint">Next level: {{ next_level }}</span>{% endif %}
   </div>
@@ -243,7 +264,9 @@
           .then(r => r.json()).then(function (res) {
             fill(select, res.items || [], placeholder);
             if (chosen) { select.value = chosen; }
-            sync(); loadNext(select, placeholder, null);
+            sync();
+            select.dispatchEvent(new Event("ssms-refresh"));   // searchable widget: re-sync label
+            loadNext(select, placeholder, null);
           });
       }
 
@@ -274,6 +297,58 @@
       var pre = ["{{ data.get('company_id') or '' }}", "{{ data.get('brand_id') or '' }}",
                  "{{ data.get('type_id') or '' }}", "{{ data.get('flavor_id') or '' }}"];
       load("", selects[0], "-- Company --", pre[0]);
+    })();
+
+    // item form: total_amount auto-calculates as price + vat_amt (still overtypeable)
+    (function () {
+      var price = document.querySelector("input[name='price']");
+      var vat = document.querySelector("input[name='vat_amt']");
+      var total = document.querySelector("input[name='total_amt']");
+      if (!price || !vat || !total) return;
+      function calc() {
+        var p = parseFloat(price.value), v = parseFloat(vat.value);
+        if (isNaN(p) && isNaN(v)) return;
+        total.value = ((p || 0) + (v || 0)).toFixed(2);
+      }
+      price.addEventListener("input", calc);
+      vat.addEventListener("input", calc);
+    })();
+
+    // outlet form: store dropdown loads the active stores of the chosen distributor
+    (function () {
+      var store = document.getElementById("f-store_id");
+      if (!store) return;
+      var depotField = document.querySelector("select[name='" + (store.getAttribute("data-store-depends") || "depot_id") + "']");
+      function load(depot, keepCurrent) {
+        fetch("/api/depot/stores?depot_id=" + encodeURIComponent(depot || ""))
+          .then(r => r.json()).then(function (res) {
+            var keep = keepCurrent ? store.value : "";
+            var rows = res.items || [];
+            store.innerHTML = "";
+            var ph = document.createElement("option");
+            ph.value = "";
+            ph.textContent = depot ? "-- Store of " + depot + " --" : "-- Select a distributor first --";
+            store.appendChild(ph);
+            var kept = false;
+            rows.forEach(function (s) {
+              var o = document.createElement("option");
+              o.value = s.store_id;
+              o.textContent = s.store_id + " — " + s.store_name;
+              if (keep && s.store_id === keep) { o.selected = true; kept = true; }
+              store.appendChild(o);
+            });
+            if (keep && !kept) {          // value not in this depot's list — keep showing it
+              var o = document.createElement("option");
+              o.value = keep; o.textContent = keep; o.selected = true;
+              store.appendChild(o);
+            }
+            store.dispatchEvent(new Event("ssms-refresh"));
+          });
+      }
+      if (depotField) {
+        depotField.addEventListener("change", function () { load(depotField.value, false); });
+        load(depotField.value, true);
+      }
     })();
 
     // image upload: live preview of the picked file (create + edit replace)

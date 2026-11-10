@@ -27,7 +27,7 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 
 | # | Rule |
 |---|------|
-| BR1 | Item hierarchy levels are created manually (no integration). Levels: Company(C*) → Brand(B*) → Type(T*) → Flavor(F*), auto-coded `CG001/BG001/TG001/FGnNN` per level with parent path columns `level0..level3`. |
+| BR1 | Item hierarchy levels are created manually (no integration). Levels: Company(C*) → Brand(B*) → Type(T*) → Flavor(F*), auto-coded `MG001/BG001/CG001/FG001` per level with parent path columns `level0..level3`. |
 | BR2 | Leaf flag invariant: a hierarchy node has `is_leaf=1` **iff it has no ACTIVE child** — recomputed automatically on create, update, soft delete and restore; renaming a level propagates through descendant path columns. |
 | BR3 | Items come from integration or manual creation; every item automatically gets a **default batch `1` with expiry 2100-12-31** (`sm_item_batch`). |
 | BR4 | Items are tagged sequentially with Company > Brand > Type > Flavor from the hierarchy. |

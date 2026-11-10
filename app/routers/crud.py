@@ -180,13 +180,50 @@ def _cat_options(type_name):
                           ORDER BY cat_type_id""", (config.CID, type_name))]
 
 
+def _brand_opts_from_hierarchy():
+    """Brand filter options — ACTIVE depth-1 nodes of the item hierarchy."""
+    return [(r["level_id"], r["level_name"] or r["level_id"])
+            for r in q("""SELECT level_id, level_name FROM sm_item_hierarchy
+                          WHERE cid=%s AND status='ACTIVE' AND depth=1
+                          ORDER BY level_name""", (config.CID,))]
+
+
+def _brand_opts_from_items():
+    """Brand filter options — brands that actually occur on ACTIVE items."""
+    return [(r["brand_id"], r["brand_name"] or r["brand_id"])
+            for r in q("""SELECT DISTINCT brand_id, brand_name FROM sm_item
+                          WHERE cid=%s AND status='ACTIVE'
+                            AND brand_id IS NOT NULL AND brand_id NOT IN ('', '-')
+                          ORDER BY brand_name""", (config.CID,))]
+
+
 def _filter_options(m):
     out = []
     for f in m["filters"]:
         name, label, kind = f[0], f[1], f[2]
-        opts = _cat_options(f[3]) if kind == "cat" else STATUS_OPTIONS
+        if kind == "cat":
+            opts = _cat_options(f[3])
+        elif kind == "hier_brand":
+            opts = _brand_opts_from_hierarchy()
+        elif kind == "item_brand":
+            opts = _brand_opts_from_items()
+        else:
+            opts = STATUS_OPTIONS
         out.append({"name": name, "label": label, "options": opts})
     return out
+
+
+def _select_opts_for(slug):
+    """Dropdown option rows needed by create/edit forms of a module."""
+    item_opts, depot_opts = [], []
+    if slug == "item-batch":
+        item_opts = q("""SELECT item_id, name, brand_name FROM sm_item
+                         WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 300""",
+                      (config.CID,))
+    if slug in ("distributor-store", "outlet"):
+        depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
+                          ORDER BY name LIMIT 300""", (config.CID,))
+    return item_opts, depot_opts
 
 
 def _record_key(m, row):
@@ -200,7 +237,7 @@ def _record_key(m, row):
 def key_col_of(m):
     return {"brand": "level_id", "item": "item_id", "item-batch": "batch_id",
             "distributor": "depot_id", "distributor-store": "store_id",
-            "category-type": "id"}.get(m["perm"], "id")
+            "outlet": "client_id", "category-type": "id"}.get(m["perm"], "id")
 
 
 # ------------------------------------------------------------------- list
@@ -228,10 +265,26 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         val = (filt_vals.get(name) or "").strip()
         if not val:
             continue
-        # column always `name` except status filter on tables whose column name is status
-        col = name if name in table_cols(m) else "status"
-        where.append(f"t.{col}=%s")
-        params.append(val)
+        if kind in ("hier_brand", "item_brand"):
+            # brand filter: match on the item's brand column when the module
+            # table has one, otherwise through the items of that brand
+            if "brand_id" in table_cols(m):
+                where.append("t.brand_id=%s")
+                params.append(val)
+            else:
+                where.append("t.item_id IN (SELECT item_id FROM sm_item "
+                             "WHERE cid=%s AND status='ACTIVE' AND brand_id=%s)")
+                params += [config.CID, val]
+        elif kind == "cat":
+            col = name if name in table_cols(m) else "status"
+            # case-insensitive: legacy rows may store the display name instead of the code
+            where.append(f"UPPER(t.{col})=%s")
+            params.append(val.upper())
+        else:
+            # column always `name` except status filter on tables whose column name is status
+            col = name if name in table_cols(m) else "status"
+            where.append(f"t.{col}=%s")
+            params.append(val)
     wsql = " AND ".join(where)
 
     total = scalar(f"SELECT COUNT(*) c FROM `{m['table']}` t WHERE {wsql}", params, 0)
@@ -251,34 +304,34 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
     if slug == "brand":
         rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
                      ORDER BY depth ASC, level_id ASC""", params)
-        
         if qk or any(filt_vals.values()):
-            seen = list(set([r["level_id"] for r in rows]))
-            seen_str = str(seen).strip().replace('[','(').replace(']',')')
-            # return seen
-
-            anc = q(f"""SELECT * FROM sm_item_hierarchy WHERE cid=%s AND level_id=%s""",
-                    (config.CID, seen_str))
-            if anc:
-                rows = anc
-
-            rows = sorted(
-                rows,
-                key=lambda r: (
-                    int(r["depth"] or 0),
-                    r["level_id"] or ""
-                )
-            )
-            # rows.sort(key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
+            # ancestors of every match are already on the row as level0..level{depth-1}
+            have = {r["level_id"] for r in rows}
+            need = set()
+            for r in rows:
+                for i in range(int(r["depth"] or 0)):
+                    pid = r.get(f"level{i}") or ""
+                    if pid and pid not in ("-", "0"):
+                        need.add(pid)
+            missing = list(need - have)
+            if missing:
+                ph = ", ".join(["%s"] * len(missing))
+                anc = q(f"""SELECT t.* FROM `{m['table']}` t
+                            WHERE t.cid=%s AND t.level_id IN ({ph})""",
+                        [config.CID] + missing)
+                by_id = {r["id"]: r for r in rows}
+                for r in anc:
+                    by_id.setdefault(r["id"], r)
+                rows = list(by_id.values())
+        rows = sorted(rows, key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
+        total = len(rows)
         tree = _build_tree(rows)
     item_opts = None
-    if slug == "item-batch":
-        item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
-                         ORDER BY name LIMIT 300""", (config.CID,))
     depot_opts = None
-    if slug == "distributor-store":
-        depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
-                          ORDER BY name LIMIT 300""", (config.CID,))
+    if slug in ("item-batch", "distributor-store", "outlet"):
+        item_opts, depot_opts = _select_opts_for(slug)
+    item_opts = item_opts or []
+    depot_opts = depot_opts or []
 
     keep = {"qk": qk, "page_size": page_size, "status": status}
     keep.update(filt_vals)
@@ -322,12 +375,8 @@ async def module_create_form(request: Request, slug: str):
     parent_opts, item_opts, depot_opts = [], [], []
     if slug == "brand":
         parent_opts = _hierarchy_parent_opts()
-    if slug == "item-batch":
-        item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
-                         ORDER BY name LIMIT 300""", (config.CID,))
-    if slug == "distributor-store":
-        depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
-                          ORDER BY name LIMIT 300""", (config.CID,))
+    if slug in ("item-batch", "distributor-store", "outlet"):
+        item_opts, depot_opts = _select_opts_for(slug)
     if slug == "category-type":
         context["type_names"] = [r["type_name"] for r in
                                  q("SELECT DISTINCT type_name FROM sm_category_type WHERE cid=%s ORDER BY type_name",
@@ -335,7 +384,7 @@ async def module_create_form(request: Request, slug: str):
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
-        _form_context(m, context, "Create", data={s["name"]: (s["default"] if s["type"] in ("select", "int", "float") else "")
+        _form_context(m, context, "Create", data={s["name"]: (s["default"] if s["type"] in ("select", "int", "float", "date") else "")
                                                  for s in m["form_fields"]},
                       parent_opts=parent_opts, item_opts=item_opts, depot_opts=depot_opts))
 
@@ -382,12 +431,8 @@ async def module_create(request: Request, slug: str):
         parent_opts = item_opts = depot_opts = []
         if slug == "brand":
             parent_opts = _hierarchy_parent_opts()
-        elif slug == "item-batch":
-            item_opts = q("""SELECT item_id, name FROM sm_item WHERE cid=%s AND status='ACTIVE'
-                             ORDER BY name LIMIT 300""", (config.CID,))
-        elif slug == "distributor-store":
-            depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
-                              ORDER BY name LIMIT 300""", (config.CID,))
+        elif slug in ("item-batch", "distributor-store", "outlet"):
+            item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
             request, "generic/form.html",
@@ -434,12 +479,16 @@ async def module_edit_form(request: Request, slug: str, rid: int):
     if slug == "brand":
         children = _hierarchy_children(row["level_id"])
         next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
+    item_opts, depot_opts = ([], [])
+    if slug in ("item-batch", "distributor-store", "outlet"):
+        item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
         _form_context(m, context, "Edit", row=row,
                       data={k: ("" if v is None else v) for k, v in row.items()},
-                      children=children, next_level=next_level))
+                      children=children, next_level=next_level,
+                      item_opts=item_opts, depot_opts=depot_opts))
 
 
 @router.post("/{slug}/edit/{rid}")
@@ -467,11 +516,15 @@ async def module_edit(request: Request, slug: str, rid: int):
     hook = HOOKS.get(m["create_hook"], {})
     err = img_err or (hook["prepare"](config.CID, data, row, user["user_id"]) if hook.get("prepare") else None)
     if err:
+        item_opts, depot_opts = ([], [])
+        if slug in ("item-batch", "distributor-store", "outlet"):
+            item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
             request, "generic/form.html",
             _form_context(m, context, "Edit", row=row, data={k: ("" if v is None else v) for k, v in data.items()},
-                          error=err, children=children, next_level=next_level))
+                          error=err, children=children, next_level=next_level,
+                          item_opts=item_opts, depot_opts=depot_opts))
     if img_updates:                      # no new file -> keep the existing image_path
         data.update(img_updates)
     _update(m, rid, data, user["user_id"])
@@ -613,6 +666,9 @@ async def module_template(request: Request, slug: str):
                "distributor": {"depot_id": "131313", "name": "Sample Distributor"},
                "distributor-store": {"depot_id": "131313", "store_id": "131313140",
                                      "store_name": "Commercial", "store_type": "COMMERCIAL"},
+               "outlet": {"client_id": "OUT001", "name": "Sample Outlet", "category_id": "OC001",
+                          "sub_category_id": "OSC001", "depot_id": "131313", "store_id": "131313140",
+                          "contact_no1": "017000000000"},
                "category-type": {"type_name": "STORE_TYPE", "cat_type_id": "EXAMPLE",
                                  "cat_type_name": "Example"}}
     ws.append([example.get(slug, {}).get(c, "") for c in m["excel_cols"]])
@@ -711,4 +767,16 @@ async def hierarchy_children(request: Request, parent: str = "0"):
                 FROM sm_item_hierarchy h
                 WHERE cid=%s AND status='ACTIVE' AND parent_level_id=%s""",
              (config.CID, parent or "0"))
+    return {"items": rows}
+
+
+@router.get("/api/depot/stores")
+async def depot_stores(request: Request, depot_id: str = ""):
+    """Active stores of one distributor — feeds the dependent Outlet store dropdown."""
+    user = current_user(request)
+    if not user:
+        return {"items": []}
+    rows = q("""SELECT store_id, store_name FROM sm_depot_store
+                WHERE cid=%s AND status='ACTIVE' AND depot_id=%s
+                ORDER BY store_id""", (config.CID, (depot_id or "").strip()))
     return {"items": rows}
