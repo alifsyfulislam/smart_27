@@ -78,12 +78,14 @@
           <td><span class="badge {{ 'active' if r['status']=='ACTIVE' else 'inactive' }}">{{ r['status'] }}</span></td>
           {% if can_manage %}
           <td class="acts" style="text-align:right">
+            {% if r['role_id'] != 'super_admin' or user['is_super'] == 1 %}
             <button class="btn btn-sm" onclick="toggleEdit('{{ r['role_id'] }}')"><i class="fa-solid fa-pen"></i></button>
-            {% if r['status'] == 'ACTIVE' %}
+            {% endif %}
+            {% if r['status'] == 'ACTIVE' and r['role_id'] != 'super_admin' %}
             <form method="post" action="/roles/delete/{{ r['role_id'] }}" style="display:inline">
               <button class="btn btn-sm btn-danger" data-confirm="Deactivate role {{ r['role_id'] }}?"><i class="fa-solid fa-trash"></i></button>
             </form>
-            {% elif r['status'] != 'ACTIVE' %}
+            {% elif r['status'] != 'ACTIVE' and r['role_id'] != 'super_admin' %}
             <form method="post" action="/roles/delete/{{ r['role_id'] }}" style="display:inline">
               <input type="hidden" name="restore" value="1">
               <button class="btn btn-sm btn-green" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
