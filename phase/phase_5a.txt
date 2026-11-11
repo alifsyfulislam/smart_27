@@ -1,49 +1,47 @@
-# IMPLEMENTATION CHECKPOINT — PHASE 5 PAUSED
+We are continuing the AI Project Brain Optimization project in the same conversation.
 
-My AI coding token limit has been reached. Implementation is temporarily paused and will resume tomorrow.
+Yesterday, we started Phase 5 — Implement Approved Architecture — but the token limit was exhausted before implementation was completed.
 
-Before stopping, perform the following actions:
+IMPORTANT INSTRUCTIONS:
 
-1. Stop all further implementation activities.
-2. Identify exactly where Phase 5 implementation stopped.
-3. List all completed implementation steps.
-4. List all partially completed steps.
-5. Identify remaining implementation steps.
-6. Record every modified, created and deleted file.
-7. Verify which changes have been successfully saved.
-8. Identify any incomplete operations or unresolved errors.
-9. Record dependencies and important implementation decisions.
-10. Preserve all existing project knowledge and historical information.
+1. Do NOT restart Phase 1, Phase 2, Phase 3, or Phase 4.
+2. Do NOT repeat the previous investigation or audit.
+3. Preserve all previously approved architectural decisions.
+4. Review our conversation history to recover the approved implementation plan.
+5. Inspect the current project files to identify what was actually implemented yesterday.
+6. Read the latest implementation progress/checkpoint from MY_WATCHER and Brain documentation, if available.
+7. Compare the implementation checklist against the actual project state.
+8. Identify completed, partially completed, and pending tasks.
+9. Verify existing changes before modifying anything.
+10. Never assume a task was completed just because it was previously discussed.
 
-## Create Implementation Checkpoint
+RESUME EXECUTION:
 
-Save a detailed checkpoint in the existing Brain architecture.
+Continue Phase 5 from the first incomplete implementation task.
 
-Include:
+After each task:
+- Verify the implementation.
+- Check file references and compatibility.
+- Record modified files.
+- Update the implementation progress in MY_WATCHER.
+- Synchronize relevant Brain documentation.
+- Record remaining tasks.
 
-- Current phase: Phase 5 — Implementation.
-- Implementation progress.
-- Completed tasks.
-- Pending tasks.
-- Partially completed tasks.
-- Modified files.
-- Remaining implementation plan.
-- Known issues.
-- Last successfully verified operation.
-- Exact next action to execute.
+Once Phase 5 is complete, proceed to Phase 6 testing and then Phase 7 final audit, following the original approved plan.
 
-Update MY_WATCHER.txt or the appropriate existing Brain document if necessary. Do not create duplicate checkpoint files.
+Do not skip verification.
 
-## IMPORTANT
+Do not modify application business logic.
 
-Do not:
-- Restart Phase 1.
-- Repeat the audit.
-- Redesign the approved architecture.
-- Reimplement completed changes.
-- Overwrite working files unnecessarily.
-- Mark unfinished tasks as completed.
+FIRST ACTION:
+Give me a concise recovery report containing:
+- Last completed implementation step.
+- Last partially completed step.
+- Remaining Phase 5 checklist.
+- Files modified so far.
+- Any unexpected issues.
+- Exact next action.
 
-At the end, provide a concise handover report with the exact instruction I should give you tomorrow to resume Phase 5.
+Then continue implementation without repeating completed work.
 
-STOP after saving and verifying the checkpoint.
+Our objective remains the same: complete the approved AI Project Brain Optimization architecture with verified results.

@@ -14,7 +14,7 @@ CID = "SMART"  # default company id used everywhere
 DB_HOST = os.environ.get("SSMS_DB_HOST", "localhost")
 DB_PORT = int(os.environ.get("SSMS_DB_PORT", "3306"))
 DB_USER = os.environ.get("SSMS_DB_USER", "root")
-DB_PASS = os.environ.get("SSMS_DB_PASS", "")          # password: NULL
+DB_PASS = os.environ.get("SSMS_DB_PASS", "")
 DB_NAME = os.environ.get("SSMS_DB_NAME", "smart_27")
 
 SECRET_KEY = os.environ.get("SSMS_SECRET_KEY", "ssms-change-me-secret-key")

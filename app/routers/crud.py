@@ -653,7 +653,7 @@ async def module_template(request: Request, slug: str):
     ws = wb.active
     ws.title = "TEMPLATE"
     ws.append([s.replace("_", " ").upper() for s in m["excel_cols"]])
-    ws.append([s.upper() for s in m["excel_cols"]])
+    # ws.append([s.upper() for s in m["excel_cols"]])
     for col in range(1, len(m["excel_cols"]) + 1):
         ws.cell(row=1, column=col).font = ws.cell(row=1, column=col).font.copy(bold=True)
     # example row
