@@ -4,10 +4,10 @@
 -- Reviewed for MySQL 8 / MariaDB 10.4 compatibility.
 -- Schema updates done as instructed by requirements ("check table desc
 -- if update needed on type do it"):
---   * sm_item_hierarchy : added `status` (soft delete to INACTIVE)
---   * sm_item_batch     : added `status` (soft delete to INACTIVE)
---   * sm_depot_store    : added `status` (soft delete to INACTIVE)
---   * sm_category_type  : added `status` (soft delete to INACTIVE)
+--   * sm_item_hierarchy : added `status` (soft delete to PENDING)
+--   * sm_item_batch     : added `status` (soft delete to PENDING)
+--   * sm_depot_store    : added `status` (soft delete to PENDING)
+--   * sm_category_type  : added `status` (soft delete to PENDING)
 --   * new ACL tables    : sm_acl_user / sm_acl_role / sm_acl_permission
 --                         sm_acl_user_role / sm_acl_user_permission /
 --                         sm_acl_role_permission

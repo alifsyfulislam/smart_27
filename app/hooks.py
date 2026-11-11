@@ -10,7 +10,8 @@ LEVEL_PREFIX = {0: "MG", 1: "BG", 2: "CG", 3: "FG"}
 def hierarchy_prepare(cid, data, existing=None, user=None):
     """Create/edit an sm_item_hierarchy row.
 
-    On create: auto-generate level_id (CG/BG/TG/FG + padded number), fill the
+    On create: auto-generate level_id (MG/BG/CG/FG + padded number per
+    LEVEL_PREFIX), fill the
     full path columns (level0..level3), depth and is_leaf — exactly the sample
     rows described in the requirements.
     """
