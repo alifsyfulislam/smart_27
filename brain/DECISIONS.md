@@ -1,0 +1,15 @@
+# SSMS Decision Log (append-only)
+
+One decision per entry. Never edit or delete an entry — supersede it with a new one
+(`superseded-by: D-nnn`). Dates from git/PRD verification records.
+
+- **D-001** · 2026-11-05 — **Generic CRUD engine** (`app/modules.py` registry + `app/routers/crud.py`): one router serves every master module; a new module = one dict entry + hooks. Do NOT fork per-module code.
+- **D-002** · 2026-11-05 — **Schema fidelity with sanctioned fixes**: table/column names from requirements kept verbatim (incl. the historical typo `expiary_date`). Allowed fixes: added `status` columns to `sm_item_hierarchy`, `sm_item_batch`, `sm_depot_store`, `sm_category_type` for soft-delete; normalized `PRIMARY KEY (id DESC)` for MariaDB 10.4.
+- **D-003** · 2026-11-05 — **App-only audit**: `sm_audit_log` written by `app/audit.py` around every create/update/delete/restore/login; no DB triggers; audit failures never block business ops.
+- **D-004** · 2026-11-05 — **ACL model**: varchar business keys (`user_id`, `role_id`, `perm_id`), cid-scoped unique keys, permission strings `module.action`, super-admin bypass. Permission cache in `app/security.py` invalidated via `invalidate_user_cache` after role/user edits. ACL user/role soft-delete uses `status='INACTIVE'` (distinct from master modules' PENDING).
+- **D-005** · 2026-11-05 — **No CDN**: Font Awesome 6.5.2 vendored under `app/static/vendor/fontawesome`; keep for offline/intranet deployments.
+- **D-006** · 2026-11-05 — **UI**: Facebook-style palette (values: `docs/PRD.md` §2.3). Accordion sidebar: opening one group collapses others; persisted via localStorage.
+- **D-007** · 2026-11-09 — **Image uploads** handled generically in `crud.py` for any registry field of type `image` (form input `{col}_file`); extension whitelist + 5 MB cap; file written only AFTER the DB write succeeds; naming `{table}_{slug}_image_{timestamp}.{ext}`; DB stores the `/static/uploads/...` link.
+- **D-008** · 2026-11-09 — **Searchable single select**: any `<select data-searchable>` gets a type-to-search widget injected by `app/static/js/app.js`; native select stays the value holder (forms submit without JS).
+- **D-009** · 2026-11-09 — **`is_leaf` invariant (BR2)**: `1` iff no ACTIVE child; recomputed by `hooks._recompute_is_leaf` on create/update/soft-delete/restore; rename propagates through descendant path columns.
+- **D-010** · 2026-11-10 — **Outlet module** on the generic engine (commits 7279a94, e33f355): `sm_client` master; `customer_type` auto-generated from `category_id|category_name`; category/sub-category from `sm_category_type` groups `OUTLET_CATEGORY`/`OUTLET_SUB_CATEGORY`; depot/store from `sm_depot`/`sm_depot_store`; seed's `DEPOT_CATEGORY` group renamed to `DISTRIBUTOR_CATEGORY` (old rows removed from seed).

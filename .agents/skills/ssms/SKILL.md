@@ -26,6 +26,7 @@ description: >
 - **UI**: Facebook-style palette (values: `docs/PRD.md` §2.3), Font Awesome local only, accordion sidebar (`openGroup` in localStorage), responsive ≥900px desktop / drawer on mobile.
 - **Jinja pitfalls**: dict keys named `items` collide with the dict method in attribute lookup — use `entries`; `max`/`min` are registered globals; there is no `set()` — use `[]` literals.
 - **Starlette pitfalls**: register `SessionMiddleware` AFTER route middleware; include `acl_admin` router BEFORE `crud` (the `/{slug}` catch-all would swallow `/users`, `/roles`, `/permissions`).
+- **Access + seed behavior**: `_access()` redirects unknown module slugs to `/`, unauthenticated users to `/login`. `seed()` checks emptiness **per table** — partial failures self-heal on the next `setup_database.py` run (first-run MANAGER-role bug was tuple-vs-id, fixed in `ROLE_PERM_MATRIX`).
 
 ## Doc-update checklist (per requirements, keep in sync on every change)
 - `docs/BRD.md` business rules BR1–BR9 → new/changed rules
