@@ -57,7 +57,7 @@ async def users_list(request: Request, qk: str = ""):
                  FROM sm_acl_user u WHERE {' AND '.join(where)}
                  ORDER BY u.id DESC LIMIT 200""", params)
     
-    all_roles = q("SELECT * FROM sm_acl_role WHERE cid=%s AND status = 'ACTIVE' ORDER BY role_id", (config.CID,))
+    all_roles = q("SELECT * FROM sm_acl_role WHERE cid=%s AND status = 'ACTIVE' AND role_id <> 'super_admin' ORDER BY role_id", (config.CID,))
     context.update({"title": "Users", "rows": rows, "all_roles": all_roles,
                     "statuses": STATUS_OPTIONS, "qk": qk,
                     "can_manage": require_perm(user, "acl.manage")})
