@@ -48,14 +48,16 @@ async def users_list(request: Request, qk: str = ""):
     if qk:
         where.append("(u.user_id LIKE %s OR u.name LIKE %s OR u.email LIKE %s)")
         params += [f"%{qk}%"] * 3
+
     rows = q(f"""SELECT u.*,
-                    (SELECT GROUP_CONCAT(r.role_name SEPARATOR ', ')
+                    (SELECT GROUP_CONCAT(r.role_id SEPARATOR ', ')
                        FROM sm_acl_user_role ur JOIN sm_acl_role r
                          ON r.cid=ur.cid AND r.role_id=ur.role_id
                       WHERE ur.cid=u.cid AND ur.user_id=u.user_id) roles
                  FROM sm_acl_user u WHERE {' AND '.join(where)}
                  ORDER BY u.id DESC LIMIT 200""", params)
-    all_roles = q("SELECT * FROM sm_acl_role WHERE cid=%s ORDER BY role_id", (config.CID,))
+    
+    all_roles = q("SELECT * FROM sm_acl_role WHERE cid=%s AND status = 'ACTIVE' ORDER BY role_id", (config.CID,))
     context.update({"title": "Users", "rows": rows, "all_roles": all_roles,
                     "statuses": STATUS_OPTIONS, "qk": qk,
                     "can_manage": require_perm(user, "acl.manage")})
@@ -144,7 +146,7 @@ async def user_delete(request: Request, uid: str):
         set_flash(request, "danger", "User not found.")
         return RedirectResponse("/users", status_code=303)
     form = await request.form()
-    to_status = "ACTIVE" if (form.get("restore") == "1") else "INACTIVE"
+    to_status = "ACTIVE" if (form.get("restore") == "1") else "PENDING"
     x("UPDATE sm_acl_user SET status=%s, updated_on=NOW(), updated_by=%s WHERE cid=%s AND user_id=%s",
       (to_status, user["user_id"], config.CID, uid))
     invalidate_user_cache(uid)
@@ -222,7 +224,6 @@ async def role_edit(request: Request, rid: str):
     set_flash(request, "success", f"Role '{rid}' updated.")
     return RedirectResponse("/roles", status_code=303)
 
-
 @router.post("/roles/delete/{rid}")
 async def role_delete(request: Request, rid: str):
     user, context, redirect = _guard_user(request, manage=True)
@@ -232,11 +233,13 @@ async def role_delete(request: Request, rid: str):
     if not old:
         set_flash(request, "danger", "Role not found.")
         return RedirectResponse("/roles", status_code=303)
-    x("UPDATE sm_acl_role SET status='INACTIVE', updated_on=NOW(), updated_by=%s WHERE cid=%s AND role_id=%s",
-      (user["user_id"], config.CID, rid))
-    log_change(config.CID, "sm_acl_role", rid, "DELETE", old=old,
-               changed_by=user["user_id"], user_ip=client_ip(request))
-    set_flash(request, "success", f"Role '{rid}' set to INACTIVE.")
+    form = await request.form()
+    to_status = "ACTIVE" if (form.get("restore") == "1") else "PENDING"
+    x("UPDATE sm_acl_role SET status=%s, updated_on=NOW(), updated_by=%s WHERE cid=%s AND role_id=%s",
+      (to_status, user["user_id"], config.CID, rid))
+    log_change(config.CID, "sm_acl_role", rid, "RESTORE" if to_status == "ACTIVE" else "DELETE",
+                   old=old, changed_by=user["user_id"], user_ip=client_ip(request))
+    set_flash(request, "success", f"Role '{rid}' {'restored' if to_status == 'ACTIVE' else 'set to INACTIVE'}.")
     return RedirectResponse("/roles", status_code=303)
 
 

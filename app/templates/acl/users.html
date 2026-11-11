@@ -67,6 +67,7 @@
         <tr id="edit-{{ u['user_id'] }}" style="display:none;background:#fafbfc">
           <td colspan="7">
             <form method="post" action="/users/edit/{{ u['user_id'] }}" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:10px">
+              <div class="field"><label>USERID</label><input readonly ="name" value="{{ u['user_id'] }}"></div>
               <div class="field"><label>Name</label><input name="name" value="{{ u['name'] }}"></div>
               <div class="field"><label>Email</label><input name="email" value="{{ u['email'] }}"></div>
               <div class="field"><label>New Password (optional)</label><input name="password" type="password"></div>
@@ -74,7 +75,7 @@
                 <select name="is_super"><option value="0" {{ 'selected' if not u['is_super'] }}>No</option>
                 <option value="1" {{ 'selected' if u['is_super'] }}>Yes</option></select></div>
               <div class="field"><label>Status</label>
-                <select name="status">{% for s in statuses %}<option {{ 'selected' if u['status']==s }}>{{ s }}</option>{% endfor %}</select></div>
+                <select name="status">{% for s in statuses %}<option {{ 'selected' if u['status']==s[0] }}>{{ s[0] }}</option>{% endfor %}</select></div>
               <div class="field full">
                 <label>Roles</label>
                 {% set uroles = (u['roles'] or '')|map('trim')|list %}

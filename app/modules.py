@@ -269,7 +269,7 @@ MODULES = {
     },
     # ================= Settings =================
     "category-type": {
-        "title": "Category Type",
+        "title": "Module Category",
         "icon": "fa-shapes",
         "perm": "category_type",
         "table": "sm_category_type",

@@ -17,7 +17,39 @@
     <form method="post" action="/roles/create" style="display:grid;grid-template-columns:220px 260px;gap:10px">
       <div class="field"><label>Role ID <span class="req">*</span></label><input name="role_id" required placeholder="e.g. AUDITOR"></div>
       <div class="field"><label>Role Name <span class="req">*</span></label><input name="role_name" required></div>
+
       <div class="field full">
+        <label>Permissions</label>
+      
+        <input type="text" id="permissionSearch" placeholder="Search module or permission..."
+          style="width:100%;margin-bottom:10px;padding:8px;">
+      
+        <div id="permissionContainer" style="padding:6px">
+
+          {% for module, plist in perms_by_module.items() %}
+          <div class="permission-module">
+
+            <b class="permission-module-name">
+              {{ module }}
+            </b>
+
+            <div class="permission-list">
+              {% for p in plist %}
+              <label class="permission-item">
+                <input type="checkbox" name="perms" value="{{ p['perm_id'] }}">
+                <span>{{ p['perm_id'] }}</span>
+              </label>
+              {% endfor %}
+            </div>
+
+          </div>
+          {% endfor %}
+
+        </div>
+
+      </div>
+
+      <!-- <div class="field full">
         <label>Permissions</label>
         <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:8px;padding:6px">
           {% for module, plist in perms_by_module.items() %}
@@ -27,7 +59,7 @@
           {% endfor %}
           {% endfor %}
         </div>
-      </div>
+      </div> -->
       <div class="field full"><button class="btn btn-green" type="submit"><i class="fa-solid fa-plus"></i> Create Role</button></div>
     </form>
     {% else %}<div class="hint">Read-only view — you need the <code>acl.manage</code> permission to manage roles.</div>{% endif %}
@@ -51,6 +83,11 @@
             <form method="post" action="/roles/delete/{{ r['role_id'] }}" style="display:inline">
               <button class="btn btn-sm btn-danger" data-confirm="Deactivate role {{ r['role_id'] }}?"><i class="fa-solid fa-trash"></i></button>
             </form>
+            {% elif r['status'] != 'ACTIVE' %}
+            <form method="post" action="/roles/delete/{{ r['role_id'] }}" style="display:inline">
+              <input type="hidden" name="restore" value="1">
+              <button class="btn btn-sm btn-green" title="Restore"><i class="fa-solid fa-rotate-left"></i></button>
+            </form>
             {% endif %}
           </td>
           {% endif %}
@@ -61,7 +98,7 @@
             <form method="post" action="/roles/edit/{{ r['role_id'] }}">
               <div style="display:grid;grid-template-columns:260px 1fr;gap:10px">
                 <div class="field"><label>Role Name</label><input name="role_name" value="{{ r['role_name'] }}"></div>
-                <div class="field">
+                <!-- <div class="field">
                   <label>Permissions</label>
                   <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:6px;padding:4px">
                     {% for module, plist in perms_by_module.items() %}
@@ -72,7 +109,48 @@
                     {% endfor %}
                     {% endfor %}
                   </div>
+                </div> -->
+
+
+                <div class="field">
+                  <label>Permissions</label>
+
+                  <input type="text" id="epermissionSearch" placeholder="Search module or permission..."
+                    style="width:100%;padding:8px;margin-bottom:10px;">
+
+                  <div id="epermissionContainer" style="display:grid;
+                                grid-template-columns:repeat(1, minmax(0, 1fr));
+                                gap:10px;padding:4px;">
+
+                    {% for module, plist in perms_by_module.items() %}
+                    <div class="epermission-module" style="border:1px solid #eee;border-radius:6px;padding:10px;">
+
+                      <b class="emodule-name" style="font-size:12px;display:block;margin-bottom:8px;">
+                        {{ module }}
+                      </b>
+
+                      <div style="display:grid;
+                                        grid-template-columns:repeat(1, minmax(0, 1fr));
+                                        gap:4px;">
+
+                        {% for p in plist %}
+                        <label class="epermission-item" style="font-weight:400;display:flex;
+                                              align-items:center;gap:5px;">
+
+                          <input type="checkbox" name="perms" value="{{ p['perm_id'] }}" style="width:auto;margin:0;" {{ 'checked' if
+                            p['perm_id'] in role_perms.get(r['role_id'], []) else '' }}>
+
+                          {{ p['perm_id'] }}
+                        </label>
+                        {% endfor %}
+
+                      </div>
+                    </div>
+                    {% endfor %}
+                  </div>
                 </div>
+
+
                 <div class="field full"><button class="btn btn-primary" type="submit"><i class="fa-solid fa-floppy-disk"></i> Update Role</button></div>
               </div>
             </form>
@@ -92,5 +170,53 @@
     var row = document.getElementById("edit-" + id);
     row.style.display = row.style.display === "none" ? "" : "none";
   }
+
+
+  document.getElementById('permissionSearch').addEventListener('input', function () {
+      const search = this.value.toLowerCase().trim();
+
+      document.querySelectorAll('.permission-module').forEach(module => {
+          const moduleName = module.querySelector('b').textContent.toLowerCase();
+          let visiblePermissions = 0;
+
+          module.querySelectorAll('.permission-item').forEach(item => {
+              const permissionName = item.textContent.toLowerCase();
+              const match = moduleName.includes(search) || permissionName.includes(search);
+
+              item.style.display = match ? 'flex' : 'none';
+
+              if (match) visiblePermissions++;
+          });
+
+          module.style.display = visiblePermissions > 0 ? 'flex' : 'none';
+      });
+  });
+
+
+  document.getElementById('epermissionSearch').addEventListener('input', function () {
+      const search = this.value.toLowerCase().trim();
+
+      document.querySelectorAll('.epermission-module').forEach(module => {
+          const moduleName = module.querySelector('.emodule-name').textContent.toLowerCase();
+          const permissions = module.querySelectorAll('.epermission-item');
+
+          let visibleCount = 0;
+
+          permissions.forEach(permission => {
+              const permissionName = permission.textContent.toLowerCase();
+
+              const match = moduleName.includes(search) ||
+                            permissionName.includes(search);
+
+              permission.style.display = match ? 'flex' : 'none';
+
+              if (match) visibleCount++;
+          });
+
+          module.style.display = visibleCount > 0 ? '' : 'none';
+      });
+  });
+
+
 </script>
 {% endblock %}

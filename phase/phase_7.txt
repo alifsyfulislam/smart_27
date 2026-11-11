@@ -1,0 +1,33 @@
+PHASE 7: FINAL SYSTEM AUDIT AND HANDOVER
+
+Perform a final audit of the optimized AI Project Brain architecture.
+
+Verify:
+
+1. All approved changes are implemented.
+2. MY_WATCHER follows the new workflow.
+3. AGENTS.md contains clear instructions.
+4. Brain indexing works.
+5. Context retrieval is task-specific.
+6. Documentation synchronization works.
+7. Historical decisions are preserved.
+8. Session handover works.
+9. No duplicate or conflicting instructions were introduced.
+10. No existing project functionality was damaged.
+
+Prepare the final documentation:
+
+- Final architecture overview.
+- Updated AI workflow.
+- Context loading rules.
+- Brain synchronization rules.
+- MY_WATCHER execution instructions.
+- Troubleshooting guide.
+- Token efficiency report.
+- Known limitations.
+
+Finally, explain how I should use this system every day.
+
+Do not introduce additional architectural changes unless a critical issue is discovered.
+
+Mark the project optimization as complete only after verification.

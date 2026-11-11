@@ -1,0 +1,47 @@
+PHASE 6: CONTEXT MANAGEMENT VALIDATION
+
+Test the optimized AI Project Brain system using realistic development scenarios.
+
+TEST 1: New Session
+Start with no previous conversation context.
+Verify that AI can understand the project using its startup instructions and current state.
+
+TEST 2: Simple Task
+Give AI a small development task.
+Verify that it retrieves only relevant documentation and source files.
+
+TEST 3: Complex Task
+Give AI a task involving multiple modules and database dependencies.
+Verify that all necessary context is retrieved.
+
+TEST 4: Repeated Task
+Run a similar task again.
+Check whether unnecessary unchanged documentation is being processed again.
+
+TEST 5: Brain Synchronization
+Complete a development task and verify that the correct Brain documents are updated.
+
+TEST 6: Historical Decision
+Ask AI about a previous technical decision.
+Verify that it retrieves the correct historical information.
+
+TEST 7: Session Handover
+End one session and start another.
+Verify that the next session can continue without manually explaining previous work.
+
+TEST 8: Change Detection
+Modify a relevant document and verify that outdated context is not reused.
+
+For every test report:
+- Expected behavior.
+- Actual behavior.
+- Files accessed.
+- Context retrieved.
+- Token usage, if measurable.
+- Pass/fail result.
+
+Do not fabricate token savings. Use actual measurements or clearly labeled estimates.
+
+Fix failures and retest.
+
+Do not modify business logic during these tests.

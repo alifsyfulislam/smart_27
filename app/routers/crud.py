@@ -243,7 +243,7 @@ def key_col_of(m):
 # ------------------------------------------------------------------- list
 @router.get("/{slug}")
 async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
-                      page_size: int = 10, status: str = "", sort: str = ""):
+                      page_size: int = 25, status: str = "", sort: str = ""):
     result = _access(request, slug, "view")
     m, user, context = result[0], result[1], result[2]
     if isinstance(context, RedirectResponse):

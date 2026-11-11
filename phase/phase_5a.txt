@@ -1,0 +1,49 @@
+# IMPLEMENTATION CHECKPOINT — PHASE 5 PAUSED
+
+My AI coding token limit has been reached. Implementation is temporarily paused and will resume tomorrow.
+
+Before stopping, perform the following actions:
+
+1. Stop all further implementation activities.
+2. Identify exactly where Phase 5 implementation stopped.
+3. List all completed implementation steps.
+4. List all partially completed steps.
+5. Identify remaining implementation steps.
+6. Record every modified, created and deleted file.
+7. Verify which changes have been successfully saved.
+8. Identify any incomplete operations or unresolved errors.
+9. Record dependencies and important implementation decisions.
+10. Preserve all existing project knowledge and historical information.
+
+## Create Implementation Checkpoint
+
+Save a detailed checkpoint in the existing Brain architecture.
+
+Include:
+
+- Current phase: Phase 5 — Implementation.
+- Implementation progress.
+- Completed tasks.
+- Pending tasks.
+- Partially completed tasks.
+- Modified files.
+- Remaining implementation plan.
+- Known issues.
+- Last successfully verified operation.
+- Exact next action to execute.
+
+Update MY_WATCHER.txt or the appropriate existing Brain document if necessary. Do not create duplicate checkpoint files.
+
+## IMPORTANT
+
+Do not:
+- Restart Phase 1.
+- Repeat the audit.
+- Redesign the approved architecture.
+- Reimplement completed changes.
+- Overwrite working files unnecessarily.
+- Mark unfinished tasks as completed.
+
+At the end, provide a concise handover report with the exact instruction I should give you tomorrow to resume Phase 5.
+
+STOP after saving and verifying the checkpoint.
