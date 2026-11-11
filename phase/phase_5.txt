@@ -1,0 +1,40 @@
+PHASE 5: IMPLEMENT APPROVED OPTIMIZATIONS
+
+Implement the previously approved architecture.
+
+Follow the implementation checklist in order.
+
+Rules:
+
+1. Back up existing files before modifying them.
+2. Modify existing files wherever possible.
+3. Do not create duplicate documentation.
+4. Preserve existing project knowledge.
+5. Preserve historical decisions.
+6. Maintain compatibility with my AI coding tool.
+7. Keep instructions concise and non-conflicting.
+8. Implement task-specific context retrieval.
+9. Implement Brain synchronization.
+10. Implement document and context indexing where approved.
+11. Implement change detection where approved.
+12. Avoid modifying application business logic.
+
+After each implementation step:
+- Verify the changes.
+- Check for conflicting instructions.
+- Check references and file paths.
+- Record modified files.
+- Record remaining work.
+
+Do not claim functionality is implemented unless verified.
+
+If a significant unexpected issue appears, stop and report it before proceeding.
+
+DELIVERABLE:
+Implementation report with completed steps, modified files and outstanding issues.
+
+
+===================================== RESPONSE =============================================
+
+
+

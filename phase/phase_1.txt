@@ -1,0 +1,174 @@
+PHASE 1: COMPLETE PROJECT INSPECTION
+
+Inspect my entire existing AI project management architecture.
+
+Pay special attention to:
+
+- MY_WATCHER.txt
+- AGENTS.md
+- .agents/
+- brain/
+- docs/ (BRD, PRD, SRS)
+- prompts/
+- skills/
+- Existing scripts and automation.
+
+Understand:
+1. How my AI currently starts a session.
+2. How it reads project documentation.
+3. How it retrieves project context.
+4. How it executes daily tasks.
+5. How it updates Project Brain.
+6. How it maintains historical information.
+7. How it handles task completion and session handover.
+
+Trace the actual workflow instead of assuming how it works.
+
+Identify all existing instructions, dependencies and relationships.
+
+Do not modify, create, delete or rename any files.
+
+DELIVERABLE:
+Provide a complete architecture overview, workflow explanation and list of inspected files.
+
+Stop after completing this phase.
+
+
+===================================== RESPONSE =============================================
+
+
+PHASE 1 — Architecture Overview: SSMS AI Project Management System
+1. Big picture: what this "AI management architecture" actually is
+There is no orchestrator, no daemon, no watcher script, and no session-init automation anywhere in the repo (I swept for .bat/.ps1/.sh/CI configs — none exist). What you have is a convention-based, file-driven memory system with two auto-loaded entry points and a stack of manually-read memory layers:
+
+
+text
+┌─────────────────────────────────────────────────────────────────────┐
+│ LAYER 0 — AUTO-LOADED EVERY SESSION (harness injects, no action)    │
+│   AGENTS.md ──► non-negotiables, verify loop, module checklist      │
+│   .agents/skills/ssms/SKILL.md ──► discovered as skill "ssms";      │
+│       fires by description-match ("working on FastAPI/Jinja/MySQL") │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 1 — TASK INTAKE (manual; human writes, AI reads on request)   │
+│   MY_WATCHER.txt   raw task dump, accumulates, committed to git     │
+│   req.txt          ORIGINAL frozen requirements (DDL truth source)  │
+│   bll_db.sql       368 KB production DB dump (reference data)       │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 2 — SPEC DOCS (read on demand, one-way derivation chain)      │
+│   docs/BRD.md (needs BR1–BR11) ──► docs/PRD.md ("Depends on: BRD")  │
+│   ──► docs/SRS.md ("Implements: PRD"); README.md (how-to)           │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 3 — LIVING MEMORY                                             │
+│   brain/PROJECT_BRAIN.md  decisions / dated status / gotchas /      │
+│                           backlog / "where things live" index       │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 4 — REUSABLE OPERATIONS                                       │
+│   prompts/PROMPTS.md   7 operator prompt templates (health check,   │
+│                        hierarchy branch, onboarding, import, role,  │
+│                        audit diff, module extension)                │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 5 — RUNTIME THE DOCS DESCRIBE                                 │
+│   scripts/ddl.sql (frozen schema + header change-log)               │
+│   scripts/setup_database.py (idempotent bootstrap + seed)           │
+│   app/: modules.py (registry) → hooks.py (rules) → crud.py (engine) │
+│         audit.py · security.py · ctx.py · database.py · main.py     │
+├─────────────────────────────────────────────────────────────────────┤
+│ LAYER 6 — VERIFICATION ARTIFACTS (committed side-effects of runs)   │
+│   cookies, cookies2 (curl session jars) · server.log                │
+│   .freebuff/project-id (external tool workspace id)                 │
+│   item_template.xlsx, items_upload.xlsx (git-ignored test files)    │
+└─────────────────────────────────────────────────────────────────────┘
+2. The seven questions — actual traced workflow
+Q1. How does the AI start a session?
+AGENTS.md is injected automatically into the system context by the agent harness (confirmed — it arrived in my own context at session start, without any user action). It carries the project identity, 6 non-negotiables, the verification commands, and the "new master module" checklist.
+The ssms skill is auto-discovered from .agents/skills/ssms/SKILL.md (frontmatter name/description) and appears in the skill list; it triggers when a task matches "FastAPI/Jinja/MySQL master-data changes".
+Nothing else loads by itself. MY_WATCHER.txt, docs, brain, prompts are all opt-in reads — the user must point the AI at the task (typically "read MY_WATCHER.txt"), or the AI must choose to look.
+Despite the name, nothing watches MY_WATCHER.txt. It is a plain scratch/intake file the human maintains by hand.
+Q2. How does it read project documentation?
+Docs are read on demand, in derivation order: BRD (business rules BR1–BR11) → PRD (page journeys, hook table, acceptance criteria) → SRS (architecture diagram, FR1–FR6, data model, ops). Each header explicitly declares its dependency ("PRD depends on BRD", "SRS implements PRD"), so the chain is self-documenting.
+AGENTS.md §6 only mandates writing the docs, not reading them. In practice the agent reads the relevant section when behavior changes, using SKILL.md's doc-update checklist as the map ("BRD → business rules; PRD → journeys + acceptance; SRS → architecture/FR").
+Q3. How does it retrieve project context?
+Four retrieval paths, all manual read/grep, no index beyond these:
+
+brain/PROJECT_BRAIN.md is the designated entry point — its "Where things live" section is the only explicit file index (hooks → app/hooks.py, UI → app/modules.py, schema → scripts/ddl.sql, …).
+scripts/ddl.sql header comment is the schema change-log ("what was added vs. the requirements' DDL and why").
+req.txt + bll_db.sql are the frozen ground truth for schema fidelity (the expiary_date typo rule is anchored here).
+Git history for feature lineage.
+Q4. How does it execute daily tasks?
+The traced loop (visible in the actual code and git diffs):
+
+Intake from MY_WATCHER.txt (tasks are often pasted as raw text + raw DDL, e.g. the whole sm_client CREATE TABLE is in there verbatim).
+Register the module in app/modules.py (MODULES dict + MODULE_ORDER/PERM2SLUG) — outlet confirmed present at app/modules.py:221 with table: sm_client, create_hook: outlet.
+Business rules as a hook in app/hooks.py (registered under HOOKS), so every write flows through crud.py → audit.
+Schema into scripts/ddl.sql (with status column if soft-delete; header comment updated), permissions seeded in scripts/setup_database.py.
+Verify per AGENTS.md/SKILL.md: start uvicorn on port 8027 → POST /login admin/admin123 → curl the module flows → confirm sm_audit_log grew. The cookies/cookies2 curl cookie jars are the physical residue of this loop (cookies2 decodes to session uid view1 — a VIEWER user, i.e. permission-negative testing was actually done). server.log confirms auto-bootstrap ran ("DB bootstrap OK (smart_27)") and one port-collision restart.
+Template/upload flows tested with the two *.xlsx artifacts in the root.
+Q5. How does it update Project Brain?
+brain/PROJECT_BRAIN.md is hand-edited by the AI; its own header sets the contract: "Living memory for anyone picking up this project. Update on every change."
+Structure: dated Status ("as of 2026-11-09") → Key decisions & why (numbered, with rationale) → Gotchas learned the hard way → Where things live → Next candidates (backlog).
+Practice check: brand-modified v3 (Nov 9) updated brain + all 3 docs + README ✔; the outlet module commits (Nov 10) did not — brain still reads "as of 2026-11-09", and PRD/SRS/SKILL/PROMPTS were untouched (see §4, Finding 2).
+Q6. How does it maintain historical information?
+Four overlapping history mechanisms, each with a different scope:
+
+Mechanism	Scope	Evidence
+Git log	Feature lineage	Terse messages: "brand-modified", "outlet module"
+MY_WATCHER.txt (git-tracked)	Task history — it accumulates and is committed with each feature, so each commit snapshots the task list that drove it	outlet commit 7279a94 added +151 lines of new tasks alongside the code
+ddl.sql header	Schema-change log	Documents every sanctioned deviation from requirements DDL
+PRD §Acceptance criteria	Verification history	"verified 2026-11-05; brand UX re-verified 2026-11-09"
+Q7. How does it handle task completion and session handover?
+There is no formal handover artifact or end-of-session script. Handover is entirely the state of the files when the session ends:
+
+Clean git tree (git status clean) — the commit is the handover boundary.
+Updated doc set + brain = the next session's briefing (brain's header literally says it's for "anyone picking up this project").
+PROMPTS.md hands over operations (7 reusable prompt templates an operator/agent can run against the live app).
+MY_WATCHER.txt carries the residual backlog — unfinished requirements simply remain in the file for the next session.
+3. Dependency & relationship map
+
+text
+AGENTS.md (auto)
+  ├── mandates updates to ─► docs/BRD.md · PRD.md · SRS.md · README.md
+  │                           brain/PROJECT_BRAIN.md · SKILL.md · PROMPTS.md
+  ├── verification loop ────► venv + port 8027 + admin/admin123 + sm_audit_log
+  └── module checklist ─────► app/modules.py ⇄ app/hooks.py ⇄ scripts/ddl.sql
+                               ⇄ scripts/setup_database.py
+.agents/skills/ssms/SKILL.md (auto-listed skill)
+  ├── runs AGENTS.md's verify loop (same commands, more detail)
+  ├── defines "rules of engagement" (one registry, audit completeness, ACL strings)
+  └── duplicates the doc-update checklist (2nd copy of the same contract)
+req.txt ──► scripts/ddl.sql (fidelity: exact names, keep `expiary_date`)
+bll_db.sql ──► reference data for schema design
+docs/BRD.md ──derives──► docs/PRD.md ──derives──► docs/SRS.md
+brain/PROJECT_BRAIN.md ◄── summarizes ── everything above
+prompts/PROMPTS.md ── exercises ──► the running app (routes in README table)
+MY_WATCHER.txt ── feeds ──► all code; is committed with each feature commit
+Notable redundancy: the doc-update checklist exists twice verbatim (AGENTS.md §6 and SKILL.md final section) — they must stay in sync manually.
+
+4. Findings (observations only — nothing changed)
+skills/ at root is empty — superseded by .agents/skills/ssms/SKILL.md. README.md §"Project layout" still lists it ("brain/ skills/ prompts/"), a stale pointer.
+Doc-sync drift on the latest feature: the outlet module (commits 7279a94, e33f355, Nov 10) changed BRD.md by ~1 line but did not update brain/PROJECT_BRAIN.md (status still "2026-11-09", still says "6 master modules"), PRD.md, SRS.md, SKILL.md, or PROMPTS.md — despite the checklist in AGENTS.md §6. The brand-modified v3 commit did follow it fully, so compliance is inconsistent rather than absent.
+MY_WATCHER.txt is dual-purpose and unstructured: it mixes the task queue, UX specs, and full raw DDL (sm_client CREATE TABLE) in one accumulating file. There is no watcher — the name is aspirational.
+Credential/session residue is committed: cookies and cookies2 contain live ssms_session signed cookies (admin and view1 respectively) and are git-tracked; server.log also committed. Not covered by .gitignore.
+The enforcement model is entirely exhortative: every guarantee (audit completeness, doc sync, schema fidelity) relies on the AI following prose checklists; nothing machine-verifies it (no pre-commit hooks, no CI, no test suite — pytest is only a backlog item in the brain file).
+Minor: AGENTS.md non-negotiable #5 has the literal text "localhost/root//smart_27" (double slash = empty password convention, undocumented).
+5. Complete list of inspected files
+File	Lines/Size	Role
+AGENTS.md	30	Project instructions — auto-injected each session
+MY_WATCHER.txt	~154	Task intake / accumulating task history (git-tracked)
+.agents/skills/ssms/SKILL.md	37	Project skill (auto-discovered) — run/verify loop, rules of engagement, doc checklist
+brain/PROJECT_BRAIN.md	44	Living memory — status, decisions, gotchas, index, backlog
+docs/BRD.md	62	Business rules BR1–BR11
+docs/PRD.md	86	Journeys, hook catalogue, acceptance criteria
+docs/SRS.md	94	Architecture, FR1–FR6, data model, ops
+README.md	76	Run instructions, route table, layout
+prompts/PROMPTS.md	41	7 operator/agent prompt templates
+req.txt	294	Original frozen requirements (read first 60 lines in full; nature confirmed)
+scripts/ddl.sql	389	Frozen schema + header change-log (read header in full)
+scripts/setup_database.py	234	Bootstrap/seed (noted; not needed in detail for this phase)
+.gitignore	6	Ignores venv/pycache/.env/uploads/*.xlsx
+cookies, cookies2	small	Curl session jars — verification-loop artifacts
+server.log	small	Bootstrap + port-collision evidence
+.freebuff/project-id	37 B	External tool workspace id (opaque)
+app/modules.py (excerpt)	—	Confirmed outlet registry entry :221, sm_client, hook outlet
+Git history (git log, git show --stat × 3)	6 commits	Traced actual workflow compliance per feature
+skills/	empty	Superseded directory
+Directory sweep also covered: app/ (file inventory), .agents/, brain/, docs/, prompts/, scripts/, .freebuff/, venv/ (present, not inspected — runtime only). Searched for .bat/.ps1/.sh, .github/, .vscode/, .zcode/, CLAUDE/cursor/copilot files — none exist.

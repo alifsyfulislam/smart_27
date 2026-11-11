@@ -1,0 +1,296 @@
+PHASE 3: DESIGN AI CONTEXT MANAGEMENT ARCHITECTURE
+
+Based on the completed audit, design an optimized architecture that improves my existing Project Brain.
+
+My primary objectives:
+
+1. Minimize unnecessary token consumption.
+2. Avoid reading unchanged documentation repeatedly.
+3. Retrieve only task-relevant context.
+4. Maintain accurate long-term project memory.
+5. Synchronize Brain automatically after development tasks.
+6. Preserve historical decisions.
+7. Support continuous development across multiple AI sessions.
+
+Design the following mechanisms:
+
+A. Context Loading Strategy
+- Essential context.
+- Task-specific context.
+- Historical context.
+- Conditional context.
+
+B. Brain Indexing
+- Document index.
+- Module mapping.
+- Dependency mapping.
+- Document relationships.
+- Retrieval rules.
+
+C. Change Detection
+- Detect modified documents and source files.
+- Avoid blindly trusting outdated context.
+- Re-index only affected information.
+
+D. Task Management
+- Task identification.
+- Task dependencies.
+- Implementation status.
+- Completed task archiving.
+- Next-session handover.
+
+E. Memory Synchronization
+- Update only relevant Brain documents.
+- Prevent duplicate information.
+- Preserve historical decisions.
+- Validate documentation consistency.
+
+Evaluate whether lightweight indexing, code search, caching, semantic search or RAG is necessary. Do not introduce unnecessary infrastructure.
+
+Provide:
+- Proposed architecture.
+- Proposed workflow diagrams.
+- File-level changes.
+- Token optimization strategy.
+- Risks and trade-offs.
+- Implementation sequence.
+
+Do not modify files.
+
+Stop and wait for approval.
+
+
+===================================== RESPONSE =============================================
+
+
+PHASE 3 — Proposed Design: SSMS AI Context Management Architecture
+Design only — no files modified. Every mechanism below maps to a Phase-2 finding and is buildable with zero new infrastructure (plain markdown + git + one stdlib Python script).
+
+0. Infrastructure verdict first (as requested)
+Candidate	Verdict	Reasoning
+Lightweight indexing	✅ YES	One brain/INDEX.md (~3KB) becomes the retrieval layer. This is the single highest-leverage change.
+Code search (grep/anchors)	✅ Already available	The harness has grep/Glob/read-by-line-range. The INDEX just makes it targeted — no new tooling needed.
+Caching	✅ YES — but git-based, not custom	Freshness stamps in INDEX + git diff since last-sync. The repo itself already is the persistent cache across sessions; don't build a second one.
+Semantic search	❌ NO	Corpus is ~43KB ≈ 10k tokens. At this scale grep + a fact-map beats embeddings on every axis, and embeddings add a staleness problem — the exact disease being treated.
+RAG / vector DB	❌ NO	Adds chunking, embedding jobs, a store, and retrieval errors, to index a corpus that fits in one context window. Revisit only if the knowledge base exceeds ~200KB or the team grows.
+Consistency checker script	✅ YES — the only new code	scripts/check_context.py, stdlib-only, ~120 lines. Converts the audit's "exhortative checklists" into mechanical verification. This is what makes auto-sync trustworthy.
+Design principle: the architecture is flat files + git as the change-detection engine + one verifier script. Nothing else.
+
+1. Proposed architecture (layers and files)
+
+text
+┌────────────────────────────────────────────────────────────────────────┐
+│ L0 ROUTER — always loaded (auto-injected)          target ≈ 800 tok    │
+│   AGENTS.md (slimmed): non-negotiables + loading router + "code wins"  │
+│   .agents/skills/ssms/SKILL.md (slimmed): conventions only, no facts   │
+├────────────────────────────────────────────────────────────────────────┤
+│ L1 RETRIEVAL — read every session, ~2KB            target ≈ 500 tok    │
+│   brain/INDEX.md        fact→source map · module map · doc map ·       │
+│                         freshness stamps · conditional-loading rules   │
+│   brain/STATUS.md       current snapshot (counts, module list, state)  │
+├────────────────────────────────────────────────────────────────────────┤
+│ L2 TASK — per task, read only relevant rows         1–2k tok           │
+│   brain/TASKS.md        OPEN / BLOCKED / IN_PROGRESS with id·deps·tag  │
+│   → then INDEX-guided line-range reads into code + doc sections        │
+├────────────────────────────────────────────────────────────────────────┤
+│ L3 DEEP REFERENCE — on demand only, by anchor       2–6k tok           │
+│   docs/BRD.md   needs + rule IDs (BR1..) only — no mechanics           │
+│   docs/PRD.md   journeys referencing BR-IDs — no duplicated facts      │
+│   docs/SRS.md   architecture referencing code symbols                  │
+│   README.md     how-to run                                             │
+├────────────────────────────────────────────────────────────────────────┤
+│ L4 MEMORY — append-only history                    on demand           │
+│   brain/DECISIONS.md    D-nnn log, dated, supersede-chained            │
+│   brain/VERIFICATION_LOG.md   V-nnn log: date·commit·module·result     │
+│   brain/archive/        drained MY_WATCHER content                     │
+├────────────────────────────────────────────────────────────────────────┤
+│ L5 VERIFIER — mechanical sync & consistency        runs in seconds     │
+│   scripts/check_context.py   counts · anchors · vocabulary ·           │
+│                              duplicate-detector · task-integrity       │
+└────────────────────────────────────────────────────────────────────────┘
+   HAZARD FILES (conditional, fenced): req.txt (fidelity disputes only),
+   bll_db.sql (never read whole — query targeted), cookies/logs (gitignored)
+Core invariant (fixes the audit's root disease): every fact has exactly one home. Prose copies are replaced by pointers. Any fact stated twice is a defect the checker flags.
+
+2. The five mechanisms
+A. Context Loading Strategy
+Essential (every session, ~800 tokens):
+
+Auto-injected slim AGENTS.md (~600 tok): identity, 6 non-negotiables (unchanged), plus a 10-line loading router.
+The router's rules:
+Read brain/INDEX.md header + STATUS first (≈500 tok).
+Code wins over docs when they disagree (C1/C3 resolution rule).
+Never read whole bll_db.sql / req.txt / engine files without an INDEX anchor.
+Task-specific (per task, via INDEX rows):
+
+INDEX §2 Module map gives, per module: registry line, hook name, table, route, perm slug, doc anchor → the AI reads those line ranges (20–60 lines each), not whole files.
+Engine access becomes surgical: e.g. outlet task = modules.py:221–298 + hooks.py:358–420 + relevant form.html section instead of 73KB of engine.
+Historical (on demand, tagged):
+
+DECISIONS.md filtered by module tag; VERIFICATION_LOG.md tail; git log with the new module: action (T-xxx) convention.
+Loading rule: read history only for (a) "why is it like this" questions, (b) before changing an existing behavior, (c) at handover.
+Conditional context (explicit IF/THEN table, lives in INDEX §4):
+
+IF task involves…	THEN read	ELSE skip
+schema / DDL	ddl.sql header + relevant CREATE TABLE	req.txt
+DDL-fidelity dispute	req.txt (targeted section)	—
+data shape reference	live DB query (SELECT … LIMIT)	bll_db.sql whole-file
+new master module	AGENTS checklist + INDEX §2 row of one similar module	all three docs
+business-rule change	BRD rule ID → then code anchor	PRD/SRS full read
+release / handover	STATUS + VERIFICATION_LOG tail	everything else
+B. Brain Indexing
+brain/INDEX.md — five sections:
+
+
+markdown
+# INDEX — synced at commit <hash> · 2026-11-10
+## §1 FACTS → single source of truth (read ONLY the canonical cell)
+| Fact | Canonical location |
+| hierarchy codes MG/BG/CG/FG | app/hooks.py:6 LEVEL_PREFIX |
+| soft-delete value = PENDING | app/routers/crud.py:615 |
+| default batch 1 / 2100-12-31 | app/hooks.py item.after_create |
+| default stores {id}140/{id}170 | app/hooks.py depot.after_create |
+| permission catalogue (39) | scripts/setup_database.py SEED_PERMISSIONS |
+| counts (modules/perms/ctypes) | OUTPUT OF scripts/check_context.py |
+## §2 MODULE MAP  (one row per module — THE task-context entry point)
+| slug | table | registry | hook | perms | routes | deps | doc anchor |
+| outlet | sm_client | modules.py:221 | hooks.py:358 | outlet.* | /outlet | category_type, depot, depot_store | PRD §2.4 |
+## §3 DOC MAP
+| Question | File | Anchor | last-sync commit |
+## §4 CONDITIONAL-LOADING RULES (table from A above)
+## §5 OPEN TASKS SUMMARY → brain/TASKS.md (ids only, one line)
+Module mapping = §2 rows; Dependency mapping = the deps column (outlet → category_type/depot/depot_store) + hook-level cascade notes (item status → item_batch).
+Document relationships = §3 + the rule chain: BRD rule-ID → PRD journey → SRS FR → code symbol. One-way derivation, no restatement.
+Retrieval rules = §4 table + two hard rules: (1) facts from §1 are never re-derived from prose; (2) an INDEX row is trusted only if its last-sync commit ≥ HEAD — else re-verify that row only (see C).
+C. Change Detection
+Git-based, zero new infrastructure:
+
+Session start: git log --oneline -5 + compare HEAD against INDEX's synced at commit.
+HEAD == stamp → trust INDEX & STATUS wholesale; skip all docs. (Objective 2 satisfied: unchanged docs are never re-read.)
+HEAD > stamp → git diff --stat <stamp>..HEAD → changed paths identify which INDEX rows/docs to re-verify. Re-index only those rows (targeted line-range reads), never whole documents.
+Content-based validation (catches what mtimes can't): scripts/check_context.py re-derives ground truth from code (counts MODULES, SEED_PERMISSIONS, SEED_CATEGORY_TYPES, reads LEVEL_PREFIX, greps status='PENDING') and diffs it against INDEX/STATUS claims + resolves anchors. Drift → exit non-zero with a per-row report → the AI fixes exactly those rows.
+Anti-blind-trust rule in AGENTS.md: before acting on any doc-stated fact, confirm it's in INDEX §1; if it's only in prose, treat as suspect and verify against code.
+D. Task Management
+brain/TASKS.md replaces the unstructured MY_WATCHER pile (H2/M2):
+
+
+markdown
+## IN_PROGRESS (max 1)
+- T-014 | outlet: backfill docs+brain | started 2026-11-10 | next: PRD §2.4 row, STATUS counts
+## OPEN
+- T-015 | status:ready    | module:item    | deps:-     | prio:H | added:2026-11-11
+- T-016 | status:blocked  | module:outlet  | deps:T-015 | prio:M | added:2026-11-11
+## DONE (append-only archive, one line each)
+- T-013 | 2026-11-10 | e33f355 | outlet | registry+hook+perms seeded; docs NOT synced (→ became T-014)
+Identification: T-nnn ids; source link back to the original MY_WATCHER text (archived under brain/archive/).
+Dependencies: explicit deps: field; blocked tasks list separately; the AI resolves order at session start instead of guessing.
+Status: ready / blocked / in_progress / done — one IN_PROGRESS per session.
+Archiving: DONE is append-only one-liners (id·date·commit·module·result). MY_WATCHER.txt becomes a raw inbox: the AI drains it into TASKS.md at session start and leaves a tombstone ( drained → T-014..T-016, 2026-11-11), so the user keeps their familiar workflow.
+Next-session handover (objective 7): end-of-session ritual (see workflow below) writes three things: TASKS.md IN_PROGRESS+next-steps, STATUS.md refresh, INDEX re-stamp after the checker passes. The next session needs ~800 tokens to resume fully — versus today's ~10k re-orientation.
+
+E. Memory Synchronization
+Triggered once, at task completion (not mid-task):
+
+Update only what the task touched (fixes outlet-style drift at 5% effort): INDEX module row (if registry/hook changed) → STATUS counts (if add/delete) → TASKS row → VERIFICATION_LOG entry. DECISIONS.md only if a decision was made. PRD/SRS only if behavior changed, by editing the rule-ID row, not prose restatements.
+Duplicate prevention: checker scans non-canonical files for canonical phrases (2100-12-31, {id}140, PENDING/INACTIVE, MG/BG/CG/FG, #1877f2, admin123) → flags any appearance outside its declared home (H1 enforcement).
+Historical preservation: DECISIONS.md and VERIFICATION_LOG.md are append-only; superseded decisions get superseded-by: D-nnn instead of deletion.
+Consistency validation: the checker must pass before the closing commit — it is the gate that replaces "AI remembers the 8-file checklist".
+3. Workflow diagrams
+Session lifecycle:
+
+
+text
+START
+  │ auto: AGENTS.md (router, ~600 tok)
+  ▼
+check_context.py ──fail──► fix flagged rows (targeted) ─┐
+  │ pass                                                │
+  ▼                                                     │
+INDEX fresh? ──no──► git diff <stamp>..HEAD ──► re-index affected rows only
+  │ yes                                                  │
+  ▼                                                      ▼
+Drain MY_WATCHER inbox → TASKS.md (ids, deps) ──► pick IN_PROGRESS/next ready task
+  ▼
+Load task context: INDEX §2 row → line-range reads (code + doc anchors)   ≈1–2k tok
+  ▼
+IMPLEMENT (engine edit · ddl.sql + header · seed if needed)
+  ▼
+VERIFY: uvicorn + curl loop → append VERIFICATION_LOG entry
+  ▼
+SYNC: update INDEX row / STATUS / TASKS / DECISIONS (if any)  ≈300 tok
+  ▼
+check_context.py ──fail──► fix ─┐
+  │ pass                        │
+  ▼                             │
+COMMIT "module: action (T-nnn)" ◄┘
+  ▼
+HANDOVER: TASKS IN_PROGRESS block + next steps ──► END
+Change detection / re-index (detail):
+
+
+text
+HEAD vs INDEX.sync-commit
+   ├─ equal            → trust INDEX+STATUS; zero doc reads
+   └─ newer            → git diff --stat stamp..HEAD
+                          ├─ only app/* changed → re-verify §1 facts + affected §2 rows
+                          ├─ only docs changed  → refresh §3 last-sync stamps
+                          └─ mixed              → minimal superset of the above
+   checker re-runs after any re-index
+4. File-level changes (proposed; nothing executed)
+#	File	Action	Purpose	Fixes
+1	brain/INDEX.md	NEW (~3KB)	Retrieval layer: fact map, module map, doc map, conditional rules, sync stamp	M1, H4, H1
+2	brain/STATUS.md	NEW (split from PROJECT_BRAIN, ~1.5KB)	Machine-checkable current state (counts, module list, gotchas pointers)	C2
+3	brain/TASKS.md	NEW	Structured tasks: id/status/deps/prio + IN_PROGRESS + DONE archive	H2, M2, D
+4	brain/DECISIONS.md	NEW (split from PROJECT_BRAIN)	Append-only D-nnn log with dates + supersede chains	M3, E
+5	brain/VERIFICATION_LOG.md	NEW	Append-only V-nnn verification records	H3
+6	brain/PROJECT_BRAIN.md	RESTRUCTURE → thin snapshot/pointer file (~2KB)	Becomes L1 pointer; narrative moves to DECISIONS	C2
+7	AGENTS.md	SLIM 2.4→~1.6KB	Router + non-negotiables + "code wins" + sync gate rule	H1, C1/C3
+8	.agents/skills/ssms/SKILL.md	SLIM	Remove restated facts (status value, ACL list, palette); keep conventions; point to INDEX	C3, H1
+9	docs/BRD.md	DEDUPE	Keep needs + BR-rule IDs only; mechanics become pointers	H1
+10	docs/PRD.md, docs/SRS.md	DEDUPE	Reference BR-IDs/code symbols; delete restated facts; fix stale §5/codes	C1, C3, H1
+11	README.md	DEDUPE	Drop counts (→ checker output), fix stale layout section	C2, L1
+12	scripts/check_context.py	NEW (~120 lines, stdlib)	Counts/anchors/vocabulary/duplicates/task integrity; exit ≠0 on drift	all, mechanical gate
+13	MY_WATCHER.txt	CONVERT to inbox	Existing content drained → TASKS.md + brain/archive/2026-11/; tombstone left	H2
+14	.gitignore	APPEND	cookies*, *.log, server.log	L3
+15	bll_db.sql	FENCE (doc pointer + optional move to reference/)	"never read whole" rule in INDEX §4	M4
+Net effect: +5 small files, +1 script, 8 files slimmed. Total knowledge mass shrinks (~43KB → ~28KB) even while adding the index.
+
+5. Token optimization strategy (measured against Phase-2 baseline)
+Session phase	Today	Proposed	Mechanism
+Orientation	~10,000 tok (AGENTS+SKILL+brain+3 docs+README+MY_WATCHER)	~800–1,300	Router + INDEX/STATUS only; docs skipped when stamps are fresh
+Task context	~18,000 tok (full engine read)	3,000–6,000	INDEX §2 rows + line-range anchor reads
+Doc sync per change	~9,000 tok (read+write 8 files)	~1,000–2,000	Single-source facts; sync = 1 INDEX row + STATUS + TASKS
+Verification	~1,500 tok (manual curl, results lost)	~600	Checker + scripted smoke; result appended, never redone
+Historical lookup	git archaeology (variable)	~300	Tagged append-only DECISIONS/VERIFICATION logs
+Feature-session total	~37,000–40,000	~6,000–10,000	≈ 70–80% reduction
+Also eliminated: the 92k-token bll_db.sql foot-gun, and re-reading unchanged docs in unchanged areas (objective 2) — freshness stamps make "unchanged" provable, not assumed.
+
+6. Risks and trade-offs
+Risk	Severity	Mitigation
+INDEX becomes a new stale single-point-of-failure (today's brain problem, relocated)	High	Checker validates INDEX against code-derived truth every session; "code wins" rule; sync stamp only updates after checker passes
+Line-number anchors rot as files are edited	Medium	Anchors stored as symbol # line-as-of-stamp; checker resolves symbols and flags moved anchors; re-index is per-row, cheap
+Still discipline-dependent — the AI executes the sync ritual	Medium	The ritual shrinks from 8 files to ~4 small edits, and the checker makes skipping visible at next session start; commit-gate convention
+Migration itself can introduce drift (touching 13 files at once)	Medium	Done as one dedicated step with checker passing before commit; git tag as rollback point
+Ceremony overhead for trivial tasks	Low	Explicit fast-path rule in AGENTS.md: single-line fixes skip L2/L3, sync = STATUS+TASKS line only
+Slimmer BRD/PRD/SRS lose standalone readability for human stakeholders	Trade-off — needs your call	Option A (recommended): slim docs + rule-ID pointers. Option B: keep docs verbose but demote them in the loading router (INDEX still prevents AI re-reads; drift risk remains)
+Checker script itself can rot	Low	Stdlib-only, ~120 lines, self-contained; it failing loudly is a feature, not a risk
+User workflow change (MY_WATCHER drained by AI)	Low	Tombstones preserve the raw text; user keeps writing tasks the same way
+Open decisions I need from you before implementation:
+
+Hierarchy prefix map (C1): canonicalize to the code's MG/BG/CG/FG (BRD BR1 + hooks.py:6 agree) and fix AGENTS/PRD/SRS/README/seed, or change the code to the docs' CG/BG/TG/FG and re-code seed data? (This is a business-key decision — your original req.txt is internally contradictory.)
+Doc strategy: Option A (slim docs, recommended) or Option B (docs stay verbose, INDEX demotes them)?
+MY_WATCHER.txt: keep as the intake file (drained by AI, recommended) or retire it in favor of writing tasks directly into brain/TASKS.md?
+7. Implementation sequence (8 steps, ~1 working session)
+Step	Action	Validates / fixes	Depends on
+0	Tag current state (pre-context-arch), commit	rollback point	—
+1	Write scripts/check_context.py (counts, vocabulary, anchors, duplicates)	becomes the acceptance gate for every later step	—
+2	Resolve C1 prefix map + C3 status vocabulary (per your decision) in code-or-docs, one canonical home each	C1, C3	1
+3	Build brain/INDEX.md (§1 facts, §2 module map incl. outlet, §3 doc map, §4 rules)	M1; checker passes on new INDEX	2
+4	Split/restructure brain: TASKS.md (drain MY_WATCHER), DECISIONS.md, VERIFICATION_LOG.md, thin PROJECT_BRAIN.md, STATUS.md	C2, H2, M2, M3	3
+5	Slim AGENTS.md router + SKILL.md	H1, C3 instruction layer	3
+6	Dedupe docs (BRD rule-IDs; PRD/SRS/README pointers; fix stale counts/codes)	H1, C2 doc-side	5
+7	Hygiene: .gitignore cookies/logs, fence bll_db.sql, archive drained inbox	M4, L3, L1	6
+8	Validation run: checker passes end-to-end; then execute one real task under the new architecture — backfilling the outlet module's missing docs/brain rows (T-014) — as the pilot of the sync ritual	C2 evidence-closure + proves E mechanism	1–7
+Steps 3–6 are file restructures guided by the Phase-2 audit tables (fact map, module rows, dedupe list are already extracted — the analysis cost is already paid).
+
+Stopping and awaiting your approval — plus the three open decisions in §6. On approval, Phase 4 would execute steps 0–8 in order, running check_context.py as the gate at each step. No files have been modified in this phase.

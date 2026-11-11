@@ -1,0 +1,215 @@
+PHASE 4: IMPLEMENTATION PLANNING
+
+Using the approved architecture, prepare a detailed implementation plan.
+
+For every proposed change specify:
+
+1. Existing file.
+2. Required modification.
+3. New file, only if necessary.
+4. Purpose.
+5. Dependencies.
+6. Expected behavior.
+7. Validation method.
+8. Rollback strategy.
+
+Divide implementation into small, independent steps.
+
+Prioritize:
+- AGENTS.md optimization.
+- MY_WATCHER.txt optimization.
+- Brain indexing.
+- Context retrieval.
+- Change detection.
+- Task tracking.
+- Session handover.
+
+Preserve existing functionality.
+
+Do not modify files yet.
+
+Present the final implementation checklist and wait for my explicit approval.
+
+
+===================================== RESPONSE =============================================
+
+
+PHASE 4 — Implementation Plan (detailed, step-level)
+No files modified yet. 16 steps in 7 groups matching your priority order. Every step states the 8 required fields. Zero application-code changes are required (decision ① keeps hooks.py untouched except a docstring comment) — the plan touches docs, memory files, and one new script only, so existing functionality is preserved by construction.
+
+Global safety net (applies to all steps): tag pre-context-arch at start; every step is one commit; global rollback = git reset --hard pre-context-arch. Per-step validation always includes: server still boots (uvicorn app.main:app port 8027) and login smoke passes — app code is untouched, so this is a formality check.
+
+Execution order note: groups follow your priority order A→G, with one dependency-driven exception: step 9 (the checker) is pulled ahead of group D, because the session-loop wiring (D1) and every later validation gate on it.
+
+GROUP A — AGENTS.md optimization (your priority #1)
+Step 1 — AGENTS.md: conflict hygiene + two new rules
+Existing file: AGENTS.md
+Modification: (a) line 7 "auto-coded CG/BG/TG/FG" → "auto-coded MG/BG/CG/FG (canonical: app/hooks.py LEVEL_PREFIX)"; (b) replace §6's 8-file enumeration with: "Sync contract: update the INDEX row + STATUS counts + affected rule-ID doc; run scripts/check_context.py before every commit"; (c) add non-negotiables: 7. Code wins over docs when they disagree. 8. Every fact lives in exactly one file; restating an INDEX §1 fact elsewhere is a defect.
+New file: none
+Purpose: Kill audit findings C1/C3 at the instruction layer; make AGENTS.md a router instead of a fact store.
+Dependencies: none (self-contained)
+Expected behavior: Auto-injection unchanged; non-negotiables 1–6 verbatim (functionality preserved); text now agrees with hooks.py:6 and crud.py:615.
+Validation: grep → "CG/BG/TG/FG" absent from AGENTS.md; "MG/BG/CG/FG" present; file ≤ ~2.0KB; manual read.
+Rollback: git checkout -- AGENTS.md
+Step 2 — SKILL.md: de-duplicate facts, fix INACTIVE, unlock ACL list
+Existing file: .agents/skills/ssms/SKILL.md
+Modification: (a) line 23 "soft-delete uses status INACTIVE" → "status='PENDING' (truth: crud.py:615)"; (b) line 21 ACL module list → "module set = keys of MODULES (app/modules.py) — includes outlet"; (c) palette/cookie facts → one-line pointers to PRD §2.3; keep operational pitfalls (Jinja/Starlette/middleware — their canonical home stays here).
+New file: none
+Purpose: Fix C3 (wrong status vocabulary in an auto-triggered file); stop SKILL restating facts (H1).
+Dependencies: none
+Expected behavior: Skill still auto-triggers on description-match; conventions intact; no fact conflicts remain in the auto-loaded layer.
+Validation: grep → "INACTIVE" absent; "outlet" present in ACL line; byte size ↓ ~15%.
+Rollback: git checkout -- .agents/skills/ssms/SKILL.md
+Step 3 — hooks.py docstring truth-fix (comment-only)
+Existing file: app/hooks.py
+Modification: line 13 docstring "auto-generate level_id (CG/BG/TG/FG…)" → "(MG/BG/CG/FG…)" per LEVEL_PREFIX line 6. No logic change.
+New file: none
+Purpose: Remove the in-file self-contradiction (C1) so the code reads consistently.
+Dependencies: decision ① (MG/BG/CG/FG canonical)
+Expected behavior: Byte-identical runtime; docstring matches code.
+Validation: grep -n "LEVEL_PREFIX\|MG/BG/CG/FG" app/hooks.py consistent; server boots; one create-flow smoke optional.
+Rollback: git checkout -- app/hooks.py
+GROUP B — MY_WATCHER.txt optimization (your priority #2)
+Step 4 — Create brain/TASKS.md and drain the inbox into it
+Existing file: none touched
+Modification: —
+New file: brain/TASKS.md with schema id | status | module | deps | prio | added | text and sections IN_PROGRESS (≤1) / OPEN / BLOCKED / DONE (append-only one-liners).
+Purpose: Structured task store with dependency + status tracking (H2, M2); the single source for "what's next".
+Dependencies: none
+Expected behavior: Draining today's 7.2KB MY_WATCHER yields ~5 tasks, honestly statused: T-001 outlet docs/brain backfill (ready, P0) · T-002 /item brand-filter (needs-verification — not in PRD) · T-003 item-batch uniqueness (needs-verification — likely done per FR4.6) · T-004 per-module download buttons + hierarchy-template mode (needs-verification — template route exists) · T-005 menu item-batch active-menu scoping (open, ambiguous). Completed v1.0.0 items → DONE one-liners with dates/commits.
+Validation: Coverage check — every MY_WATCHER bullet maps to ≥1 task id or DONE line (side-by-side read against the archive created in step 5); IN_PROGRESS empty; no duplicated ids.
+Rollback: delete brain/TASKS.md (MY_WATCHER still untouched at this point)
+Step 5 — MY_WATCHER.txt → inbox mode (your habit unchanged)
+Existing file: MY_WATCHER.txt
+Modification: Replace body with a ~10-line inbox header ("write raw tasks here; AI drains at session start; format free") + tombstone: "drained 2026-11-11 → T-001..T-005".
+New file: brain/archive/MY_WATCHER_2026-11-11.md — byte-exact copy of the original.
+Purpose: Stop the append-only token tax (H2) while preserving your intake workflow (decision ③).
+Dependencies: Step 4 (must exist first — no gap where tasks live nowhere)
+Expected behavior: You keep pasting raw requirements as always; between sessions the file stays ~10 lines (~250 tokens vs 1,800).
+Validation: fc/diff archive == git HEAD version of MY_WATCHER.txt (zero data loss); MY_WATCHER ≤ 15 lines; TASKS.md coverage check from step 4 re-run.
+Rollback: git checkout -- MY_WATCHER.txt; delete archive file.
+GROUP C — Brain indexing (your priority #3)
+Step 6 — Split PROJECT_BRAIN.md → STATUS + DECISIONS + VERIFICATION_LOG
+Existing file: brain/PROJECT_BRAIN.md
+Modification: Re-write as a thin pointer file (~1.5KB): identity, pointer table to the three new files, "where things live" stays here as the directory index.
+New files: brain/STATUS.md (current state: stack, counts marked "checker-verified", gotchas pointer, run line) · brain/DECISIONS.md (D-001…D-008 migrated verbatim from "Key decisions & why", each dated via git/PRD, append-only) · brain/VERIFICATION_LOG.md (seeded with V-001 = 2026-11-05 v1.0.0 per SRS §5, V-002 = 2026-11-09 brand UX per PRD).
+Purpose: Separate current state (overwritable) from history (append-only) — fixes rolling-snapshot history loss (M3, H3) and makes counts machine-checkable (C2).
+Dependencies: none
+Expected behavior: All 8 decisions and both dated verifications preserved; nothing deleted, only relocated; brain total bytes ≤ current 4.8KB.
+Validation: Content-coverage grep — each decision title and each gotcha found in exactly one new home; no orphan content.
+Rollback: git checkout -- brain/PROJECT_BRAIN.md; delete the three new files.
+Step 7 — Create brain/INDEX.md (the retrieval layer)
+Existing file: none touched
+Modification: —
+New file: brain/INDEX.md (~3KB) with §1 fact→source map (MG/BG/CG/FG → hooks.py:6; soft-delete PENDING → crud.py:615; default batch/stores → hook names; counts → checker output), §2 module map — 7 rows including outlet (slug, table, registry line, hook name, perms, routes, deps column, doc anchor), §3 doc map with last-sync stamps, §4 conditional-loading rules incl. the bll_db.sql fence ("never read whole; use ddl.sql / targeted SQL"), §5 open-task pointer to TASKS.md; header carries synced-at: <current HEAD>.
+Purpose: The single retrieval layer (M1, H4) — task context by line-range instead of whole-file scans.
+Dependencies: Steps 1, 2, 4, 6 (truth established; task ids exist; STATUS exists)
+Expected behavior: Every file:line anchor resolves with its symbol present; outlet row matches modules.py:221/hooks.py:358; fresh installs and the live DB agree on facts (legacy CG001/TG001 demo rows documented as exception — see step 11).
+Validation: Manual anchor spot-check (grep each symbol at its stated line); byte size 2.5–3.5KB; formalized by the checker once step 9 exists (re-run then).
+Rollback: delete file (nothing references it until step 10).
+GROUP D — Context retrieval (your priority #4)
+Step 8 — (pulled forward from group E) Build scripts/check_context.py
+Existing file: none touched
+Modification: —
+New file: scripts/check_context.py (~180 lines, stdlib only: re, pathlib, subprocess→git). Checks: counts (len(MODULES), SEED_PERMISSIONS, SEED_CATEGORY_TYPES vs STATUS/INDEX claims) · vocabulary (PENDING in crud.py; no "status INACTIVE" claims; LEVEL_PREFIX vs INDEX §1) · anchors (INDEX anchors resolve ±5 lines) · duplicates (canonical phrases like 2100-12-31, {id}140, admin123 absent from non-canonical files; req.txt/bll_db.sql/archive exempt) · tasks (deps resolve; IN_PROGRESS ≤1; DONE has commit ref) · stamp (INDEX sync-stamp vs git rev-parse HEAD). Exit 0 clean / 1 drift / 2 structural; prints per-check PASS/FAIL + "re-index rows: …".
+Purpose: Mechanical gate replacing exhortative checklists (C2/H1 enforcement) — the architecture's trust anchor.
+Dependencies: Steps 6, 7 (files it validates exist)
+Expected behavior: On the freshly-synced tree → exit 0; on drift → exit 1 naming the exact file/row.
+Validation: Positive run (exit 0); negative tests: temporarily wrong count in STATUS → exit 1; temporarily move a symbol → anchor FAIL; revert both.
+Rollback: delete file (nothing imports it; app unaffected).
+Step 9 — Wire the session loop: AGENTS.md router + SKILL.md loop
+Existing files: AGENTS.md, .agents/skills/ssms/SKILL.md
+Modification: AGENTS.md gains "Session protocol": start → check_context.py; if exit 1, fix flagged rows only → read INDEX+STATUS → drain MY_WATCHER → pick task from TASKS.md → load context per INDEX §4. SKILL.md "Run & verify loop" gains matching start/end steps (sync ritual reference, see step 14).
+New file: none
+Purpose: Context retrieval becomes conditional and stamp-driven (objectives 1–3); unchanged docs provably never re-read.
+Dependencies: Steps 7, 8
+Expected behavior: A fresh session consumes ~800–1,300 tokens before task work (vs ~10k today); AGENTS.md still auto-loads.
+Validation: Dry-run: simulate session start following the protocol only; log every file read → assert docs/BRD|PRD|SRS not read; checker exit 0.
+Rollback: git checkout both files.
+Step 10 — Docs dedupe to rule-ID chains (decision ② = Option A)
+Existing files: docs/BRD.md, docs/PRD.md, docs/SRS.md, README.md
+Modification: BRD keeps needs + BR-rule IDs (mechanics trimmed); PRD journeys cite "BR5" etc. instead of restating rules; SRS cites code symbols (hooks.py LEVEL_PREFIX, crud.py status) instead of values; README drops counts/rule restatements → pointers. Stale-bit fixes: PRD §4 → "39 permissions (checker-verified)" + outlet in catalogue; SRS §5 "delete → INACTIVE" → PENDING; SRS FR4.1 → MG/BG/CG/FG; SRS FR4.7 DEPOT_CATEGORY → DISTRIBUTOR_CATEGORY; README layout skills/ → .agents/skills/; README seed counts → checker reference. Outlet backfill is NOT done here — that stays as pilot task T-001.
+New file: none
+Purpose: Single source of truth (H1); doc-sync cost 8 files → 1–2; fix all stale doc facts (C1/C2/C3 doc-side).
+Dependencies: Steps 1–3 (vocabulary), 9 (router already de-emphasizes docs)
+Expected behavior: Docs remain a complete derivation chain (BRD→PRD→SRS→code); total doc bytes ↓ ~40%; every fact greppable in exactly one place (checker duplicate-check passes).
+Validation: check_context.py exit 0 (incl. duplicate detector); read-through of the BR-rule chain (BR1→PRD journey→SRS FR→code symbol resolves).
+Rollback: git checkout -- docs/ README.md
+Step 11 — Seed consistency under decision ① (lite variant — no DB writes)
+Existing file: scripts/setup_database.py
+Modification: Update SEED_HIERARCHY sample to generator-canonical codes (MG001 → BG001 → CG001 → FG001/FG002) for fresh installs only; INDEX §1 documents the legacy exception: "demo rows in existing DBs keep CG001/TG001 (pre-canonical seed); do not 'fix' them". (Full data-migration variant — renaming CG001→MG001, TG001→CG001 in the live table with path-column cascades — available as opt-in; recommended against: zero functional benefit, nonzero risk.)
+New file: none
+Purpose: Align seed with the canonical map without touching your working DB (preserve functionality).
+Dependencies: decision ①; step 7 (INDEX documents the exception)
+Expected behavior: Fresh setup_database.py runs produce generator-consistent codes; existing DB untouched; no code collisions (_next_code is prefix-scoped).
+Validation: Run setup_database.py against a throwaway DB name (env var SSMS_DB_NAME) → codes MG001/…; live DB row-counts unchanged; app flows unaffected.
+Rollback: git checkout -- scripts/setup_database.py.
+GROUP E — Change detection (your priority #5)
+Step 12 — Stamp workflow formalization
+Existing file: brain/INDEX.md (from step 7)
+Modification: Add the re-index procedure as §4a: HEAD == stamp → trust wholesale; HEAD newer → git diff --stat <stamp>..HEAD → re-verify only touched rows → checker → update stamp. Add "trusted-untouched" notes to §3 rows.
+New file: none
+Purpose: Make "avoid reading unchanged docs" a provable mechanism (objective 2), re-index only affected info (objective: C).
+Dependencies: Steps 8 (checker), 9 (protocol references it)
+Expected behavior: After any commit, next session re-verifies only diff-touched rows.
+Validation: Simulate: amend one doc → git diff --stat → confirm procedure flags exactly that row; checker still exit 0 after re-stamp.
+Rollback: git checkout -- brain/INDEX.md.
+GROUP F — Task tracking (your priority #6)
+Step 13 — Session ritual codified (start/end)
+Existing file: AGENTS.md (extends step 9's protocol), brain/TASKS.md (template comments)
+Modification: AGENTS.md "Working ritual" section: end-of-task = update TASKS row → STATUS/INDEX rows if code changed → DECISIONS entry if decided → checker → commit module: action (T-nnn). TASKS.md gains format template comments at each section.
+New file: none
+Purpose: Task tracking becomes procedure, not memory (objectives 4–6; D/E).
+Dependencies: Steps 4, 8, 9
+Expected behavior: Every task produces: one TASKS transition, one commit with T-ref, checker green.
+Validation: Dry-run a trivial task end-to-end; assert all artifacts updated and checker exit 0.
+Rollback: git checkout affected files.
+GROUP G — Session handover (your priority #7) + closure
+Step 14 — Handover protocol
+Existing file: brain/TASKS.md, brain/STATUS.md
+Modification: IN_PROGRESS entry gains the handover block template: last commit · done this session · next concrete steps · open questions. End-of-session = fill block + STATUS refresh; next session resumes from AGENTS+INDEX+STATUS+TASKS only.
+New file: none
+Purpose: Multi-session continuity (objective 7) at ~1.3k tokens instead of ~10k re-orientation (H3).
+Dependencies: Steps 6, 13
+Expected behavior: A new session reaches full working context with zero doc reads and zero git archaeology.
+Validation: Simulated handover: freeze session A (fill block), start fresh session B restricted to the 4 resume files → B correctly states current task, next step, and module counts.
+Rollback: git checkout affected files.
+Step 15 — Hygiene: gitignore + committed-artifact removal
+Existing files: .gitignore, git index
+Modification: Append cookies*, *.log, server.log to .gitignore; git rm --cached cookies cookies2 server.log (files stay on disk). The session cookies are expired (8h TTL, Nov 8) — removal is hygiene, not incident response.
+New file: none
+Purpose: Stop committing session secrets/noise (L3).
+Dependencies: none
+Expected behavior: git status stays clean while those files keep changing locally.
+Validation: touch server.log → git status shows nothing; git ls-files | grep cookies → empty.
+Rollback: git checkout -- .gitignore + git add the three files.
+Step 16 — Pilot run: execute T-001 (outlet docs backfill) under the new system
+Existing files: docs/PRD.md, docs/SRS.md, README.md, prompts/PROMPTS.md, brain/STATUS.md, brain/VERIFICATION_LOG.md, brain/TASKS.md
+Modification: Per the ritual: PRD outlet journey + hook row; SRS outlet FR row; README route-table outlet row; PROMPTS outlet-onboarding template; STATUS counts 7/39/17; VERIFICATION_LOG V-003 (live verify: /outlet 200, create outlet → audit rows, customer_type auto-gen); TASKS T-001 → DONE.
+New file: none
+Purpose: Prove the whole loop end-to-end and close audit finding C2 with real evidence.
+Dependencies: all prior steps
+Expected behavior: Checker exit 0 after sync; commit outlet: docs backfill (T-001); handover block filled.
+Validation: Full checker pass; audit-log row check; next-session resume test from step 14 re-run.
+Rollback: git reset --hard pre-outlet-backfill (tagged before step 16).
+Final implementation checklist
+☐	Step	Group (your priority)	File(s)	Type	Depends on	Fixes
+☐	1	A — AGENTS.md	AGENTS.md	edit	—	C1, H1
+☐	2	A	SKILL.md	edit	—	C3, H1
+☐	3	A	app/hooks.py	comment-only	①	C1
+☐	4	B — MY_WATCHER	(new) brain/TASKS.md	new	—	H2, M2
+☐	5	B	MY_WATCHER.txt + archive	edit+new	4	H2
+☐	6	C — Brain indexing	brain/PROJECT_BRAIN.md + 3 new	restructure	—	C2, M3, H3
+☐	7	C	(new) brain/INDEX.md	new	1,2,4,6	M1, H4
+☐	8	E←D gate	(new) scripts/check_context.py	new	6,7	all (mechanical)
+☐	9	D — Retrieval	AGENTS.md, SKILL.md	edit	7,8	obj 1–3
+☐	10	D	docs/BRD·PRD·SRS, README	dedupe	1–3,9	H1, C1/C2/C3 doc-side
+☐	11	D	scripts/setup_database.py (seed only)	edit	①,7	C1 (fresh installs)
+☐	12	E — Change detection	brain/INDEX.md §4a	edit	8,9	obj 2, C
+☐	13	F — Task tracking	AGENTS.md, TASKS.md	edit	4,8,9	D, E
+☐	14	G — Handover	TASKS.md, STATUS.md	edit	6,13	obj 7, H3
+☐	15	G	.gitignore, git index	hygiene	—	L3
+☐	16	G	docs+brain (outlet backfill)	pilot	all	C2 evidence
+Functionality guarantees: no application logic changes anywhere; hooks.py touched only in a comment; setup_database.py only in the fresh-install seed list; live DB untouched; server-boot + login smoke re-verified after every step; audit/ACL/CRUD behavior identical.
+
+Waiting for your explicit approval. On approval I execute steps 0–16 in order (tag → commits per step → checker gate), stopping if any validation fails.

@@ -1,0 +1,188 @@
+PHASE 2: DEEP ARCHITECTURE AUDIT
+
+Based on Phase 1, investigate the actual problems in my AI development workflow.
+
+Analyze:
+
+1. Repeated documentation reading.
+2. Unnecessary full-project scanning.
+3. Excessive context and token consumption.
+4. Duplicate information in BRD, PRD, SRS and Brain.
+5. Missing or ineffective indexing.
+6. Outdated project memory.
+7. Conflicting AI instructions.
+8. Incorrect or incomplete Brain synchronization.
+9. Historical context retrieval problems.
+10. Session-to-session knowledge loss.
+11. MY_WATCHER execution inefficiencies.
+12. Missing task dependency tracking.
+
+For every problem, provide:
+- Problem description.
+- Root cause.
+- Affected files.
+- Impact on token consumption.
+- Impact on development quality.
+- Recommended solution.
+
+Distinguish actual problems from potential improvements.
+
+Do not modify any files.
+
+DELIVERABLE:
+A prioritized audit report with critical, high, medium and low priority issues.
+
+Stop after the audit.
+
+
+===================================== RESPONSE =============================================
+
+
+PHASE 2 — Deep Architecture Audit: SSMS AI Development Workflow
+All findings below are evidence-verified (file sizes measured, code truth checked, git diffs traced). Each finding is tagged [ACTUAL PROBLEM] (demonstrably causing harm today) or [IMPROVEMENT] (optimization opportunity). No files were modified.
+
+0. Evidence base (measurements)
+Knowledge-file inventory (≈4 bytes/token for markdown):
+
+File	Bytes	≈Tokens
+AGENTS.md (auto-loaded)	2,447	600
+.agents/skills/ssms/SKILL.md (auto-listed)	2,632	650
+brain/PROJECT_BRAIN.md	4,835	1,200
+docs/BRD.md + PRD.md + SRS.md	19,373	4,800
+README.md	4,101	1,000
+MY_WATCHER.txt	7,195	1,800
+prompts/PROMPTS.md	2,320	580
+req.txt	16,538	4,100
+scripts/ddl.sql	16,068	4,000
+bll_db.sql	368,387	≈92,000
+Code cost of "one module change": modules.py 17.3KB + hooks.py 20.4KB + crud.py 35.1KB = 72.8KB ≈ 18k tokens (the generic engine concentrates everything in 3 big files).
+
+Fact-replication counts (same fact written in N knowledge files):
+
+Fact	Copies	Files
+is_leaf invariant	8	req, BRD, PRD, SRS, README, PROMPTS, brain, ddl.sql
+Default stores {id}140/{id}170	7	req, AGENTS, BRD, PRD, SRS, README, PROMPTS
+expiary_date rule	7	req, AGENTS, MY_WATCHER, PRD, SRS, brain, SKILL
+Hierarchy prefix codes	5	req, AGENTS, BRD, PRD, README
+Run command (port 8027)	5	AGENTS, SKILL, SRS, README, brain
+admin/admin123 credentials	5	AGENTS, SKILL, BRD, SRS, README
+Facebook palette	3	SKILL, brain, PRD
+Doc-update checklist	2 verbatim	AGENTS §6, SKILL.md
+Full orientation stack (AGENTS + SKILL + brain + 3 docs + README + MY_WATCHER) = 40.6KB ≈ 10k tokens consumed before any task work begins; +req.txt +ddl.sql for schema tasks ≈ 17k tokens.
+
+CRITICAL PRIORITY
+C1. Three-way conflict on hierarchy auto-codes — the docs can make the AI "fix" correct code into broken code [ACTUAL PROBLEM] (your area #7)
+Description: The hierarchy prefix map exists in three contradictory versions:
+Code truth (app/hooks.py:6): LEVEL_PREFIX = {0:"MG", 1:"BG", 2:"CG", 3:"FG"}
+Seed + most docs (setup_database.py:91-94, AGENTS.md:7, PRD.md:61, SRS.md:50, README.md:31, and hooks.py's own docstring at line 13): CG/BG/TG/FG
+BRD BR1 (updated in commit 7279a94): MG001/BG001/CG001/FG001 — matches the code
+req.txt is internally contradictory: sample values are CG001/BG001/TG001 while the comments say "here MG is prefix of level".
+Root cause: No single source of truth + fact replicated in 5+ files. Commit 7279a94 fixed one copy (BRD) and left the other four docs, the seed data, and the hooks.py docstring stale. Note the seed emits CG001→TG001 codes the generator itself can never produce (it would emit MG### for company, CG### for type) — seeded data and generator disagree.
+Affected files: app/hooks.py (6 vs 13), AGENTS.md, docs/PRD.md, docs/SRS.md, README.md, scripts/setup_database.py, docs/BRD.md (the only accurate one), req.txt.
+Token impact: Reconciliation forces reading all 5 copies (~1–2k tokens) plus the reasoning overhead of deciding which is true — an AI without code access has no way to resolve it.
+Quality impact: Highest-severity failure mode in the repo. An AI trusting AGENTS.md/PRD/SRS (the files AGENTS.md itself calls authoritative) will "correct" hooks.py to CG/BG/TG/FG and silently corrupt user-facing business keys (level_id codes) for every new hierarchy node.
+Recommendation: Pick the canonical map once (business decision: MG/BG/CG/FG per code, or CG/BG/TG/FG per original requirements), then implement it in exactly one place — hooks.py — and replace every prose copy with a pointer: "codes: see hooks.py LEVEL_PREFIX". Also fix the seed data and the docstring in the same change.
+C2. Project memory went stale the same day it was last used — outlet module invisible to memory [ACTUAL PROBLEM] (your areas #6, #8)
+Description: The outlet module (2026-11-10, commits 7279a94/e33f355) is documented in zero of nine memory/doc files: brain/PROJECT_BRAIN.md still says "as of 2026-11-09", "6 master modules" (actual: 7, MODULE_ORDER), and its ACL context lacks outlet; SKILL.md:21 ACL module set {dashboard, brand, item, item_batch, distributor, depot_store, category_type, acl, audit} — no outlet; PRD §4 says "34 seeded permissions" (actual: 39, verified in setup_database.py) with no outlet in the catalogue; README says "34 permissions, 12 category-type values" (actual: 39 / 17); SRS FR4.7 still references DEPOT_CATEGORY, which commit e33f355 renamed to DISTRIBUTOR_CATEGORY in the seed; PROMPTS.md has no outlet template. Only BRD got a single line (and that line was about codes, not outlets).
+Root cause: The doc-sync contract spans 8 files updated by hand (AGENTS §6 / SKILL checklist). Nothing enforces or verifies it, so compliance is all-or-nothing: brand-modified v3 did it fully (6 files touched); the outlet commits did it ~5%. The sync step is at the end of the workflow, exactly where session attention is lowest.
+Affected files: brain/PROJECT_BRAIN.md, .agents/skills/ssms/SKILL.md, docs/PRD.md, docs/SRS.md, README.md, prompts/PROMPTS.md (all stale); commits 7279a94, e33f355 (incomplete sync).
+Token impact: Next session cannot trust brain/SKILL — it must re-derive module count, permission catalogue, and ACL strings from source (re-reading modules.py + setup_database.py, +5–8k tokens). Worse: stale context gets acted on.
+Quality impact: An AI following SKILL.md's ACL list will treat outlet.* permissions as nonexistent (wrong gating), plan against "6 modules", and resurrect the renamed DEPOT_CATEGORY. Memory that lies is worse than no memory.
+Recommendation: (a) Make the brain file structured (a machine-greppable "Modules" table + "Counts" block instead of prose paragraphs) so sync is a 3-line edit, not a rewrite; (b) collapse the 8-file contract into one doc-matrix file that AGENTS.md points to; (c) add a tiny self-check (e.g., a script comparing len(MODULES)/len(SEED_PERMISSIONS) against numbers grep'd from brain/README) runnable at session start.
+C3. Soft-delete value conflict: instructions say INACTIVE, code does PENDING [ACTUAL PROBLEM] (your area #7)
+Description: Code truth (app/routers/crud.py:607,615): SET status='PENDING'. But .agents/skills/ssms/SKILL.md:23 teaches "soft-delete uses status INACTIVE", scripts/ddl.sql header says "soft delete to INACTIVE", and SRS contradicts itself: FR3.5 says "PENDING" while §5 verification summary says "delete → INACTIVE". (PRD's "inactive" mentions are only dashboard stat labels; BRD/README/PRD correctly say PENDING.)
+Root cause: Same as C2 — one fact, six copies, three wrong; and the wrong copies are the two instruction files an AI reads first (SKILL.md is auto-triggered; ddl.sql header is the mandated schema reference).
+Affected files: .agents/skills/ssms/SKILL.md, scripts/ddl.sql (header), docs/SRS.md (internal contradiction), vs truth in app/routers/crud.py.
+Token impact: Modest directly (~500 tokens to reconcile), but it silently poisons the top instruction layer — the highest-trust, always-cheap-to-read files are the wrong ones, which is the expensive kind of wrongness.
+Quality impact: An AI extending list filtering or writing a new module's delete path per SKILL.md will query/write status='INACTIVE' → empty lists, broken restores, audit mismatches. Subtle: nothing crashes, rows just vanish.
+Recommendation: Same as C1's pattern — one normative home for the status vocabulary (a "status values" line in AGENTS.md: ACTIVE | PENDING(deleted) | …), and fix SKILL.md, ddl.sql header, and SRS §5 to match code truth (PENDING).
+HIGH PRIORITY
+H1. The 8-file doc-sync contract makes every change a documentation project, and duplication is its direct cause [ACTUAL PROBLEM] (your areas #1, #4)
+Description: Because every business fact is replicated 4–8× (see evidence table), AGENTS.md §6 must mandate updating 8 files, and the AI must read all 8 before safely writing any — the mandatory reading list is ~35.6KB ≈ 9k tokens per change, and the write-back is ~5 file-edits per business rule change. Git proves the cost: brand-modified v3 = 6 doc files edited for one UX feature.
+Root cause: BRD/PRD/SRS/brain/SKILL/README/PROMPTS were each written as if standalone-readable, so each restates the rules (default batch, default stores, soft-delete semantics, palette, codes) instead of referencing them.
+Affected files: all 9 knowledge files (systemic).
+Token impact: Largest structural token cost in the workflow — ~9k tokens/change in reads + writes, repeated every feature. Eliminating cross-copies cuts this to ~2–3k.
+Quality impact: Duplication is the root cause of C1, C2, C3 (every copy is a drift surface). It also slows the AI: reconciling 8 files before a 3-line code change invites shortcut behavior (which is exactly how outlet drift happened).
+Recommendation: Adopt a single-source-of-truth layout: BRD keeps only needs (rules as numbered IDs, no mechanics), PRD references rule IDs, SRS references code symbols (hooks.py LEVEL_PREFIX, crud.py status), brain holds only decisions + status, SKILL holds only conventions not elsewhere stated. Rule of thumb to enforce in AGENTS.md: any fact stated twice is a defect.
+H2. MY_WATCHER.txt is an append-only pile — completed tasks permanently tax every session [ACTUAL PROBLEM] (your areas #11, #12, #1)
+Description: Git-traced growth: 0B (initial) → 536B (8b10af5) → 7,042B (7279a94, +151 lines added alongside the outlet code). The v1.0.0-era specs (menu/brand/item/item-batch — all completed and verified per PRD acceptance criteria) still occupy ~110 lines (~4KB) at the top of the file, undifferentiated from the current outlet task. There are no status markers, IDs, priorities, or done-tombstones (my grep for DONE/[x]/status hits only substrings like "download"). Raw DDL (sm_client, 65 lines) is pasted inline, duplicating what now also lives in ddl.sql.
+Root cause: The file has no format — it's a transcription of chat messages. Nothing marks lifecycle, and committing it with each feature (which does preserve history) also means the pile is permanent and versioned.
+Affected files: MY_WATCHER.txt (7.2KB, 153 lines).
+Token impact: ~1.8k tokens re-read every session, growing unboundedly; plus the reasoning cost of guessing which bullets are still open — the file's oldest half is pure dead weight.
+Quality impact: Two failure modes: (a) re-doing completed work (nothing says the menu/brand/item items are shipped), (b) missing live items buried under stale ones. Also risk: the AI treats stale spec lines (e.g. old brand/delete-button rule) as current requirements since no timestamp exists.
+Recommendation: Give the file a minimal schema — ## OPEN / ## DONE (date, commit) sections, or one line per task: ID | status | deps | module | text. Archive DONE entries on completion. Move pasted DDL out (point at ddl.sql/bll_db.sql instead).
+H3. Session-to-session knowledge loss: verification evidence exists nowhere durable [ACTUAL PROBLEM] (your areas #10, #9)
+Description: Every session re-verifies by live HTTP + audit-log checks (per AGENTS/SKILL), but the results are never persisted. The only dated verification records in the whole repo are two PRD snapshots ("verified 2026-11-05", "re-verified 2026-11-09"). The outlet module — the newest, least-stable code — has no verification record anywhere (not in brain, PRD, or any log). The physical residue (cookies, cookies2, server.log) is incidental, unstructured, and — notably — git-committed, including live ssms_session cookies (admin and view1 sessions).
+Root cause: The workflow's verify loop ends in conversation, not in a file. Brain is a rolling snapshot (overwritten status section), so verification history is overwritten with each update.
+Affected files: brain/PROJECT_BRAIN.md (snapshot-only), cookies, cookies2, server.log (unstructured + credential hygiene problem), absent any verification log.
+Token impact: Each new session must re-execute the whole curl verification suite (~several round-trips, ~1–2k tokens of tool I/O) because prior results are unreadable — and with no test suite there's no cheaper alternative.
+Quality impact: Cannot distinguish "verified OK" from "never checked" per module — the outlet module's actual state is unknowable without redoing the work. Regressions have no baseline to compare against.
+Recommendation: Append-only brain/VERIFICATION_LOG.md (date · commit · module · checks run · result), written at task completion; remove cookies/cookies2/server.log from git and gitignore them (they're session secrets + noise).
+H4. Any small change requires loading the whole engine — monolith structure drives base token cost [IMPROVEMENT with real present-day cost] (your areas #2, #3)
+Description: The generic-CRUD design concentrates all logic in three large files (crud.py 35.1KB, hooks.py 20.4KB, modules.py 17.3KB). A one-line outlet tweak still requires reading the shared engine plus registry plus hooks (~73KB ≈ 18k tokens) and the generic templates. There is no way to read "just the outlet module".
+Root cause: Deliberate architecture choice (decision #1 in brain — justified for audit integrity), but it conflates data-flow sharing (good) with file granularity (costly).
+Affected files: app/routers/crud.py, app/hooks.py, app/modules.py, app/templates/generic/*.
+Token impact: ~18k tokens per session that touches a module — second-largest structural cost after H1.
+Quality impact: Indirect: large contexts encourage skim-reading and missed conventions (e.g., the C3 status trap lives inside a 35KB file).
+Recommendation: Don't break the engine — instead add section anchors (banner comments per hook/module) so an AI can read line-ranges, and keep module-specific docs (one short block per module in the brain) so code reading is confirmatory, not exploratory. A cheap 60% win is an index (see M1) rather than a refactor.
+MEDIUM PRIORITY
+M1. No real index anywhere; "Where things live" is one level deep [ACTUAL PROBLEM, cheap fix] (your area #5)
+Description: The only index is brain's 5-line "Where things live" (directory-level, no symbols, no line anchors, no per-module entries). Nothing maps task-type → files → sections → facts. The AI's retrieval is therefore grep-and-scan over whole files.
+Root cause: The memory files were authored as narrative docs; indexing was never designed.
+Affected files: brain/PROJECT_BRAIN.md, .agents/skills/ssms/SKILL.md, AGENTS.md.
+Token impact: Moderate but recurring — exploratory reads overshoot by 2–5× the needed content (e.g., reading all 35KB of crud.py to change one flash message).
+Quality impact: Missed conventions (the direct enabler of C1/C3 conflicts being discovered late or never).
+Recommendation: Add a compact index block to the brain: per module → registry key (modules.py:NNN), hook name (hooks.py:NNN), table (ddl.sql:NNN), route prefix, perm slug. ~30 lines, saves a full code-scan per session. Update cost is one line per new module — pairs naturally with C2's fix.
+M2. No task dependency tracking — cross-module dependencies exist only as prose [ACTUAL PROBLEM] (your area #12)
+Description: MY_WATCHER's items encode real dependencies in free text only: outlet depends on sm_category_type (Outlet_Category/Sub_Category auto-gen), sm_depot/sm_depot_store; item-status cascade affects sm_item_batch; "update all other module and load this into your skills" implies a multi-module sweep with no enumeration. No ordering, blocked-by, or completion semantics exist.
+Root cause: Same as H2 — the intake file has no schema. The AI currently infers dependency order implicitly from its own code reading.
+Affected files: MY_WATCHER.txt; partially brain/PROJECT_BRAIN.md (backlog section is unordered too).
+Token impact: Low direct; the AI pays in reasoning/planning, not reading.
+Quality impact: Dependency violations would be silent (e.g., building outlet before its category types seed → broken dropdowns). So far sequencing worked by luck (v1.0.0 built all bases first).
+Recommendation: The H2 schema solves this: add deps: and priority: fields; the brain backlog mirrors only open items.
+M3. History retrieval is un-differentiated — terse commits + rolling snapshot erase lineage [ACTUAL PROBLEM, mild] (your areas #9, #10)
+Description: Git messages are non-discriminating (outlet module ×2 for different changes; brand-modified v1–v3), brain's Status is overwritten rather than appended, and task history survives only as MY_WATCHER diffs mixed into feature commits. To answer "when did DEPOT_CATEGORY become DISTRIBUTOR_CATEGORY and why" an AI must bisect commits (e33f355) — and still finds no why.
+Root cause: No convention for commit messages, and the brain's design choice to be a snapshot (its header does say "living memory", but decisions get compressed to numbered entries without dates).
+Affected files: git history (convention), brain/PROJECT_BRAIN.md.
+Token impact: Each retro-question costs a git log/show archaeology session instead of one grep.
+Quality impact: Decisions without dates/rationale get relitigated or reverted accidentally (the DEPOT_CATEGORY rename already lacks a recorded why).
+Recommendation: Convention: commit message = module: action (task-ref); brain entries get inline dates; keep "Key decisions" append-only.
+M4. bll_db.sql (368KB ≈ 92k tokens) sits in the repo root as a context hazard [IMPROVEMENT] (your area #3)
+Description: A full production DB dump lives at root. Nothing warns the AI what it is or when to read it. One careless cat bll_db.sql consumes ≈92k tokens — likely most of a context window — for data that's only needed as shape reference (DDL already lives in ddl.sql).
+Root cause: Ad-hoc file placement; it's not referenced by any doc or gitignored, so it reads as "project documentation".
+Affected files: bll_db.sql (and any doc that could point to it).
+Token impact: Catastrophic-if-triggered; zero if properly fenced.
+Quality impact: An accidental over-read can flush earlier session context (summary pressure), degrading everything downstream.
+Recommendation: One-line pointer in the brain/SKILL: "bll_db.sql = raw production dump, DO NOT read whole; use ddl.sql for schema, query live DB for data." Optionally move under reference/ and gitignore.
+LOW PRIORITY
+L1. Instruction-file hygiene drift [ACTUAL PROBLEM, cosmetic-to-mild] (areas #7, #6)
+AGENTS.md non-negotiable #5's localhost/root//smart_27 (undocumented empty-password notation); empty root skills/ dir still listed in README's layout section (superseded by .agents/skills/ssms/); the doc-update checklist duplicated verbatim in AGENTS §6 and SKILL.md — two lists that will drift independently. Root cause: manual duplication. Tokens: negligible. Quality: small misdirections each cost one confused read. Fix: dedupe checklist to one list; fix README layout; spell out "root, empty password".
+
+L2. No test suite — the verify loop is manual curl every session [IMPROVEMENT] (areas #1, #3)
+Each session re-executes HTTP verification by hand (~1–2k tokens of tool I/O + wall-clock). pytest+httpx (already on the brain backlog) would convert verification into one command and make C2-style drift detectable mechanically. Root cause: deferred work item. Fix: seed a minimal smoke test (login → list 200 → create → audit row) invoked after every module change.
+
+L3. Committed session artifacts (cookies, cookies2, server.log) [ACTUAL PROBLEM, hygiene]
+Live signed session cookies (admin!) tracked in git. Not a token-cost issue; a security/noise issue. Fix: gitignore + git rm --cached (with the caveat that history retains them — rotate secrets if this repo ever leaves the machine).
+
+Priority matrix (12 areas × findings)
+#	Area you asked about	Finding(s)	Verdict
+1	Repeated doc reading	H1 (mandated 8-file read/write cycle)	ACTUAL
+2	Full-project scanning	H4, M1 (monolith + no index)	ACTUAL, structural
+3	Context/token consumption	H1+H4 ≈27k tokens/change baseline; M4 hazard	ACTUAL
+4	BRD/PRD/SRS/Brain duplication	H1 (measured 4–8 copies/fact)	ACTUAL — root cause of C1–C3
+5	Missing indexing	M1	ACTUAL, cheap fix
+6	Outdated memory	C2 (outlet invisible; counts 34→39, 12→17, 6→7)	ACTUAL, already drifted
+7	Conflicting instructions	C1 (codes), C3 (PENDING/INACTIVE)	ACTUAL — code vs docs
+8	Brain sync completeness	C2 (brain is the stalest file)	ACTUAL
+9	Historical retrieval	M3, H3	ACTUAL, mild
+10	Session knowledge loss	H3 (no verification log; rolling snapshot)	ACTUAL
+11	MY_WATCHER inefficiency	H2 (append-only, no lifecycle)	ACTUAL
+12	Task dependency tracking	M2 (prose-only deps)	ACTUAL, medium
+The single pattern behind 9 of 12 findings: facts are copied instead of referenced, and nothing verifies copies against sources. C1/C2/C3 are not three bugs — they are one defect observed three times. The highest-leverage fixes are therefore (1) single-source-of-truth restructure (H1), (2) structured brain + MY_WATCHER schema (C2/H2/M2 together), (3) a mechanical consistency check (counts, status vocabulary, code prefixes) that runs at session start.
+
+Stopping here. No files were modified, created, deleted, or renamed in this phase.
+
+
+
+
+
