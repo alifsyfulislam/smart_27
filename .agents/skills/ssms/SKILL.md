@@ -22,7 +22,7 @@ description: >
   depot_store, outlet, category_type, acl, audit} (canonical catalogue: `SEED_PERMISSIONS` in
   `scripts/setup_database.py`)
   and action ∈ {view, create, edit, delete, import} (acl: view/manage; audit: view).
-- **Schema discipline**: names are frozen (keep `expiary_date` typo); add columns by amending `scripts/ddl.sql` + documenting in its header; soft-delete sets `status='PENDING'` (truth: `app/routers/crud.py`).
+- **Schema discipline**: names are frozen (keep `expiary_date` typo); add columns by amending `scripts/ddl.sql` + documenting in its header. Soft-delete values: master modules `status='PENDING'` (`app/routers/crud.py`); ACL user/role `status='INACTIVE'` (`app/routers/acl_admin.py`). Item *status* (INACTIVE/PENDING/REJECTED) is a separate domain vocabulary pushed to batches (`app/hooks.py item_soft_delete`).
 - **UI**: Facebook-style palette (values: `docs/PRD.md` §2.3), Font Awesome local only, accordion sidebar (`openGroup` in localStorage), responsive ≥900px desktop / drawer on mobile.
 - **Jinja pitfalls**: dict keys named `items` collide with the dict method in attribute lookup — use `entries`; `max`/`min` are registered globals; there is no `set()` — use `[]` literals.
 - **Starlette pitfalls**: register `SessionMiddleware` AFTER route middleware; include `acl_admin` router BEFORE `crud` (the `/{slug}` catch-all would swallow `/users`, `/roles`, `/permissions`).
