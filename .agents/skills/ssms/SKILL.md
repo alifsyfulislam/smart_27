@@ -18,10 +18,12 @@ description: >
 ## Rules of engagement
 - **One registry**: module UI/fields live ONLY in `app/modules.py` (`MODULES`); business rules ONLY in `app/hooks.py` (`HOOKS[value of create_hook]`).
 - **Audit completeness**: writes go through `_do_create` / `_update` / soft-delete-restore paths in `app/routers/crud.py`; `app/audit.log_change` must wrap them.
-- **ACL strings**: `module.action` where module ∈ {dashboard, brand, item, item_batch, distributor, depot_store, category_type, acl, audit}
+- **ACL strings**: `module.action` where module ∈ {dashboard, brand, item, item_batch, distributor,
+  depot_store, outlet, category_type, acl, audit} (canonical catalogue: `SEED_PERMISSIONS` in
+  `scripts/setup_database.py`)
   and action ∈ {view, create, edit, delete, import} (acl: view/manage; audit: view).
-- **Schema discipline**: names are frozen (keep `expiary_date` typo); add columns by amending `scripts/ddl.sql` + documenting in its header; soft-delete uses `status INACTIVE`.
-- **UI**: Facebook palette (#1877f2/#f0f2f5/#050505/#65676b), Font Awesome local only, accordion sidebar (`openGroup` in localStorage), responsive ≥900px desktop / drawer on mobile.
+- **Schema discipline**: names are frozen (keep `expiary_date` typo); add columns by amending `scripts/ddl.sql` + documenting in its header; soft-delete sets `status='PENDING'` (truth: `app/routers/crud.py`).
+- **UI**: Facebook-style palette (values: `docs/PRD.md` §2.3), Font Awesome local only, accordion sidebar (`openGroup` in localStorage), responsive ≥900px desktop / drawer on mobile.
 - **Jinja pitfalls**: dict keys named `items` collide with the dict method in attribute lookup — use `entries`; `max`/`min` are registered globals; there is no `set()` — use `[]` literals.
 - **Starlette pitfalls**: register `SessionMiddleware` AFTER route middleware; include `acl_admin` router BEFORE `crud` (the `/{slug}` catch-all would swallow `/users`, `/roles`, `/permissions`).
 
