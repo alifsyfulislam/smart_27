@@ -87,12 +87,14 @@ SEED_CATEGORY_TYPES = [
 ]
 
 SEED_HIERARCHY = [
-    # level_id, level_name, parent_level_id
-    ("CG001", "TCPL Products", "0"),
-    ("BG001", "Kurkure", "CG001"),
-    ("TG001", "Collet", "BG001"),
-    ("FG001", "American Style Cream & Onion", "TG001"),
-    ("FG002", "Masala Munch", "TG001"),
+    # level_id, level_name, parent_level_id — codes follow app/hooks.py LEVEL_PREFIX
+    # (MG=company, BG=brand, CG=type, FG=flavor). Existing DBs seeded before
+    # 2026-11-12 keep the legacy demo codes CG001(company)/TG001(type).
+    ("MG001", "TCPL Products", "0"),
+    ("BG001", "Kurkure", "MG001"),
+    ("CG001", "Collet", "BG001"),
+    ("FG001", "American Style Cream & Onion", "CG001"),
+    ("FG002", "Masala Munch", "CG001"),
 ]
 
 ROLE_PERM_MATRIX = {
