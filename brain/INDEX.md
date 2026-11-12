@@ -1,4 +1,4 @@
-# INDEX — synced at commit 9763c95 · 2026-11-12
+# INDEX — synced at commit 14fd314 · 2026-11-12
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -42,11 +42,11 @@ Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/m
 ## §3 Doc map (what to read for what; skip unless §4 sends you)
 | Question | File | Last-sync |
 |---|---|---|
-| Business needs, BR1–BR11 rules | `docs/BRD.md` | 48f846f |
-| Page journeys, acceptance criteria | `docs/PRD.md` | 48f846f |
-| Architecture, FR1–FR6, data model | `docs/SRS.md` | 48f846f |
-| How to run, route table | `README.md` | 48f846f |
-| Operator prompt templates | `prompts/PROMPTS.md` | 48f846f |
+| Business needs, BR1–BR11 rules | `docs/BRD.md` | 14fd314 |
+| Page journeys, acceptance criteria | `docs/PRD.md` | 14fd314 |
+| Architecture, FR1–FR6, data model | `docs/SRS.md` | 14fd314 |
+| How to run, route table | `README.md` | 14fd314 |
+| Operator prompt templates | `prompts/PROMPTS.md` | 14fd314 |
 | Original frozen requirements (fidelity disputes ONLY) | `req.txt` | never changes |
 
 ## §4 Conditional-loading rules
