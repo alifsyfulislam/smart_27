@@ -16,10 +16,12 @@ import sys
 ROOT = pathlib.Path(__file__).resolve().parent.parent
 
 # ---- the doc/instruction layer that the phrase scan guards -------------------
+# brain/TASKS.md and MY_WATCHER.txt are intake-derived (they quote raw user
+# requirements verbatim) and are therefore exempt from the phrase scan.
 SCAN_FILES = [
     "AGENTS.md", "README.md",
     "docs/BRD.md", "docs/PRD.md", "docs/SRS.md",
-    "brain/INDEX.md", "brain/STATUS.md", "brain/PROJECT_BRAIN.md", "brain/TASKS.md",
+    "brain/INDEX.md", "brain/STATUS.md", "brain/PROJECT_BRAIN.md",
     ".agents/skills/ssms/SKILL.md", "prompts/PROMPTS.md",
 ]
 # history/intake/code layers are exempt (they may legitimately quote old facts)

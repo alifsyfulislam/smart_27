@@ -9,9 +9,9 @@ description: >
 # SSMS skill
 
 ## Run & verify loop
-1. Server: `./venv/Scripts/python -m uvicorn app.main:app --host 0.0.0.0 --port 8027`
-   (background; DB auto-bootstraps on startup — MariaDB/MySQL must be running).
-2. Login via `POST /login { user_id: admin, password: admin123 }` (session cookie `ssms_session`).
+1. Server: `./venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8027`
+   (background; DB auto-bootstraps on startup — MariaDB/MySQL must be running; host binding per `AGENTS.md`).
+2. Login via `POST /login` with the default admin credentials (see `AGENTS.md`) — session cookie `ssms_session`.
 3. Exercise routes with curl; confirm `sm_audit_log` grew after each write (query via `app.database.q`).
 4. DB work: `./venv/Scripts/python scripts/setup_database.py` re-runs DDL + seed safely (idempotent, emptiness checks per table).
 
