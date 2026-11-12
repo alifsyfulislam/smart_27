@@ -9,6 +9,7 @@ description: >
 # SSMS skill
 
 ## Run & verify loop
+0. Session start/end: follow the **Session protocol** in `AGENTS.md` (checker → INDEX/STATUS → TASKS → anchor-scoped reads; closing ritual before commit).
 1. Server: `./venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8027`
    (background; DB auto-bootstraps on startup — MariaDB/MySQL must be running; host binding per `AGENTS.md`).
 2. Login via `POST /login` with the default admin credentials (see `AGENTS.md`) — session cookie `ssms_session`.
