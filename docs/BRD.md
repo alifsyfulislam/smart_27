@@ -27,11 +27,11 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 
 | # | Rule |
 |---|------|
-| BR1 | Item hierarchy levels are created manually (no integration). Levels: Company(C*) → Brand(B*) → Type(T*) → Flavor(F*), auto-coded `MG001/BG001/CG001/FG001` per level with parent path columns `level0..level3`. |
+| BR1 | Item hierarchy levels are created manually (no integration). Levels: Company(C*) → Brand(B*) → Type(T*) → Flavor(F*), auto-coded per the level prefix map (`app/hooks.py LEVEL_PREFIX`; values in `brain/INDEX.md` §1) with parent path columns `level0..level3`. |
 | BR2 | Leaf flag invariant: a hierarchy node has `is_leaf=1` **iff it has no ACTIVE child** — recomputed automatically on create, update, soft delete and restore; renaming a level propagates through descendant path columns. |
 | BR3 | Items come from integration or manual creation; every item automatically gets a **default batch `1` with expiry 2100-12-31** (`sm_item_batch`). |
 | BR4 | Items are tagged sequentially with Company > Brand > Type > Flavor from the hierarchy. |
-| BR5 | Distributors come from integration or manual creation; every distributor automatically gets two default stores: `{depot_id}140` = **Commercial** and `{depot_id}170` = **Damage** (`sm_depot_store`). |
+| BR5 | Distributors come from integration or manual creation; every distributor automatically gets two default stores — **Commercial** and **Damage** (`sm_depot_store`; id pattern: `app/hooks.py depot_after_create`, values in `brain/INDEX.md` §1). |
 | BR6 | All master modules support: create, view, edit, **soft delete (status → PENDING)**, restore, and **template-based Excel batch upload**. |
 | BR7 | Every master-table change (create/update/delete/restore) is recorded in the central log `sm_audit_log` **by the application only** — no DB triggers. |
 | BR8 | Users are restricted by ACL: permissions like `item.view`, `item.create`, `item.edit`, `item.delete`, `item.import`, grouped under modules; roles bundle permissions; users get roles and/or direct permissions; a super-admin bypasses checks. |
@@ -52,7 +52,7 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 - Responsive; Facebook-like font/background colors; eye-comfort palette.
 - Sidebar accordion: opening one nav group auto-collapses the others, with smooth transitions; Font Awesome icons served **locally** (no CDN).
 - Search + filters + pagination on every list.
-- Runs in a Python virtual environment; default admin `admin/admin123` to be changed after first login.
+- Runs in a Python virtual environment; default admin credentials per `AGENTS.md`, to be changed after first login.
 
 ## 6. Success criteria
 

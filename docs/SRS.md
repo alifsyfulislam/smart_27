@@ -47,14 +47,14 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR3.11 Image fields (`type: "image"` in the module registry, brand `image_path`): multipart form (`enctype=multipart/form-data`), input named `{col}_file`; validation = extension whitelist (png/jpg/jpeg/gif/webp) + 5 MB cap; stored under `app/static/uploads` as `{table}_{name-slug}_image_{timestamp}.{ext}`; `image_path` gets the `/static/uploads/...` link; file written only after the DB write succeeds (no orphans on validation failure); edit with an empty input keeps the existing image.
 
 ### FR4 Business rules (hooks)
-- FR4.1 Hierarchy codes: `{CG,BG,TG,FG}{seq:03d}` continuing per prefix; depth = parent.depth+1; full path `level0..level3`; new rows start `is_leaf=1`.
+- FR4.1 Hierarchy codes: prefix map per `app/hooks.py LEVEL_PREFIX` (values: `brain/INDEX.md` §1), `{prefix}{seq:03d}` continuing per prefix; depth = parent.depth+1; full path `level0..level3`; new rows start `is_leaf=1`.
 - FR4.1a Leaf invariant: `is_leaf='1'` iff the node has no ACTIVE child — recomputed by `_recompute_is_leaf` on create (parent), update (node + parent), soft delete (parent) and restore (parent + node).
 - FR4.2 Depth cap: cannot create below flavor (max depth 3).
 - FR4.3 Rename propagates to descendants; soft-delete/restore cascade the subtree.
-- FR4.4 Item create → default batch `1` / 2100-12-31 (ON DUPLICATE-safe).
-- FR4.5 Depot create → stores `{depot_id}140` Commercial / `{depot_id}170` Damage.
+- FR4.4 Item create → default batch (BR3; hook `item_after_create`, ON DUPLICATE-safe).
+- FR4.5 Depot create → default stores (BR5; hook `depot_after_create`).
 - FR4.6 Uniqueness: item by cid+item_id; batch by cid+item_id+batch_id; store by cid+depot_id+store_id; category by cid+type_name+cat_type_id; name dup within same hierarchy parent.
-- FR4.7 Category values for type names map from `sm_category_type` (DEPOT_CATEGORY, STORE_TYPE, ITEM_CATEGORY, UNIT_TYPE).
+- FR4.7 Category values for type names map from `sm_category_type` groups (DISTRIBUTOR_CATEGORY, STORE_TYPE, ITEM_CATEGORY, ITEM_UNIT, ITEM_PACK, OUTLET_CATEGORY, OUTLET_SUB_CATEGORY — see `SEED_CATEGORY_TYPES`).
 
 ### FR5 Audit
 - FR5.1 `sm_audit_log` rows: table_name, record_key (business id), action, old_values/new_values JSON snapshots, changed_by, user_ip, note.
@@ -86,9 +86,9 @@ Key types used: `int AUTO_INCREMENT` PKs, unique/normal keys as in requirements 
 - DB: host `localhost`, user `root`, password empty, database `smart_27` (env-overridable: `SSMS_DB_HOST/PORT/USER/PASS/NAME`).
 - Bootstrap: `scripts/setup_database.py` (creates DB + schema + seed); the app also auto-bootstraps on startup.
 - Run: `./venv/Scripts/python -m uvicorn app.main:app --host 127.0.0.1 --port 8027`.
-- Default admin: `admin / admin123` (change immediately).
+- Default admin: see `AGENTS.md` (change immediately).
 - Dependencies: `requirements.txt` (fastapi, uvicorn, jinja2, pymysql, cryptography, python-multipart, openpyxl, itsdangerous). No CDN assets — FontAwesome 6.5.2 downloaded to `app/static/vendor`.
 
 ## 5. Verification summary (2026-11-05)
 
-Login 303→dashboard 200; all module lists 200; brand create → FG003; item create → default batch; depot create → 2 default stores; template download (5.3KB) + upload import; delete → INACTIVE; restore → ACTIVE; audit log records CREATE/DELETE/RESTORE/LOGIN; VIEWER restrictions enforced; /users /roles /permissions screens 200 (GET /users/create correctly redirects).
+Login 303→dashboard 200; all module lists 200; brand create → FG003; item create → default batch; depot create → 2 default stores; template download (5.3KB) + upload import; delete → PENDING; restore → ACTIVE; audit log records CREATE/DELETE/RESTORE/LOGIN; VIEWER restrictions enforced; /users /roles /permissions screens 200 (GET /users/create correctly redirects).

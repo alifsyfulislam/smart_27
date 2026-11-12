@@ -58,20 +58,20 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 
 | Hook | Detail |
 |---|---|
-| `hierarchy.prepare` | Auto level code (`CG/BG/TG/FG` + padded sequence), max depth 3, name-uniqueness under parent, path fill, new rows start `is_leaf=1` |
+| `hierarchy.prepare` | Auto level code per `LEVEL_PREFIX` (padded sequence, values in `brain/INDEX.md` §1), max depth 3, name-uniqueness under parent, path fill, new rows start `is_leaf=1` |
 | `hierarchy.after_create` | Parent leaf flag recomputed (`is_leaf=0` once it has an ACTIVE child) |
 | `hierarchy.after_update` | Rename propagation to `parent_level_name` and `level{n}_name` of descendants; node + parent leaf flags recomputed from ACTIVE children |
 | `hierarchy.soft_delete/restore` | Subtree cascading with parent-active check on restore; parent leaf flag recomputed on both (deleted last child → parent leaf again) |
 | `crud image upload` | Any form field of type `image` (brand `image_path` today): multipart read, extension/size validation, `{table}_{slug}_image_{timestamp}` naming, file written only after the row insert/update succeeds |
-| `item.after_create` | Default batch `batch_id='1'`, `expiary_date='2100-12-31'` |
-| `depot.after_create` | Default stores `{id}140` Commercial / `{id}170` Damage |
+| `item.after_create` | Default batch per BR3 (hook: `app/hooks.py item_after_create`) |
+| `depot.after_create` | Default stores per BR5 (hook: `app/hooks.py depot_after_create`) |
 | `item_batch.prepare` | Item existence, auto name, uniqueness per item |
 | `depot_store.prepare` | Depot existence, uniqueness per depot |
 | `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids |
 
 ## 4. Permissions catalogue (seed)
 
-`dashboard.view`; per module `{brand,item,item_batch,distributor,depot_store,category_type}.{view,create,edit,delete,import}`; `acl.view`, `acl.manage`; `audit.view` — 34 seeded permissions, roles SUPER_ADMIN (all), MANAGER, VIEWER.
+`dashboard.view`; per module `{brand,item,item_batch,distributor,depot_store,outlet,category_type}.{view,create,edit,delete,import}`; `acl.view`, `acl.manage`; `audit.view` — 39 seeded permissions (catalogue: `SEED_PERMISSIONS` in `scripts/setup_database.py`), roles SUPER_ADMIN (all), MANAGER, VIEWER.
 
 ## 5. Acceptance criteria (verified 2026-11-05; brand UX re-verified 2026-11-09)
 
@@ -80,7 +80,7 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 - Brand tree (verified in-browser): on page load only the depth-0 node shows its children; opening a second node in the same level collapses the first; toggling again closes the node.
 - Brand create accepts an image file; the file is stored under `/static/uploads/` with the `{table}_{slug}_image_{timestamp}` name, the URL is saved in `image_path` and serves with HTTP 200; editing with no file keeps the current image; a non-image extension is rejected with a visible error.
 - Brand edit page lists child levels and accepts multiple names in one submit (duplicates ignored); each child gets its own auto-code and audit row.
-- Creating item `1101` creates default batch `1` (2100-12-31); audit rows `CREATE sm_item`, `CREATE sm_item_batch` written.
+- Creating item `1101` creates the default batch (BR3); audit rows `CREATE sm_item`, `CREATE sm_item_batch` written.
 - Creating distributor `131313` auto-creates stores `131313140` (Commercial) and `131313170` (Damage).
 - Excel template download 200; upload creates rows and reports errors; soft delete → PENDING; restore → ACTIVE; each logged in `sm_audit_log`.
 - VIEWER can browse but every write action is blocked; unknown modules redirect to the dashboard.

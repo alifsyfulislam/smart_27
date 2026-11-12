@@ -28,10 +28,10 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Area | Routes | Notes |
 |---|---|---|
 | Dashboard | `/` | stats, hierarchy bars, recent audit, quick actions |
-| Brand (hierarchy) | `/brand` | auto codes CG/BG/TG/FG, path columns, subtree soft delete, rename propagation; tree list opens depth-0 by default with per-level accordion; type-to-search parent picker, image upload+preview (`/static/uploads`, link in `image_path`), add one/many child levels from the edit page (`POST /brand/add-children/{id}`); `is_leaf` kept = "no ACTIVE child" on create/update/delete/restore |
-| Item | `/item` | hierarchy tagging, prices; auto default batch `1` (2100-12-31) |
+| Brand (hierarchy) | `/brand` | auto codes via `LEVEL_PREFIX`, path columns, subtree soft delete, rename propagation; tree list opens depth-0 by default with per-level accordion; type-to-search parent picker, image upload+preview (`/static/uploads`, link in `image_path`), add one/many child levels from the edit page (`POST /brand/add-children/{id}`); `is_leaf` kept = "no ACTIVE child" on create/update/delete/restore |
+| Item | `/item` | hierarchy tagging, prices; auto default batch (BR3) |
 | Item Batch | `/item-batch` | per-item batches, datalist item picker |
-| Distributor | `/distributor` | auto default stores `{id}140` Commercial, `{id}170` Damage |
+| Distributor | `/distributor` | auto default stores Commercial + Damage (BR5) |
 | Distributor Store | `/distributor-store` | store types from category master |
 | Category Type | `/category-type` | value definitions for other modules |
 | Users / Roles / Permissions | `/users` `/roles` `/permissions` | full ACL management |
@@ -59,7 +59,8 @@ scripts/
   ddl.sql            full schema (reviewed + status columns + ACL + audit)
   setup_database.py  create DB + seed (roles/permissions/admin/category types/sample hierarchy)
 docs/                BRD  PRD  SRS
-brain/  skills/  prompts/  AGENTS.md   — project memory / skill / agent / prompt docs
+brain/  .agents/skills/ssms/  prompts/  AGENTS.md   — project memory / skill / agent / prompt docs
+scripts/check_context.py — knowledge-layer consistency gate (run before commits)
 ```
 
 ## Re-generating / checking the DB
@@ -67,7 +68,7 @@ brain/  skills/  prompts/  AGENTS.md   — project memory / skill / agent / prom
 ```bash
 ./venv/Scripts/python scripts/setup_database.py
 ```
-Seed data: 3 roles, 34 permissions, admin user, 12 category-type values, TCPL sample hierarchy (CG001 → BG001 → TG001 → FG001/FG002).
+Seed data: 3 roles, admin user, 39 permissions, 17 category-type values, TCPL sample hierarchy. Existing DBs keep the legacy demo codes (CG001 → …); fresh installs generate codes per `app/hooks.py LEVEL_PREFIX` (see `brain/INDEX.md` §1). Counts are verified by `scripts/check_context.py`.
 
 ## Documentation
 
