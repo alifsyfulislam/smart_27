@@ -41,6 +41,7 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 | BR11 | From the Brand **edit page** a user can add one or many **child levels** in a single submit (names deduped; each child flows through the normal auto-code/path/audit pipeline). A Flavor (depth 3) cannot have children. |
 
 | BR12 | Outlets (`sm_client`) are linked to distributors and stores; customer type is auto-generated as `category_id|category_name` from `sm_category_type` (groups `OUTLET_CATEGORY` and `OUTLET_SUB_CATEGORY`). |
+| BR13 | Dynamic dropdown and foreign-key select fields (hierarchy levels, item lookup, distributor lookup, store lookup) must display selectable options in canonical `ID | Name` format (e.g. `BG001 | Kurkure`). In item create and edit forms, hierarchy cascade options must remain fully visible and searchable without placeholder filter occlusion, and on edit, previously saved hierarchy associations must auto-hydrate sequentially from database values. |
 
 ## 4. Users
 

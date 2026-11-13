@@ -176,7 +176,7 @@ def _build_tree(rows):
 
 
 def _cat_options(type_name):
-    return [(r["cat_type_id"], r["cat_type_name"] or r["cat_type_id"])
+    return [(r["cat_type_id"], f"{r['cat_type_id']} | {r['cat_type_name']}" if r["cat_type_name"] else r["cat_type_id"])
             for r in q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
                           WHERE cid=%s AND type_name=%s AND status='ACTIVE'
                           ORDER BY cat_type_id""", (config.CID, type_name))]
@@ -184,7 +184,7 @@ def _cat_options(type_name):
 
 def _brand_opts_from_hierarchy():
     """Brand filter options — ACTIVE depth-1 nodes of the item hierarchy."""
-    return [(r["level_id"], r["level_name"] or r["level_id"])
+    return [(r["level_id"], f"{r['level_id']} | {r['level_name']}" if r["level_name"] else r["level_id"])
             for r in q("""SELECT level_id, level_name FROM sm_item_hierarchy
                           WHERE cid=%s AND status='ACTIVE' AND depth=1
                           ORDER BY level_name""", (config.CID,))]
@@ -192,7 +192,7 @@ def _brand_opts_from_hierarchy():
 
 def _brand_opts_from_items():
     """Brand filter options — brands that actually occur on ACTIVE items."""
-    return [(r["brand_id"], r["brand_name"] or r["brand_id"])
+    return [(r["brand_id"], f"{r['brand_id']} | {r['brand_name']}" if r["brand_name"] else r["brand_id"])
             for r in q("""SELECT DISTINCT brand_id, brand_name FROM sm_item
                           WHERE cid=%s AND status='ACTIVE'
                             AND brand_id IS NOT NULL AND brand_id NOT IN ('', '-')

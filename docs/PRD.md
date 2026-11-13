@@ -48,6 +48,13 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
 - **Image** field: file input with live preview on create; on edit the current image is previewed and a new file can be picked to replace it (empty input keeps it). Files land in `/static/uploads` as `{table}_{name-slug}_image_{timestamp}.{ext}`; the link is stored in `image_path` (PNG/JPG/GIF/WEBP, max 5 MB, extension-checked).
 - **Child Levels card** on the Edit/View page: lists existing child levels (view/edit links, status badges) and, on Edit, offers one name box plus "Add another" to create **one or many** children in a single submit (`POST /{slug}/add-children/{id}`, names deduped, per-name errors reported). Disabled for Flavors (depth 3).
 
+### 2.4.2 Dynamic Form Dropdowns & Hierarchy Cascade
+- **Option display format**: All dynamically populated form selects (Brand parent picker, Item hierarchy cascade, Item in Item Batch, Distributor in Distributor Store, Store in Outlet) format selectable options as `ID | Name` (e.g. `BG001 | Kurkure`), replacing dash delimiters.
+- **Searchable single-select UX (`select[data-searchable]`)**: When focused or typed into, placeholder text (e.g., `-- Company --`, `-- Select item --`) never acts as a pre-applied search query. The options list displays all valid options when empty/focused, allowing instant typeahead filtering.
+- **Hierarchy cascade (Item create & edit)**:
+  - **Create**: Company dropdown initially populates from `/api/hierarchy/children?parent=0`. Selecting a level loads its active child levels for the next select (Company → Brand → Type → Flavor).
+  - **Edit**: Existing item hierarchy values (`company_id`, `brand_id`, `type_id`, `flavor_id`) automatically hydrate sequentially from database values on page load, setting the respective values and updating visible dropdown labels across all four levels.
+
 ### 2.5 Administration
 - **Users**: create/edit (name, email, password reset, super flag, status, role checkboxes), soft delete/restore; cannot deactivate own account.
 - **Roles**: create/edit with permission checkboxes grouped by module; soft delete.

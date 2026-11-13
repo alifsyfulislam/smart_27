@@ -1,4 +1,4 @@
-# INDEX — synced at commit e624d22 · 2026-11-13
+# INDEX — synced at commit 25e4bc5 · 2026-11-13
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -42,7 +42,7 @@ Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/m
 ## §3 Doc map (what to read for what; skip unless §4 sends you)
 | Question | File | Last-sync |
 |---|---|---|
-| Business needs, BR1–BR11 rules | `docs/BRD.md` | 14fd314 |
+| Business needs, BR1–BR13 rules | `docs/BRD.md` | 14fd314 |
 | Page journeys, acceptance criteria | `docs/PRD.md` | 14fd314 |
 | Architecture, FR1–FR6, data model | `docs/SRS.md` | 14fd314 |
 | How to run, route table | `README.md` | 14fd314 |

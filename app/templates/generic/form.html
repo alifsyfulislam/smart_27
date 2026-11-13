@@ -21,13 +21,12 @@
             {% if a in ['Edit','View'] %}
               <input type="hidden" name="parent_level_id" id="parent_level_id" value="{{ data.get('parent_level_id') or 'MG001' }}">
               <input type="hidden" name="parent_level_name" id="parent_level_name" value="{{ data.get('parent_level_name') or 'N/A' }}">
-              <input type="text" value="{{ (data.get('parent_level_id') or '0')}} — {{ 'Root' if data.get('parent_level_name') == '-' else (data.get('parent_level_name')) }}" disabled>
+              <input type="text" value="{{ (data.get('parent_level_id') or '0')}} | {{ 'Root' if data.get('parent_level_name') == '-' else (data.get('parent_level_name')) }}" disabled>
             {% else %}
             <select name="parent_level_id" id="f-parent_level_id" data-searchable
                     data-search-placeholder="Type to search parent level…">
-              <!-- <option value="0">— Root — (new Company)</option> -->
               {% for p in parent_opts %}
-              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} — {{ p['level_name'] }}</option>
+              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} | {{ p['level_name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -58,7 +57,7 @@
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select item --</option>
               {% for o in item_opts %}
-              <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} — {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}){% endif %}</option>
+              <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} | {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}){% endif %}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -73,7 +72,7 @@
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select distributor --</option>
               {% for o in depot_opts %}
-              <option value="{{ o['depot_id'] }}" {{ 'selected' if data.get('depot_id') == o['depot_id'] }}>{{ o['depot_id'] }} — {{ o['name'] }}</option>
+              <option value="{{ o['depot_id'] }}" {{ 'selected' if data.get('depot_id') == o['depot_id'] }}>{{ o['depot_id'] }} | {{ o['name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -82,13 +81,13 @@
           {% elif s.type == 'store_select' %}
           <div class="field">
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} — {{ data.get('store_name') }}{% endif %}</div>
+            {% if a == 'View' %}<div>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} | {{ data.get('store_name') }}{% endif %}</div>
             {% else %}
             <select name="store_id" id="f-store_id" data-store-depends="depot_id" data-searchable
                     data-search-placeholder="Type to search store…"
                     {{ 'required' if s.required and a == 'Create' }}>
               {% if data.get('store_id') %}
-              <option value="{{ data.get('store_id') }}" selected>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} — {{ data.get('store_name') }}{% endif %}</option>
+              <option value="{{ data.get('store_id') }}" selected>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} | {{ data.get('store_name') }}{% endif %}</option>
               {% endif %}
             </select>
             {% endif %}
@@ -122,12 +121,12 @@
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
             {% else %}
-            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.name != 'status' }}>
+            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}>
               {% for o in (field_opts.get(s.name) or s.options or []) %}
               <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
               {% endfor %}
             </select>
-            {% if a == 'Edit' and s.name != 'status' %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
+            {% if a == 'Edit' and s.readonly_on_edit %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -243,6 +242,7 @@
     // hierarchy cascade (item module): Company > Brand > Type > Flavor
     (function () {
       var PRE = { h0: "company_id", h1: "brand_id", h2: "type_id", h3: "flavor_id" };
+      var placeholders = ["-- Company --", "-- Brand --", "-- Type --", "-- Flavor --"];
       var selects = ["h0", "h1", "h2", "h3"].map(id => document.getElementById(id));
       if (!selects[0]) return;
 
@@ -254,49 +254,79 @@
         items.forEach(function (it) {
           var o = document.createElement("option");
           o.value = it.level_id;
-          o.textContent = it.level_id + " — " + it.level_name;
+          o.textContent = it.level_id + " | " + it.level_name;
           select.appendChild(o);
         });
       }
 
-      function load(parentId, select, placeholder, chosen) {
-        fetch("/api/hierarchy/children?parent=" + encodeURIComponent(parentId || "0"))
-          .then(r => r.json()).then(function (res) {
-            fill(select, res.items || [], placeholder);
-            if (chosen) { select.value = chosen; }
-            sync();
-            select.dispatchEvent(new Event("ssms-refresh"));   // searchable widget: re-sync label
-            loadNext(select, placeholder, null);
-          });
-      }
-
-      function loadNext(select, placeholder, chosen) {
-        var i = selects.indexOf(select);
-        if (i >= 0 && i < 3) {
-          load(select.value, selects[i + 1], ["-- Brand --", "-- Type --", "-- Flavor --"][i], chosen);
+      function clearFrom(idx) {
+        for (var i = idx; i < selects.length; i++) {
+          if (selects[i]) {
+            fill(selects[i], [], placeholders[i]);
+            selects[i].value = "";
+            selects[i].dispatchEvent(new Event("ssms-refresh"));
+          }
         }
       }
 
       function sync() {
         ["company_id", "brand_id", "type_id", "flavor_id"].forEach(function (k) {
-          document.getElementById(k).value = "";
+          var inp = document.getElementById(k);
+          if (inp) inp.value = "";
         });
         selects.forEach(function (sel, idx) {
-          if (sel.value) document.getElementById(PRE["h" + idx]).value = sel.value;
-          if (idx > 0 && !selects[idx - 1].value) sel.value = "";
+          var hiddenKey = PRE["h" + idx];
+          var inp = document.getElementById(hiddenKey);
+          if (sel && sel.value && inp) {
+            inp.value = sel.value;
+          }
+          if (idx > 0 && selects[idx - 1] && !selects[idx - 1].value && sel) {
+            sel.value = "";
+          }
         });
       }
 
-      selects.forEach(function (sel, idx) {
-        sel.addEventListener("change", function () {
+      async function fetchTier(parentId, select, placeholder, chosen) {
+        try {
+          var r = await fetch("/api/hierarchy/children?parent=" + encodeURIComponent(parentId || "0"));
+          var res = await r.json();
+          fill(select, res.items || [], placeholder);
+          if (chosen) {
+            select.value = chosen;
+          }
           sync();
-          if (idx < 3) load(sel.value, selects[idx + 1], ["-- Brand --", "-- Type --", "-- Flavor --"][idx], null);
+          select.dispatchEvent(new Event("ssms-refresh"));
+        } catch (e) {
+          console.error("hierarchy load error", e);
+        }
+      }
+
+      selects.forEach(function (sel, idx) {
+        sel.addEventListener("change", async function () {
+          clearFrom(idx + 1);
+          sync();
+          if (idx < 3 && sel.value) {
+            await fetchTier(sel.value, selects[idx + 1], placeholders[idx + 1], null);
+          }
         });
       });
 
       var pre = ["{{ data.get('company_id') or '' }}", "{{ data.get('brand_id') or '' }}",
                  "{{ data.get('type_id') or '' }}", "{{ data.get('flavor_id') or '' }}"];
-      load("", selects[0], "-- Company --", pre[0]);
+
+      // Sequential cascade hydration (Edit / Create with saved values)
+      (async function init() {
+        var parent = "0";
+        for (var i = 0; i < 4; i++) {
+          await fetchTier(parent, selects[i], placeholders[i], pre[i]);
+          if (!pre[i] || !selects[i].value) {
+            clearFrom(i + 1);
+            break;
+          }
+          parent = pre[i];
+        }
+        sync();
+      })();
     })();
 
     // item form: total_amount auto-calculates as price + vat_amt (still overtypeable)
@@ -333,7 +363,7 @@
             rows.forEach(function (s) {
               var o = document.createElement("option");
               o.value = s.store_id;
-              o.textContent = s.store_id + " — " + s.store_name;
+              o.textContent = s.store_id + " | " + s.store_name;
               if (keep && s.store_id === keep) { o.selected = true; kept = true; }
               store.appendChild(o);
             });

@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit e624d22 · Date: 2026-11-13 -->
+<!-- Synced with repo state at commit 25e4bc5 · Date: 2026-11-13 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
@@ -68,6 +68,11 @@
 ### 3.3 Default Auto-Provisions
 - **Default Item Batch (BR3):** Creating an item automatically creates default batch `batch_id='1'` with expiry `2100-12-31` (`app/hooks.py item_after_create`).
 - **Default Distributor Stores (BR5):** Creating a distributor (depot) automatically creates two default stores: `{depot_id}140` (Commercial) and `{depot_id}170` (Damage) (`app/hooks.py depot_after_create`).
+
+### 3.4 Dynamic Form Dropdowns & Hierarchy Standards
+- **Option Display Standard:** All dynamic/foreign-key dropdown options (Item hierarchy cascade, Brand parent picker, Item in Item Batch, Distributor in Distributor Store, Store in Outlet) format selectable options uniformly as `ID | Name` (e.g., `BG001 | Kurkure`).
+- **Searchable Select Component:** Focus or click on a searchable single select must display all options matching an empty search query rather than filtering out entries matching placeholder text.
+- **Hierarchy Cascade Auto-Hydration:** In Item edit, previously saved hierarchy levels (`company_id`, `brand_id`, `type_id`, `flavor_id`) must sequentially auto-hydrate from database values, ensuring stored associations are preserved and visible.
 
 ---
 
@@ -154,11 +159,13 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **V-002 (2026-11-09 · 8b10af5):** Brand UX verified (Tree list, accordion per level, parent picker, image upload, multi-child addition, `is_leaf` invariant).
 - **V-003 (2026-11-13 · 00f28df):** Excel data download & hierarchy export verified across all 7 master modules (HIERARCHY_TREE, HIERARCHY_PATHS, ITEMS with synced levels, openpyxl styling).
 - **V-004 (2026-11-13 · HEAD):** Compact list layout (high-density table cells 5px 8px, card margin 12px, header 8px 14px, pager 6px 12px) and typeahead multi-select filter components (`.ms-dropdown`) verified live via HTTP against all 7 master modules with Excel export synchronization.
+- **V-005 (2026-11-13 · HEAD):** Dynamic dropdowns formatting & cascade hydration: Searchable select `openAll()` un-occluded option visibility; sequential async cascade hydration on `/item/edit/{id}` preserving stored company/brand/type/flavor; `ID | Name` standard delimiter formatting across `/brand/create`, `/item/create`, `/item-batch/create`, `/distributor-store/create`, `/outlet/create`, and category/brand filter options; verified live against MySQL database with authenticated session.
 
 ### Open Task Register (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
 |---|---|---|---|---|
+| **T-012** | **P1** | `all` | `done` | Dynamic dropdowns sweep: (a) item create hierarchy options visibility fix (searchselect placeholder occlusion bug); (b) item edit hierarchy auto-selection from stored DB values (sequential cascade hydration); (c) canonical ID \| Name option format (e.g. BG001 \| Kurkure) across hierarchy cascade and all dynamic dropdowns (item_select, depot_select, store_select, hier_root_select). (verified live V-005) |
 | **T-010** | **P2** | `ui` | `done` | Compact list-page layout: minimal cell padding (5px 8px), card headers, margins, and search bar (verified live V-004). |
 | **T-011** | **P2** | `ui` | `done` | List-page search filter column multi-select and type-to-search for filter dropdowns (verified live V-004). |
 | **T-001** | **P0** | `outlet` | `done` | Backfill outlet module documentation: PRD journey, SRS FR row, `sm_client` schema doc, README route table, PROMPTS template, STATUS count sync, and live verification (V-003). |
@@ -173,7 +180,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-013)
+## 8. Architectural Decision Summary (D-001 to D-014)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -188,6 +195,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-011:** Soft-delete vocabulary across both master data and ACL unified to `status='PENDING'`.
 - **D-012:** Filtered Excel Data Export with Hierarchy Synchronization (`GET /{slug}/export`, `/{slug}/download`) implemented as synchronous `def module_export` executed via threadpool, exporting styled sheets (`HIERARCHY_TREE`, `HIERARCHY_PATHS`, `ITEMS` with synced levels).
 - **D-013:** Compact High-Density Table Layout & Typeahead Multi-Select Filter Components: minimal table cell padding (5px 8px), tight card headers and search bars, zero-CDN vanilla JS/CSS multi-select dropdowns (`.ms-dropdown`) with real-time text search, multi-key/comma-separated query serialization, and SQL `IN (...)` filtering synchronized across list views, pagination, and Excel export.
+- **D-014:** Standardized `ID | Name` Dynamic Option Formatting & Sequential Hierarchy Hydration: Standardized dynamic dropdown options across master forms and filters to canonical `ID | Name` (e.g. `BG001 | Kurkure` instead of legacy dash ` — ` delimiters). Fixed searchable select component in `app.js` (`select[data-searchable]`) to display all valid options on focus/click without placeholder occlusion. Implemented asynchronous sequential cascade hydration loop (`0 -> company -> brand -> type -> flavor`) in `app/templates/generic/form.html` to auto-hydrate saved hierarchy selections from DB values during Edit without clearing child tiers. Corrected `form.html` select field disable logic from `s.name != 'status'` to `s.readonly_on_edit`, restoring editability for category and pack attributes.
 
 ---
 

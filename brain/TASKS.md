@@ -17,6 +17,7 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 - T-009 | ready | core | - | P3 | 2026-11-11 | BACKLOG (not user-requested; from old brain): test suite (pytest + httpx) once API surface grows — would also mechanize the verify loop.
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-012 | done | all | - | P1 | 2026-11-13 | Dynamic dropdowns sweep: (a) hierarchy cascade searchable select un-occluded open on focus/click; (b) sequential cascade hydration on item edit; (c) ID | Name option format across dynamic dropdowns (V-005)
 - T-010 | done | ui | - | P2 | 2026-11-13 | Compact list-page layout: minimal cell padding (5px 8px), card headers, margins, and search bar (verified live V-004)
 - T-011 | done | ui | - | P2 | 2026-11-13 | List-page search filter column multi-select and type-to-search for filter dropdowns (verified live V-004)
 - T-004 | done | all | - | P2 | 2026-11-13 | Download data button on all list pages (filtered visible page data; hierarchy-based Excel for hierarchy-synced modules)

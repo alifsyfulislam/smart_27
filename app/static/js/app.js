@@ -113,14 +113,18 @@
     sel.parentNode.insertBefore(box, sel);
 
     function opts() { return Array.prototype.slice.call(sel.options); }
-    function currentLabel() {
+    function syncLabel() {
       var o = sel.options[sel.selectedIndex];
-      return o ? o.textContent : "";
+      if (sel.value && o) {
+        input.value = o.textContent;
+      } else {
+        input.value = "";
+      }
     }
     function close() { list.classList.remove("open"); }
     function choose(o) {
       sel.value = o.value;
-      input.value = o.textContent;
+      syncLabel();
       close();
       sel.dispatchEvent(new Event("change", { bubbles: true }));
     }
@@ -129,6 +133,7 @@
       var f = (filter || "").trim().toLowerCase();
       var shown = 0;
       opts().forEach(function (o) {
+        if (!o.value && (o.textContent.startsWith("--") || !o.textContent.trim())) return;
         var hay = (o.textContent + " " + o.value).toLowerCase();
         if (f && hay.indexOf(f) === -1) return;
         var item = document.createElement("div");
@@ -149,22 +154,42 @@
         list.appendChild(none);
       }
     }
-    function open() { render(input.value); list.classList.add("open"); }
+    function openAll() {
+      render("");
+      list.classList.add("open");
+      if (input.value) {
+        input.select();
+      }
+    }
 
-    input.value = currentLabel();
+    syncLabel();
     // external code (hierarchy cascade AJAX, dependent store dropdown) may
     // rebuild the select's options — re-sync the visible label when told to
-    sel.addEventListener("ssms-refresh", function () { input.value = currentLabel(); });
-    input.addEventListener("focus", open);
-    input.addEventListener("input", open);
-    input.addEventListener("blur", function () { setTimeout(close, 130); });
+    sel.addEventListener("ssms-refresh", function () { syncLabel(); });
+    input.addEventListener("focus", openAll);
+    input.addEventListener("click", function () {
+      if (!list.classList.contains("open")) openAll();
+    });
+    input.addEventListener("input", function () {
+      render(input.value);
+      list.classList.add("open");
+    });
+    input.addEventListener("blur", function () {
+      setTimeout(function () {
+        close();
+        syncLabel();
+      }, 150);
+    });
     input.addEventListener("keydown", function (ev) {
       var items = Array.prototype.slice.call(list.querySelectorAll(".searchselect-item:not(.muted)"));
       var active = list.querySelector(".searchselect-item.active");
       var idx = items.indexOf(active);
       if (ev.key === "ArrowDown" || ev.key === "ArrowUp") {
         ev.preventDefault();
-        if (!list.classList.contains("open")) open();
+        if (!list.classList.contains("open")) {
+          openAll();
+          return;
+        }
         if (!items.length) return;
         idx = ev.key === "ArrowDown" ? Math.min(idx + 1, items.length - 1)
                                      : Math.max(idx - 1, 0);
@@ -181,7 +206,7 @@
         }
       } else if (ev.key === "Escape") {
         close();
-        input.value = currentLabel();
+        syncLabel();
       }
     });
   });
