@@ -24,13 +24,16 @@
         {% endfor %}
       </select>
       {% endfor %}
-      {% if slug != 'brand' %}
+      <!-- {% if slug != 'brand' %}
       <select name="page_size">
         {% for ps in (10, 25, 50, 100) %}<option value="{{ ps }}" {{ 'selected' if page_size == ps }}>show {{ ps }}</option>{% endfor %}
       </select>
-      {% endif %}
+      {% endif %} -->
       <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Filter</button>
       {% if qk or filt_vals %}<a class="btn" href="/{{ slug }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>{% endif %}
+      {% if perms.get('view') %}
+      <a class="btn" href="/{{ slug }}/export?{{ query }}{{ '&' if query else '' }}page={{ page }}&page_size={{ page_size }}" title="Download visible page data to Excel"><i class="fa-solid fa-download"></i> Download</a>
+    {% endif %}
     </form>
   </div>
 
@@ -141,7 +144,12 @@
   </div>
 
   {% if slug == 'brand' %}
-  <div class="pager"><span class="info">{{ total }} node(s) — full hierarchy tree</span></div>
+  <div class="pager">
+    <span class="info">{{ total }} node(s) — full hierarchy tree</span>
+    {% if perms.get('view') %}
+      <a class="btn btn-sm" href="/{{ slug }}/export?{{ query }}" style="margin-left:12px" title="Download hierarchy tree to Excel"><i class="fa-solid fa-file-excel"></i> Download Hierarchy ({{ total }})</a>
+    {% endif %}
+  </div>
   {% else %}
   <div class="pager">
     {% if page > 1 %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page - 1 }}">&laquo; Prev</a>{% endif %}
@@ -150,6 +158,9 @@
     {% endfor %}
     {% if page < pages %}<a href="?{{ query }}{{ '&' if query else '' }}page={{ page + 1 }}">Next &raquo;</a>{% endif %}
     <span class="info">Page {{ page }} of {{ pages }} — {{ total }} record(s)</span>
+    {% if pages > 1 and perms.get('view') %}
+      <a class="btn btn-sm" href="/{{ slug }}/export?{{ query }}&scope=all" style="margin-left:12px" title="Download all filtered records to Excel"><i class="fa-solid fa-file-excel"></i> Download All ({{ total }})</a>
+    {% endif %}
   </div>
   {% endif %}
 </div>

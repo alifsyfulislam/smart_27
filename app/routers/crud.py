@@ -15,6 +15,8 @@ from fastapi import APIRouter, Request
 from fastapi.responses import RedirectResponse, Response
 
 from openpyxl import Workbook, load_workbook
+from openpyxl.styles import Alignment, Border, Font, PatternFill, Side
+from openpyxl.utils import get_column_letter
 
 from .. import config
 from ..audit import log_change
@@ -240,17 +242,8 @@ def key_col_of(m):
             "outlet": "client_id", "category-type": "id"}.get(m["perm"], "id")
 
 
-# ------------------------------------------------------------------- list
-@router.get("/{slug}")
-async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
-                      page_size: int = 25, status: str = "", sort: str = ""):
-    result = _access(request, slug, "view")
-    m, user, context = result[0], result[1], result[2]
-    if isinstance(context, RedirectResponse):
-        return context
-    if m is None:
-        return RedirectResponse("/", status_code=303)
-
+def _filter_sql(m, request, qk=""):
+    """Build shared WHERE clause and params for list and export views."""
     where, params = [f"t.cid=%s"], [config.CID]
 
     if qk:
@@ -285,7 +278,21 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
             col = name if name in table_cols(m) else "status"
             where.append(f"t.{col}=%s")
             params.append(val)
-    wsql = " AND ".join(where)
+    return " AND ".join(where), params, filt_vals
+
+
+# ------------------------------------------------------------------- list
+@router.get("/{slug}")
+async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
+                      page_size: int = 25, status: str = "", sort: str = ""):
+    result = _access(request, slug, "view")
+    m, user, context = result[0], result[1], result[2]
+    if isinstance(context, RedirectResponse):
+        return context
+    if m is None:
+        return RedirectResponse("/", status_code=303)
+
+    wsql, params, filt_vals = _filter_sql(m, request, qk)
 
     total = scalar(f"SELECT COUNT(*) c FROM `{m['table']}` t WHERE {wsql}", params, 0)
     page_size = max(5, min(page_size, 100))
@@ -335,7 +342,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
 
     keep = {"qk": qk, "page_size": page_size, "status": status}
     keep.update(filt_vals)
-    query = urlencode({"k": v for k, v in keep.items() if v})
+    query = urlencode({k: v for k, v in keep.items() if v})
 
     context.update({
         "m": m, "slug": slug, "title": m["title"], "rows": rows, "fcols": m["list_cols"],
@@ -640,6 +647,280 @@ async def module_restore(request: Request, slug: str, rid: int):
                old=old, new=None, changed_by=user["user_id"], user_ip=client_ip(request))
     set_flash(request, "success", f"{m['title']} restored to ACTIVE.")
     return RedirectResponse(f"/{slug}", status_code=303)
+
+
+# -------------------------------------------------- excel export (visible data & hierarchy)
+def _style_worksheet(ws):
+    """Apply styling, freeze panes, auto-fit columns and gridlines to an openpyxl worksheet."""
+    try:
+        ws.views.sheetView[0].showGridLines = True
+    except Exception:
+        pass
+    ws.freeze_panes = "A2"
+
+    header_font = Font(name="Calibri", size=11, bold=True, color="FFFFFF")
+    header_fill = PatternFill(start_color="1877F2", end_color="1877F2", fill_type="solid")
+    header_align = Alignment(horizontal="center", vertical="center", wrap_text=True)
+
+    data_font = Font(name="Calibri", size=10)
+    zebra_fill = PatternFill(start_color="F8F9FA", end_color="F8F9FA", fill_type="solid")
+    thin_border = Border(
+        left=Side(style='thin', color='E0E0E0'),
+        right=Side(style='thin', color='E0E0E0'),
+        top=Side(style='thin', color='E0E0E0'),
+        bottom=Side(style='thin', color='E0E0E0')
+    )
+
+    ws.row_dimensions[1].height = 26
+    for cell in ws[1]:
+        cell.font = header_font
+        cell.fill = header_fill
+        cell.alignment = header_align
+        cell.border = thin_border
+
+    for row_idx, row in enumerate(ws.iter_rows(min_row=2), start=2):
+        ws.row_dimensions[row_idx].height = 20
+        is_even = (row_idx % 2 == 0)
+        for cell in row:
+            cell.font = data_font
+            cell.border = thin_border
+            if is_even:
+                cell.fill = zebra_fill
+
+    for col in ws.columns:
+        max_len = 0
+        for cell in col:
+            v = str(cell.value or "")
+            if len(v) > max_len:
+                max_len = len(v)
+        col_letter = get_column_letter(col[0].column)
+        ws.column_dimensions[col_letter].width = max(12, min(max_len + 3, 50))
+
+
+@router.get("/{slug}/export")
+@router.get("/{slug}/download")
+def module_export(request: Request, slug: str, page: int = 1, qk: str = "",
+                  page_size: int = 25, status: str = "", sort: str = "",
+                  scope: str = ""):
+    result = _access(request, slug, "view")
+    m, user, context = result[0], result[1], result[2]
+    if isinstance(context, RedirectResponse):
+        return context
+    if m is None:
+        return RedirectResponse("/", status_code=303)
+
+    wsql, params, filt_vals = _filter_sql(m, request, qk)
+    order = sort if (sort and "{" not in sort) else m["order"]
+
+    wb = Workbook()
+
+    if slug == "brand":
+        # ------------------------------------------------------------- BRAND (Hierarchy Tree & Paths)
+        rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
+                     ORDER BY depth ASC, level_id ASC""", params)
+        if qk or any(filt_vals.values()):
+            have = {r["level_id"] for r in rows}
+            need = set()
+            for r in rows:
+                for i in range(int(r["depth"] or 0)):
+                    pid = r.get(f"level{i}") or ""
+                    if pid and pid not in ("-", "0"):
+                        need.add(pid)
+            missing = list(need - have)
+            if missing:
+                ph = ", ".join(["%s"] * len(missing))
+                anc = q(f"""SELECT t.* FROM `{m['table']}` t
+                            WHERE t.cid=%s AND t.level_id IN ({ph})""",
+                        [config.CID] + missing)
+                by_id = {r["id"]: r for r in rows}
+                for r in anc:
+                    by_id.setdefault(r["id"], r)
+                rows = list(by_id.values())
+        rows = sorted(rows, key=lambda r: (int(r["depth"] or 0), r["level_id"] or ""))
+
+        tree = _build_tree(rows)
+        def _flatten_tree(tree_list, cur_depth=0):
+            out = []
+            for node in tree_list:
+                out.append((node, cur_depth))
+                if node.get("children"):
+                    out.extend(_flatten_tree(node["children"], cur_depth + 1))
+            return out
+
+        flat_tree = _flatten_tree(tree)
+        level_labels = {0: "Company", 1: "Brand", 2: "Type", 3: "Flavor"}
+
+        # Sheet 1: Hierarchy Tree
+        ws1 = wb.active
+        ws1.title = "HIERARCHY_TREE"
+        ws1.append([
+            "LEVEL TYPE", "LEVEL ID", "LEVEL NAME (HIERARCHY)", "RAW LEVEL NAME",
+            "PARENT ID", "PARENT NAME", "COMPANY (L0)", "BRAND (L1)", "TYPE (L2)",
+            "FLAVOR (L3)", "DEPTH", "IS LEAF", "STATUS", "NOTE"
+        ])
+        for node, d in flat_tree:
+            depth_val = int(node.get("depth") or 0)
+            level_label = level_labels.get(depth_val, f"Level {depth_val}")
+            indent = "    " * d + ("└── " if d > 0 else "")
+            hier_name = indent + (node.get("level_name") or "")
+            l0 = f"{node['level0']} - {node['level0_name']}" if node.get("level0") and node["level0"] not in ("-", "0") else "-"
+            l1 = f"{node['level1']} - {node['level1_name']}" if node.get("level1") and node["level1"] not in ("-", "0") else "-"
+            l2 = f"{node['level2']} - {node['level2_name']}" if node.get("level2") and node["level2"] not in ("-", "0") else "-"
+            l3 = f"{node['level3']} - {node['level3_name']}" if node.get("level3") and node["level3"] not in ("-", "0") else "-"
+            is_leaf_str = "Yes" if str(node.get("is_leaf")) == "1" else "No"
+            ws1.append([
+                level_label, node.get("level_id") or "", hier_name, node.get("level_name") or "",
+                node.get("parent_level_id") or "0", node.get("parent_level_name") or "-",
+                l0, l1, l2, l3, depth_val, is_leaf_str, node.get("status") or "ACTIVE",
+                node.get("note") or ""
+            ])
+        _style_worksheet(ws1)
+
+        # Sheet 2: Hierarchy Paths (Leaf paths for lookups / analysis)
+        ws2 = wb.create_sheet(title="HIERARCHY_PATHS")
+        ws2.append([
+            "LEAF CODE", "LEAF NAME", "LEAF TYPE", "COMPANY CODE", "COMPANY NAME",
+            "BRAND CODE", "BRAND NAME", "TYPE CODE", "TYPE NAME", "FLAVOR CODE",
+            "FLAVOR NAME", "STATUS"
+        ])
+        for node, d in flat_tree:
+            if str(node.get("is_leaf")) == "1":
+                depth_val = int(node.get("depth") or 0)
+                level_label = level_labels.get(depth_val, f"Level {depth_val}")
+                ws2.append([
+                    node.get("level_id") or "", node.get("level_name") or "", level_label,
+                    node.get("level0") or "-", node.get("level0_name") or "-",
+                    node.get("level1") or "-", node.get("level1_name") or "-",
+                    node.get("level2") or "-", node.get("level2_name") or "-",
+                    node.get("level3") or "-", node.get("level3_name") or "-",
+                    node.get("status") or "ACTIVE"
+                ])
+        _style_worksheet(ws2)
+
+        filename = f"brand_hierarchy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    else:
+        # Non-brand modules: paginate or all
+        if scope == "all" or page <= 0:
+            rows = q(f"SELECT t.* FROM `{m['table']}` t WHERE {wsql} ORDER BY {order}", params)
+        else:
+            page_size = max(5, min(page_size or 25, 100))
+            offset = (max(1, page) - 1) * page_size
+            rows = q(f"SELECT t.* FROM `{m['table']}` t WHERE {wsql} ORDER BY {order} LIMIT %s OFFSET %s",
+                     params + [page_size, offset])
+
+        ws = wb.active
+
+        if slug == "item":
+            # --------------------------------------------------------- ITEM (with synced hierarchy)
+            ws.title = "ITEMS"
+            ws.append([
+                "ITEM ID", "ITEM NAME", "COMPANY CODE", "COMPANY NAME",
+                "BRAND CODE", "BRAND NAME", "TYPE CODE", "TYPE NAME",
+                "FLAVOR CODE", "FLAVOR NAME", "ITEM CATEGORY", "PACK SIZE",
+                "UNIT", "CTN PCS RATIO", "WEIGHT", "INVOICE PRICE", "PRICE",
+                "VAT AMOUNT", "TOTAL AMOUNT", "MRP", "STATUS", "NOTE"
+            ])
+            for r in rows:
+                ws.append([
+                    r.get("item_id") or "", r.get("name") or "",
+                    r.get("company_id") or "-", r.get("company_name") or "-",
+                    r.get("brand_id") or "-", r.get("brand_name") or "-",
+                    r.get("type_id") or "-", r.get("type_name") or "-",
+                    r.get("flavor_id") or "-", r.get("flavor_name") or "-",
+                    r.get("item_category") or "", r.get("pack_size") or "",
+                    r.get("unit_type") or "", r.get("ctn_pcs_ratio") or 1,
+                    r.get("weight") or 0.0, r.get("invoice_price") or 0.0,
+                    r.get("price") or 0.0, r.get("vat_amt") or 0.0,
+                    r.get("total_amt") or 0.0, r.get("mrp") or 0.0,
+                    r.get("status") or "", r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"item_hierarchy_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        elif slug == "item-batch":
+            ws.title = "ITEM_BATCHES"
+            ws.append(["ITEM ID", "BATCH ID", "BATCH NAME", "EXPIARY DATE", "STATUS", "NOTE"])
+            for r in rows:
+                ws.append([
+                    r.get("item_id") or "", r.get("batch_id") or "", r.get("name") or "",
+                    str(r.get("expiary_date") or ""), r.get("status") or "", r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"item_batch_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        elif slug == "distributor":
+            ws.title = "DISTRIBUTORS"
+            ws.append([
+                "DISTRIBUTOR ID", "NAME", "CATEGORY", "OWNER NAME", "CONTACT",
+                "CONTACT 2", "EMAIL", "TOWN NAME", "ADDRESS", "TIN", "BIN", "STATUS", "NOTE"
+            ])
+            for r in rows:
+                ws.append([
+                    r.get("depot_id") or "", r.get("name") or "", r.get("depot_category") or "",
+                    r.get("owner_name") or "", r.get("contact") or "", r.get("contact_2") or "",
+                    r.get("email") or "", r.get("town_name") or "", r.get("address") or "",
+                    r.get("tin") or "", r.get("bin") or "", r.get("status") or "", r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"distributor_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        elif slug == "distributor-store":
+            ws.title = "DISTRIBUTOR_STORES"
+            ws.append(["DISTRIBUTOR ID", "STORE ID", "STORE NAME", "STORE TYPE", "STATUS", "NOTE"])
+            for r in rows:
+                ws.append([
+                    r.get("depot_id") or "", r.get("store_id") or "", r.get("store_name") or "",
+                    r.get("store_type") or "", r.get("status") or "", r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"distributor_store_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        elif slug == "outlet":
+            ws.title = "OUTLETS"
+            ws.append([
+                "OUTLET ID", "OLD OUTLET ID", "OUTLET NAME", "CATEGORY", "SUB CATEGORY",
+                "CUSTOMER TYPE", "DISTRIBUTOR ID", "STORE ID", "STORE NAME", "OWNER NAME",
+                "CONTACT 1", "CONTACT 2", "ADDRESS", "STATUS", "NOTE"
+            ])
+            for r in rows:
+                ws.append([
+                    r.get("client_id") or "", r.get("client_old_id") or "", r.get("name") or "",
+                    r.get("category_name") or "", r.get("sub_category_name") or "",
+                    r.get("customer_type") or "", r.get("depot_id") or "", r.get("store_id") or "",
+                    r.get("store_name") or "", r.get("owner_name") or "", r.get("contact_no1") or "",
+                    r.get("contact_no2") or "", r.get("address") or "", r.get("status") or "",
+                    r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"outlet_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        elif slug == "category-type":
+            ws.title = "MODULE_CATEGORIES"
+            ws.append(["TYPE NAME", "CATEGORY ID", "CATEGORY NAME", "STATUS", "NOTE"])
+            for r in rows:
+                ws.append([
+                    r.get("type_name") or "", r.get("cat_type_id") or "",
+                    r.get("cat_type_name") or "", r.get("status") or "", r.get("note") or ""
+                ])
+            _style_worksheet(ws)
+            filename = f"category_type_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+        else:
+            ws.title = "DATA"
+            ws.append([clabel.upper() for cname, clabel in m["list_cols"]])
+            for r in rows:
+                ws.append([r.get(cname, "") for cname, clabel in m["list_cols"]])
+            _style_worksheet(ws)
+            filename = f"{slug}_data_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+
+    buf = io.BytesIO()
+    wb.save(buf)
+    return Response(
+        content=buf.getvalue(),
+        media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'}
+    )
 
 
 # -------------------------------------------------- excel template + upload

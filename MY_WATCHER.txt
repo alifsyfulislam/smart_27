@@ -1,9 +1,8 @@
-# MY_WATCHER — raw task inbox
-Write new tasks/requirements here in any format (paste DDL, specs, bugs — anything).
-At session start the AI drains this file into `brain/TASKS.md` (structured: id, status,
-deps, priority) and replaces the content with a new tombstone line. Raw history lives in
-`brain/archive/`. Nothing here needs formatting — plain text is fine.
 
----
-Drained 2026-11-11 -> T-001..T-006 (see brain/TASKS.md). Raw original:
-brain/archive/MY_WATCHER_2026-11-11.md
+
+
+
+1. List page view it looks beautiful but issue is it takes lots of space i treat as waste margin pading reduicing as minimal 
+
+
+2. list page search filter col mutiselect and typing search as well
