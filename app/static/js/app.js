@@ -185,4 +185,149 @@
       }
     });
   });
+
+  // --- multi-select & typeahead filter dropdowns --------------------------
+  function initMultiSelects() {
+    var dropdowns = Array.prototype.slice.call(document.querySelectorAll(".ms-dropdown"));
+    if (!dropdowns.length) return;
+
+    function closeAll(except) {
+      dropdowns.forEach(function (d) {
+        if (d !== except) d.classList.remove("open");
+      });
+    }
+
+    dropdowns.forEach(function (dd) {
+      var btn = dd.querySelector(".ms-btn");
+      var btnText = dd.querySelector(".ms-btn-text");
+      var searchInput = dd.querySelector(".ms-search");
+      var clearSearchBtn = dd.querySelector(".ms-clear-search");
+      var selectAllBtn = dd.querySelector(".ms-select-all");
+      var clearAllBtn = dd.querySelector(".ms-clear-all");
+      var optLabels = Array.prototype.slice.call(dd.querySelectorAll(".ms-opt"));
+      var emptyNotice = dd.querySelector(".ms-empty");
+      var filterLabel = dd.getAttribute("data-label") || "Filter";
+
+      function updateBtnText() {
+        var checked = optLabels.filter(function (l) {
+          var cb = l.querySelector('input[type="checkbox"]');
+          return cb && cb.checked;
+        });
+        if (!checked.length) {
+          btnText.textContent = "All " + filterLabel;
+          btn.classList.remove("has-value");
+        } else if (checked.length === 1) {
+          var labelSpan = checked[0].querySelector(".ms-opt-text");
+          btnText.textContent = labelSpan ? labelSpan.textContent.trim() : checked[0].textContent.trim();
+          btn.classList.add("has-value");
+        } else {
+          btnText.textContent = filterLabel + " (" + checked.length + ")";
+          btn.classList.add("has-value");
+        }
+      }
+
+      function filterOptions(query) {
+        var q = (query || "").toLowerCase().trim();
+        var matchCount = 0;
+        optLabels.forEach(function (lbl) {
+          var text = (lbl.getAttribute("data-label") || lbl.textContent).toLowerCase();
+          if (!q || text.indexOf(q) !== -1) {
+            lbl.style.display = "";
+            matchCount++;
+          } else {
+            lbl.style.display = "none";
+          }
+        });
+        if (clearSearchBtn) clearSearchBtn.style.display = q ? "" : "none";
+        if (emptyNotice) emptyNotice.style.display = matchCount === 0 ? "" : "none";
+      }
+
+      btn.addEventListener("click", function (ev) {
+        ev.stopPropagation();
+        var isOpen = dd.classList.contains("open");
+        closeAll(dd);
+        if (!isOpen) {
+          dd.classList.add("open");
+          if (searchInput) {
+            searchInput.value = "";
+            filterOptions("");
+            setTimeout(function () { searchInput.focus(); }, 50);
+          }
+        } else {
+          dd.classList.remove("open");
+        }
+      });
+
+      if (searchInput) {
+        searchInput.addEventListener("input", function () {
+          filterOptions(searchInput.value);
+        });
+        searchInput.addEventListener("keydown", function (ev) {
+          if (ev.key === "Enter") {
+            ev.preventDefault();
+            var form = dd.closest("form");
+            if (form) form.submit();
+          }
+        });
+      }
+
+      if (clearSearchBtn) {
+        clearSearchBtn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          if (searchInput) {
+            searchInput.value = "";
+            filterOptions("");
+            searchInput.focus();
+          }
+        });
+      }
+
+      if (selectAllBtn) {
+        selectAllBtn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          optLabels.forEach(function (lbl) {
+            if (lbl.style.display !== "none") {
+              var cb = lbl.querySelector('input[type="checkbox"]');
+              if (cb) cb.checked = true;
+            }
+          });
+          updateBtnText();
+        });
+      }
+
+      if (clearAllBtn) {
+        clearAllBtn.addEventListener("click", function (ev) {
+          ev.stopPropagation();
+          optLabels.forEach(function (lbl) {
+            var cb = lbl.querySelector('input[type="checkbox"]');
+            if (cb) cb.checked = false;
+          });
+          updateBtnText();
+        });
+      }
+
+      optLabels.forEach(function (lbl) {
+        var cb = lbl.querySelector('input[type="checkbox"]');
+        if (cb) {
+          cb.addEventListener("change", function () {
+            updateBtnText();
+          });
+        }
+      });
+    });
+
+    document.addEventListener("click", function (ev) {
+      if (!ev.target.closest(".ms-dropdown")) {
+        closeAll();
+      }
+    });
+
+    document.addEventListener("keydown", function (ev) {
+      if (ev.key === "Escape") {
+        closeAll();
+      }
+    });
+  }
+
+  initMultiSelects();
 })();

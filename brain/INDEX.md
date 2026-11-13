@@ -1,4 +1,4 @@
-# INDEX — synced at commit 00f28df · 2026-11-13
+# INDEX — synced at commit e624d22 · 2026-11-13
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -9,7 +9,7 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 |---|---|---|
 | Hierarchy auto-code prefixes | MG=Company, BG=Brand, CG=Type, FG=Flavor | `app/hooks.py:6 (LEVEL_PREFIX)` |
 | Hierarchy max depth | 3 | `app/hooks.py:5 (MAX_DEPTH)` |
-| Master-module soft-delete value | `status='PENDING'` | `app/routers/crud.py:615` |
+| Master-module soft-delete value | `status='PENDING'` | `app/routers/crud.py:628` |
 | ACL user/role soft-delete value | `status='PENDING'` (unified with master modules 2026-11-12, see D-011) | `app/routers/acl_admin.py:149 (to_status)` |
 | Default item batch | `batch_id='1'`, expiry `2100-12-31` | `app/hooks.py:217 (item_after_create)` |
 | Default distributor stores | `{depot_id}140` Commercial / `{depot_id}170` Damage | `app/hooks.py:307 (depot_after_create)` |

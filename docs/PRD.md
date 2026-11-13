@@ -38,7 +38,8 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
 | Soft delete | status → PENDING (for brand: subtree PENDING); restore reverses with parent-active check |
 | Excel import | Template download (xlsx) + upload panel; row-by-row insert reusing form hooks; per-row error report |
 | Excel export | Download filtered visible page data (`GET /{slug}/export`); 'Download All' for entire result set (`scope=all`); hierarchy (`brand`) exports multi-sheet tree + leaf paths; hierarchy-synced items (`item`) export with synchronized Company, Brand, Type, and Flavor columns |
-| Search/filter | Free-text search over configured columns + dropdown filters (status, category selects) |
+| Search/filter | Free-text search over configured columns + typeahead search and multi-select dropdown filters (status, category selects) |
+| Density / Layout | Minimal margin and padding high-density layout across table rows, card containers, and search controls to eliminate wasted screen space |
 | Pagination | Configurable page size (10/25/50/100), page window, record counts |
 
 ### 2.4.1 Brand-specific UX (Item Info › Brand)

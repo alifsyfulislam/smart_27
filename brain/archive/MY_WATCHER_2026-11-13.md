@@ -1,0 +1,6 @@
+# MY_WATCHER raw inbox archive — 2026-11-13
+
+1. List page view it looks beautiful but issue is it takes lots of space i treat as waste margin pading reduicing as minimal 
+
+
+2. list page search filter col mutiselect and typing search as well

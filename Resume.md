@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit 70823fb · Date: 2026-11-13 -->
+<!-- Synced with repo state at commit e624d22 · Date: 2026-11-13 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
@@ -152,15 +152,19 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 ### Active Milestones Verified
 - **V-001 (2026-11-05 · fb0e803):** Core v1.0.0 end-to-end verified (Login, dashboard, 6 master modules, ACL admin, audit log).
 - **V-002 (2026-11-09 · 8b10af5):** Brand UX verified (Tree list, accordion per level, parent picker, image upload, multi-child addition, `is_leaf` invariant).
+- **V-003 (2026-11-13 · 00f28df):** Excel data download & hierarchy export verified across all 7 master modules (HIERARCHY_TREE, HIERARCHY_PATHS, ITEMS with synced levels, openpyxl styling).
+- **V-004 (2026-11-13 · HEAD):** Compact list layout (high-density table cells 5px 8px, card margin 12px, header 8px 14px, pager 6px 12px) and typeahead multi-select filter components (`.ms-dropdown`) verified live via HTTP against all 7 master modules with Excel export synchronization.
 
 ### Open Task Register (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
 |---|---|---|---|---|
+| **T-010** | **P2** | `ui` | `done` | Compact list-page layout: minimal cell padding (5px 8px), card headers, margins, and search bar (verified live V-004). |
+| **T-011** | **P2** | `ui` | `done` | List-page search filter column multi-select and type-to-search for filter dropdowns (verified live V-004). |
 | **T-001** | **P0** | `outlet` | `done` | Backfill outlet module documentation: PRD journey, SRS FR row, `sm_client` schema doc, README route table, PROMPTS template, STATUS count sync, and live verification (V-003). |
 | **T-002** | **P1** | `item` | `needs-verification` | Item sweep: list Brand filter, uniqueness check, hierarchy dropdown search, edit pre-selects, float fields calculation, status cascade to batches. |
 | **T-003** | **P1** | `item_batch` | `needs-verification` | Item batch sweep: cid+item_id+batch_id uniqueness, active items dropdown, expiry default 2100-12-31, list Brand filter. |
-| **T-004** | **P2** | `all` | `needs-verification` | Template download buttons presence and mode (hierarchy-mode vs standard) across all list views. |
+| **T-004** | **P2** | `all` | `done` | Download data button on all list pages (filtered visible page data; hierarchy-based Excel for hierarchy-synced modules). |
 | **T-005** | **P2** | `core` | `clarify` | Scoping active-menu highlight on sidebar when sub-modules share names (e.g., `item` vs `item-batch`). |
 | **T-006** | **P3** | `brand` | `clarify` | Confirm brand delete button visibility condition (`is_leaf` logic). |
 | **T-007** | **P3** | `api` | `ready` | REST API routes for planned Flutter mobile application. |
@@ -169,7 +173,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-011)
+## 8. Architectural Decision Summary (D-001 to D-013)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -182,12 +186,14 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-009:** `is_leaf` invariant dynamically recomputed from active children.
 - **D-010:** Outlet master (`sm_client`) registered on generic engine with automatic customer type generation.
 - **D-011:** Soft-delete vocabulary across both master data and ACL unified to `status='PENDING'`.
+- **D-012:** Filtered Excel Data Export with Hierarchy Synchronization (`GET /{slug}/export`, `/{slug}/download`) implemented as synchronous `def module_export` executed via threadpool, exporting styled sheets (`HIERARCHY_TREE`, `HIERARCHY_PATHS`, `ITEMS` with synced levels).
+- **D-013:** Compact High-Density Table Layout & Typeahead Multi-Select Filter Components: minimal table cell padding (5px 8px), tight card headers and search bars, zero-CDN vanilla JS/CSS multi-select dropdowns (`.ms-dropdown`) with real-time text search, multi-key/comma-separated query serialization, and SQL `IN (...)` filtering synchronized across list views, pagination, and Excel export.
 
 ---
 
 ## 9. System Health & Audit Checkpoint
 
-- **Context Checker Status:** **PASS (14/14 checks clean)** at commit `70823fb`.
+- **Context Checker Status:** **PASS (15/15 checks clean)**.
 - **Known Technical Debt / Pending Actions:**
   1. Complete T-001 (Outlet documentation and memory backfill).
   2. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore` (Step 15 from Phase 4).

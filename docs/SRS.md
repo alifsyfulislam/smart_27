@@ -34,7 +34,7 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR2.3 Unauthenticated access to any page redirects to `/login`; unknown module slugs redirect to `/`.
 
 ### FR3 Master modules (per module M of `app/modules.py`)
-- FR3.1 `GET /{slug}` — list: cid-filtered, free-text search (configurable `search_cols`), dropdown filters, ORDER, LIMIT/OFFSET pagination, page-size select. Brand renders the full hierarchy as a tree instead: nodes at depth 0 start expanded (server-side `open` class), deeper nodes collapsed; `app/static/js/app.js` toggles nodes with a per-level accordion — expanding a node collapses the other open nodes under the same parent.
+- FR3.1 `GET /{slug}` — list: cid-filtered, free-text search (configurable `search_cols`), dropdown filters with typeahead search and multi-select support, compact high-density layout (minimized cell and container padding/margins), ORDER, LIMIT/OFFSET pagination, page-size select. Brand renders the full hierarchy as a tree instead: nodes at depth 0 start expanded (server-side `open` class), deeper nodes collapsed; `app/static/js/app.js` toggles nodes with a per-level accordion — expanding a node collapses the other open nodes under the same parent.
 - FR3.2 `GET/POST /{slug}/create` — form → `values_from_form` → hook prepare → insert (`touch` stamps cid/created_on/by) → hook after_create → audit CREATE.
 - FR3.3 `GET/POST /{slug}/edit/{id}` — existing merged with submitted values → hook prepare (dup checks) → update → after_update/hook → audit UPDATE (old+new snapshots).
 - FR3.4 `GET /{slug}/view/{id}` — read-only render.

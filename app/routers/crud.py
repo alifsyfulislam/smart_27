@@ -252,32 +252,41 @@ def _filter_sql(m, request, qk=""):
             likes.append(f"t.{c} LIKE %s")
             params.append(f"%{qk}%")
         where.append("(" + " OR ".join(likes) + ")")
-    filt_vals = {f[0]: request.query_params.get(f[0], "") for f in m["filters"]}
+    filt_vals = {}
     for f in m["filters"]:
         name, _label, kind = f[0], f[1], f[2]
-        val = (filt_vals.get(name) or "").strip()
-        if not val:
+        raw_list = request.query_params.getlist(name)
+        vals = []
+        for item in raw_list:
+            for part in str(item).split(","):
+                p = part.strip()
+                if p and p not in vals:
+                    vals.append(p)
+        filt_vals[name] = vals
+        if not vals:
             continue
+        ph = ", ".join(["%s"] * len(vals))
         if kind in ("hier_brand", "item_brand"):
             # brand filter: match on the item's brand column when the module
             # table has one, otherwise through the items of that brand
             if "brand_id" in table_cols(m):
-                where.append("t.brand_id=%s")
-                params.append(val)
+                where.append(f"t.brand_id IN ({ph})")
+                params.extend(vals)
             else:
-                where.append("t.item_id IN (SELECT item_id FROM sm_item "
-                             "WHERE cid=%s AND status='ACTIVE' AND brand_id=%s)")
-                params += [config.CID, val]
+                where.append(f"t.item_id IN (SELECT item_id FROM sm_item "
+                             f"WHERE cid=%s AND status='ACTIVE' AND brand_id IN ({ph}))")
+                params.append(config.CID)
+                params.extend(vals)
         elif kind == "cat":
             col = name if name in table_cols(m) else "status"
             # case-insensitive: legacy rows may store the display name instead of the code
-            where.append(f"UPPER(t.{col})=%s")
-            params.append(val.upper())
+            where.append(f"UPPER(t.{col}) IN ({ph})")
+            params.extend([v.upper() for v in vals])
         else:
             # column always `name` except status filter on tables whose column name is status
             col = name if name in table_cols(m) else "status"
-            where.append(f"t.{col}=%s")
-            params.append(val)
+            where.append(f"t.{col} IN ({ph})")
+            params.extend(vals)
     return " AND ".join(where), params, filt_vals
 
 
@@ -340,15 +349,19 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
     item_opts = item_opts or []
     depot_opts = depot_opts or []
 
-    keep = {"qk": qk, "page_size": page_size, "status": status}
-    keep.update(filt_vals)
-    query = urlencode({k: v for k, v in keep.items() if v})
+    keep = {"qk": qk, "page_size": page_size}
+    for k, v in filt_vals.items():
+        if v:
+            keep[k] = v
+    query = urlencode({k: v for k, v in keep.items() if v}, doseq=True)
+
+    has_filters = bool(qk or any(filt_vals.values()))
 
     context.update({
         "m": m, "slug": slug, "title": m["title"], "rows": rows, "fcols": m["list_cols"],
         "total": total, "page": page, "pages": pages, "page_size": page_size,
         "qk": qk, "filters": _filter_options(m), "filt_vals": filt_vals,
-        "query": query, "tree": tree,
+        "query": query, "has_filters": has_filters, "tree": tree,
         "item_opts": item_opts or [], "depot_opts": depot_opts or [],
     })
     from ..main import templates

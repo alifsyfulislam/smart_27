@@ -54,7 +54,8 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 - Login page + collapsible sidebar dashboard, modern and optimized layout.
 - Responsive; Facebook-like font/background colors; eye-comfort palette.
 - Sidebar accordion: opening one nav group auto-collapses the others, with smooth transitions; Font Awesome icons served **locally** (no CDN).
-- Search + filters + pagination on every list.
+- Search + filters + pagination on every list; column filters support typeahead search and multi-select.
+- High-density compact view: minimal margin and padding across tables, cards, and filter controls to maximize visible data and eliminate wasted screen space.
 - Runs in a Python virtual environment; default admin credentials per `AGENTS.md`, to be changed after first login.
 
 ## 6. Success criteria

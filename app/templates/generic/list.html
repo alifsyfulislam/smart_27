@@ -1,7 +1,7 @@
 {% extends "base.html" %}
 {% block title %}{{ m.title }}{% endblock %}
 {% block content %}
-<div class="card">
+<div class="card list-card">
   <div class="card-head">
     <h2><i class="fa-solid {{ m.icon }}"></i> {{ m.title }}</h2>
     <span class="spacer"></span>
@@ -14,15 +14,54 @@
   </div>
   <div class="card-body">
     <form method="get" action="/{{ slug }}" class="search-bar">
-      <input type="text" name="qk" value="{{ qk }}" placeholder="Search {{ m.search_cols|join(', ') }}..." style="min-width:230px">
+      <input type="text" name="qk" value="{{ qk }}" placeholder="Search {{ m.search_cols|join(', ') }}..." style="min-width:210px">
       {% for fo in filters %}
-      <select name="{{ fo.name }}">
-        <option value="">All {{ fo.label }}</option>
-        {% for opt in fo.options %}
-        {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
-        <option value="{{ ov }}" {{ 'selected' if filt_vals.get(fo.name) == ov }}>{{ opt[1] if opt is iterable and opt is not string else opt }}</option>
-        {% endfor %}
-      </select>
+      {% set cur_vals = filt_vals.get(fo.name, []) %}
+      <div class="ms-dropdown" data-name="{{ fo.name }}" data-label="{{ fo.label }}">
+        <button type="button" class="ms-btn {{ 'has-value' if cur_vals }}" title="Filter by {{ fo.label }}">
+          <span class="ms-btn-text">
+            {% if not cur_vals %}
+              All {{ fo.label }}
+            {% elif cur_vals|length == 1 %}
+              {% set ns = namespace(found='') %}
+              {% for opt in fo.options %}
+                {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
+                {% set ol = opt[1] if opt is iterable and opt is not string else opt %}
+                {% if ov == cur_vals[0] %}{% set ns.found = ol %}{% endif %}
+              {% endfor %}
+              {{ ns.found or cur_vals[0] }}
+            {% else %}
+              {{ fo.label }} ({{ cur_vals|length }})
+            {% endif %}
+          </span>
+          <i class="fa-solid fa-chevron-down ms-chevron"></i>
+        </button>
+        <div class="ms-menu">
+          <div class="ms-header">
+            <div class="ms-search-box">
+              <i class="fa-solid fa-magnifying-glass ms-icon"></i>
+              <input type="text" class="ms-search" placeholder="Search {{ fo.label }}..." autocomplete="off">
+              <button type="button" class="ms-clear-search" title="Clear search" style="display:none">&times;</button>
+            </div>
+            <div class="ms-quick-actions">
+              <button type="button" class="ms-action ms-select-all">Select All</button>
+              <button type="button" class="ms-action ms-clear-all">Clear</button>
+            </div>
+          </div>
+          <div class="ms-options">
+            {% for opt in fo.options %}
+            {% set ov = opt[0] if opt is iterable and opt is not string else opt %}
+            {% set ol = opt[1] if opt is iterable and opt is not string else opt %}
+            {% set is_chk = ov in cur_vals %}
+            <label class="ms-opt" data-val="{{ ov }}" data-label="{{ ol|lower }} {{ ov|lower }}">
+              <input type="checkbox" name="{{ fo.name }}" value="{{ ov }}" {{ 'checked' if is_chk }}>
+              <span class="ms-opt-text">{{ ol }}</span>
+            </label>
+            {% endfor %}
+            <div class="ms-empty" style="display:none">No matching options</div>
+          </div>
+        </div>
+      </div>
       {% endfor %}
       <!-- {% if slug != 'brand' %}
       <select name="page_size">
@@ -30,7 +69,7 @@
       </select>
       {% endif %} -->
       <button class="btn btn-primary" type="submit"><i class="fa-solid fa-magnifying-glass"></i> Filter</button>
-      {% if qk or filt_vals %}<a class="btn" href="/{{ slug }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>{% endif %}
+      {% if has_filters %}<a class="btn" href="/{{ slug }}"><i class="fa-solid fa-rotate-left"></i> Reset</a>{% endif %}
       {% if perms.get('view') %}
       <a class="btn" href="/{{ slug }}/export?{{ query }}{{ '&' if query else '' }}page={{ page }}&page_size={{ page_size }}" title="Download visible page data to Excel"><i class="fa-solid fa-download"></i> Download</a>
     {% endif %}
@@ -38,12 +77,12 @@
   </div>
 
   {% if perms.get('import') %}
-  <details style="padding:0 16px 14px">
-    <summary style="cursor:pointer;color:#1877f2;font-size:13px;font-weight:600"><i class="fa-solid fa-upload"></i> Batch Upload (template based Excel)</summary>
-    <form method="post" action="/{{ slug }}/upload" enctype="multipart/form-data" style="margin-top:10px;display:flex;gap:10px;align-items:center;flex-wrap:wrap">
+  <details class="batch-upload-details">
+    <summary><i class="fa-solid fa-upload"></i> Batch Upload (template based Excel)</summary>
+    <form method="post" action="/{{ slug }}/upload" enctype="multipart/form-data">
       <input type="file" name="file" accept=".xlsx" required>
       <button class="btn btn-primary btn-sm" type="submit"><i class="fa-solid fa-upload"></i> Upload &amp; Import</button>
-      <span style="color:#65676b;font-size:12px">Download the template first, fill rows, then upload the .xlsx.</span>
+      <span class="batch-upload-hint">Download the template first, fill rows, then upload the .xlsx.</span>
     </form>
   </details>
   {% endif %}
