@@ -1,4 +1,4 @@
-# INDEX — synced at commit 14fd314 · 2026-11-12
+# INDEX — synced at commit 70823fb · 2026-11-13
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -33,7 +33,7 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | item-batch | sm_item_batch | `app/modules.py:113 ("item-batch")` | `app/hooks.py:267 (item_batch_prepare)` | item_batch | /item-batch | item | PRD §2.4 |
 | distributor | sm_depot | `app/modules.py:145 ("distributor")` | `app/hooks.py:291 (depot_prepare)`, `:307 (depot_after_create)` | distributor | /distributor | — | PRD §2.4 |
 | distributor-store | sm_depot_store | `app/modules.py:194 ("distributor-store")` | `app/hooks.py:323 (depot_store_prepare)` | depot_store | /distributor-store | distributor | PRD §2.4 |
-| outlet | sm_client | `app/modules.py:221 ("outlet")` | `app/hooks.py:371 (outlet_prepare)` | outlet | /outlet | category_type, depot, depot_store | *(T-001 backfill pending)* |
+| outlet | sm_client | `app/modules.py:221 ("outlet")` | `app/hooks.py:371 (outlet_prepare)` | outlet | /outlet | category_type, depot, depot_store | PRD §2.4, SRS §2 FR4.8 |
 | category-type | sm_category_type | `app/modules.py:271 ("category-type")` | `app/hooks.py:342 (category_type_prepare)` | category_type | /category-type | — | PRD §2.4 |
 
 ACL screens: `app/routers/acl_admin.py` (users/roles/permissions — include BEFORE crud router).

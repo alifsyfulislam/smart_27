@@ -22,13 +22,13 @@ secondary-sales master data with login-based access control and full auditabilit
 - Recent 8 audit entries; quick actions (new level/item/batch/distributor, template downloads).
 
 ### 2.3 Sidebar navigation
-Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch) · **Distributor Info** (Distributor, Distributor Store) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
+Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch) · **Distributor Info** (Distributor, Distributor Store) · **Outlet Info** (Outlet) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
 Accordion behavior — opening a group collapses the others (persisted in localStorage); a toggle
 collapses the sidebar to icon rail on desktop, drawer + overlay on mobile; smooth CSS transitions;
 Font Awesome icons; Facebook-style colors (#1877f2 primary, #f0f2f5 background, #050505/#65676b text).
 
 ### 2.4 Master modules (generic engine driven by `app/modules.py`)
-Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor Store**, **Category Type**
+Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor Store**, **Outlet**, **Category Type**
 
 | Feature | Behavior |
 |---|---|
@@ -67,6 +67,7 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 | `depot.after_create` | Default stores per BR5 (hook: `app/hooks.py depot_after_create`) |
 | `item_batch.prepare` | Item existence, auto name, uniqueness per item |
 | `depot_store.prepare` | Depot existence, uniqueness per depot |
+| `outlet.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids |
 
 ## 4. Permissions catalogue (seed)

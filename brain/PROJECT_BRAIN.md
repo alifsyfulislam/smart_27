@@ -5,6 +5,7 @@ content lives in its one home. **Session start: read `brain/INDEX.md` + `brain/S
 
 | Want… | Go to |
 |---|---|
+| Comprehensive SSOT / Session Resumption Guide | `Resume.md` |
 | Current state, verified counts, run line | `brain/STATUS.md` |
 | Why something is the way it is (all decisions, dated) | `brain/DECISIONS.md` (append-only) |
 | What was verified, when, with what result | `brain/VERIFICATION_LOG.md` (append-only) |

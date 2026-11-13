@@ -17,9 +17,10 @@ role-based access control and keeps a central audit trail of every master-data c
 In scope (this release):
 1. **Item Info** — Brand (item hierarchy), Item, Item Batch.
 2. **Distributor Info** — Distributor, Distributor Store.
-3. **Settings** — Category Type (data definitions for columns like `depot_category`, `store_type`, `pack_size`, `unit_type`, `item_category`).
-4. **Access Control** — User / Role / Permission (ACL) with mapping tables.
-5. **Records** — Central audit log written only by the application.
+3. **Outlet Info** — Outlet (client master with distributor, store, and category linkage).
+4. **Settings** — Category Type (data definitions for columns like `depot_category`, `store_type`, `pack_size`, `unit_type`, `item_category`).
+5. **Access Control** — User / Role / Permission (ACL) with mapping tables.
+6. **Records** — Central audit log written only by the application.
 
 Out of scope (future): sales orders, requisitions, deliveries, payments, invoicing, and the Flutter mobile client.
 
@@ -38,6 +39,8 @@ Out of scope (future): sales orders, requisitions, deliveries, payments, invoici
 | BR9 | `sm_category_type` feeds the value lists used by other modules (depot category, store type, item category, unit type). |
 | BR10 | A brand (hierarchy) level may carry an **image**: uploaded files are stored under `app/static/uploads` as `{table}_{name-slug}_image_{timestamp}.{ext}` (PNG/JPG/GIF/WEBP, max 5 MB) and the generated link is saved in `image_path`. Editing can preview and replace the image; leaving the file input empty keeps the current one. |
 | BR11 | From the Brand **edit page** a user can add one or many **child levels** in a single submit (names deduped; each child flows through the normal auto-code/path/audit pipeline). A Flavor (depth 3) cannot have children. |
+
+| BR12 | Outlets (`sm_client`) are linked to distributors and stores; customer type is auto-generated as `category_id|category_name` from `sm_category_type` (groups `OUTLET_CATEGORY` and `OUTLET_SUB_CATEGORY`). |
 
 ## 4. Users
 

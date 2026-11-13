@@ -56,6 +56,8 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR4.6 Uniqueness: item by cid+item_id; batch by cid+item_id+batch_id; store by cid+depot_id+store_id; category by cid+type_name+cat_type_id; name dup within same hierarchy parent.
 - FR4.7 Category values for type names map from `sm_category_type` groups (DISTRIBUTOR_CATEGORY, STORE_TYPE, ITEM_CATEGORY, ITEM_UNIT, ITEM_PACK, OUTLET_CATEGORY, OUTLET_SUB_CATEGORY — see `SEED_CATEGORY_TYPES`).
 
+- FR4.8 Outlet (`sm_client`): uniqueness cid+client_id; category/sub-category resolution; auto-generated customer_type (`category_id|category_name`); depot and store validation against `sm_depot` and `sm_depot_store`.
+
 ### FR5 Audit
 - FR5.1 `sm_audit_log` rows: table_name, record_key (business id), action, old_values/new_values JSON snapshots, changed_by, user_ip, note.
 - FR5.2 App-only; failures to log never break the business transaction.

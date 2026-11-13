@@ -127,6 +127,24 @@ if index_rows == n_modules:
 else:
     fail(f"INDEX §2 has {index_rows} module rows != registry {n_modules}")
 
+# ---- 1b. module documentation coverage ---------------------------------------
+try:
+    sys.path.insert(0, str(ROOT))
+    from scripts.sync_modules_docs import parse_modules, audit_module
+    mod_specs = parse_modules()
+    gaps = []
+    for m_slug, m_meta in mod_specs.items():
+        res = audit_module(m_slug, m_meta)
+        missing_keys = [k for k, v in res.items() if not v["ok"]]
+        if missing_keys:
+            gaps.append(f"{m_slug} ({', '.join(missing_keys)})")
+    if not gaps:
+        ok(f"all {len(mod_specs)} master modules documented across BRD/PRD/SRS/README/PROMPTS/INDEX")
+    else:
+        fail(f"module documentation drift: {'; '.join(gaps)} — run 'python scripts/sync_modules_docs.py --fix' to sync")
+except Exception as e:
+    fail(f"could not audit module documentation: {e}")
+
 # ---- 2. vocabulary vs code ---------------------------------------------------
 crud = read("app/routers/crud.py")
 if "status='PENDING'" in crud:

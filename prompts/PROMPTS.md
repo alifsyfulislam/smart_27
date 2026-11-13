@@ -4,7 +4,7 @@ Prompt templates an operator or agent can reuse against the running SSMS applica
 
 ## 1. Daily operations check
 > Verify SSMS health: confirm the server answers 200 on `/`, `/brand`, `/item`, `/item-batch`,
-> `/distributor`, `/distributor-store`, `/category-type`, `/users`, `/roles`, `/permissions`,
+> `/distributor`, `/distributor-store`, `/outlet`, `/category-type`, `/users`, `/roles`, `/permissions`,
 > `/audit-log` after logging in with admin credentials. Report any non-200 response and the
 > new `sm_audit_log` rows since the last check.
 
@@ -38,3 +38,9 @@ Prompt templates an operator or agent can reuse against the running SSMS applica
 > Add master module `<name>` using the existing engine only: registry entry in `app/modules.py`,
 > hooks in `app/hooks.py`, DDL in `scripts/ddl.sql` (with `status`), permission seeds, ACE-style
 > route selection (acl_admin before crud), doc updates per AGENTS.md §Adding a new master module.
+
+## 8. Onboard an outlet
+> In the Outlet Info → Outlet module, create outlet `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.

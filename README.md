@@ -33,6 +33,7 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Item Batch | `/item-batch` | per-item batches, datalist item picker |
 | Distributor | `/distributor` | auto default stores Commercial + Damage (BR5) |
 | Distributor Store | `/distributor-store` | store types from category master |
+| Outlet | `/outlet` | client_id uniqueness, auto customer_type, distributor & store linking |
 | Category Type | `/category-type` | value definitions for other modules |
 | Users / Roles / Permissions | `/users` `/roles` `/permissions` | full ACL management |
 | Audit Log | `/audit-log` | app-written central change log with filters |
