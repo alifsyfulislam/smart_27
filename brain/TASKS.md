@@ -12,5 +12,9 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-028 | done | level | - | P1 | 2026-11-16 | Field Structure Route and Beat code length synchronization (R0000037, B0000037 8-character zero-padded format) with sm_level data migration (V-014, D-023).
+- T-027 | done | level | - | P1 | 2026-11-16 | Parent Level option whitespace fix in /top-level/create and /level/create; dynamic Zone-to-Territory suggestion filter in Field Structure (V-013, D-022).
+- T-026 | done | level | - | P1 | 2026-11-16 | Field Structure Parent Level options from sm_top_level depth 2 (active Zones) for /level/create and /level/edit with depth 3 Territory name sync (V-012, D-021).
+- T-025 | done | core | - | P1 | 2026-11-16 | Item view hierarchy print, readonly item_id on item/batch edit, top-level parent depth 0 without image, level parent depth 0 with territory select (V-011, D-020).
 - T-024 | done | level | - | P1 | 2026-11-16 | Field Structure territory sync from sm_top_level depth 3 + town-level distributor tagging and route/beat auto-cascade (V-010, D-019).
 - T-023 | done | item | - | P1 | 2026-11-16 | Item image upload: replicate Brand image upload pattern for sm_item.image_path on /item/create and /item/edit/{id}, guard against '-' defaults in form.html, and update docs (V-009, D-018).

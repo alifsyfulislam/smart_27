@@ -7,8 +7,9 @@ from . import config
 
 
 def get_conn():
+    host = "127.0.0.1" if config.DB_HOST == "localhost" else config.DB_HOST
     return pymysql.connect(
-        host=config.DB_HOST,
+        host=host,
         port=config.DB_PORT,
         user=config.DB_USER,
         password=config.DB_PASS or None,

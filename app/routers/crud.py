@@ -160,19 +160,19 @@ def _hierarchy_parent_opts():
 
 
 def _top_level_parent_opts():
-    """Parent choices for National Structure — root or any active node with depth < 3."""
-    return [{"level_id": "0", "level_name": "- Root (National) -"}] + list(q(
+    """Parent choices for National Structure — root or active nodes with depth = 0."""
+    return [{"level_id": "0", "level_name": "- Root (National) -", "depth": -1}] + list(q(
         """SELECT id, level_id, level_name, depth FROM sm_top_level
-           WHERE cid=%s AND status='ACTIVE' AND depth < 3
+           WHERE cid=%s AND status='ACTIVE' AND depth = 0
            ORDER BY depth, level_id""", (config.CID,)))
 
 
 def _level_parent_opts():
-    """Parent choices for Field Structure — root or any active node with depth < 3."""
-    return [{"level_id": "0", "level_name": "- Root (Territory) -", "depth": -1}] + list(q(
-        """SELECT id, level_id, level_name, depth FROM sm_level
-           WHERE cid=%s AND status='ACTIVE' AND depth < 3
-           ORDER BY depth, level_id""", (config.CID,)))
+    """Parent choices for Field Structure — sm_top_level depth 2 (active Zones)."""
+    return [{"level_id": "", "level_name": "-- Select Parent Zone --", "depth": 2}] + list(q(
+        """SELECT id, level_id, level_name, depth FROM sm_top_level
+           WHERE cid=%s AND status='ACTIVE' AND depth = 2
+           ORDER BY level_name""", (config.CID,)))
 
 
 def _hierarchy_children(slug, level_id):
@@ -457,7 +457,7 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
 
     elif slug == "level":
         context["top_level_terrs"] = q(
-            """SELECT level_id, level_name FROM sm_top_level
+            """SELECT level_id, level_name, parent_level_id FROM sm_top_level
                WHERE cid=%s AND depth=3 AND status='ACTIVE'
                ORDER BY level_name""", (config.CID,))
 
@@ -593,7 +593,13 @@ async def module_edit_form(request: Request, slug: str, rid: int):
     if slug in ("brand", "top-level", "level"):
         children = _hierarchy_children(slug, row["level_id"])
         next_level = _NEXT_LEVEL_BY_SLUG.get(slug, {}).get(int(row["depth"] or 0), "")
-    item_opts, depot_opts = ([], [])
+    parent_opts, item_opts, depot_opts = ([], [], [])
+    if slug == "brand":
+        parent_opts = _hierarchy_parent_opts()
+    elif slug == "top-level":
+        parent_opts = _top_level_parent_opts()
+    elif slug == "level":
+        parent_opts = _level_parent_opts()
     if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
@@ -602,6 +608,7 @@ async def module_edit_form(request: Request, slug: str, rid: int):
         _form_context(m, context, "Edit", row=row,
                       data={k: ("" if v is None else v) for k, v in row.items()},
                       children=children, next_level=next_level,
+                      parent_opts=parent_opts,
                       item_opts=item_opts, depot_opts=depot_opts))
 
 
@@ -630,7 +637,13 @@ async def module_edit(request: Request, slug: str, rid: int):
     hook = HOOKS.get(m["create_hook"], {})
     err = img_err or (hook["prepare"](config.CID, data, row, user["user_id"]) if hook.get("prepare") else None)
     if err:
-        item_opts, depot_opts = ([], [])
+        parent_opts, item_opts, depot_opts = ([], [], [])
+        if slug == "brand":
+            parent_opts = _hierarchy_parent_opts()
+        elif slug == "top-level":
+            parent_opts = _top_level_parent_opts()
+        elif slug == "level":
+            parent_opts = _level_parent_opts()
         if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
@@ -638,6 +651,7 @@ async def module_edit(request: Request, slug: str, rid: int):
             request, "generic/form.html",
             _form_context(m, context, "Edit", row=row, data={k: ("" if v is None else v) for k, v in data.items()},
                           error=err, children=children, next_level=next_level,
+                          parent_opts=parent_opts,
                           item_opts=item_opts, depot_opts=depot_opts))
     if img_updates:                      # no new file -> keep the existing image_path
         data.update(img_updates)

@@ -18,7 +18,7 @@
           {% if s.type == 'hier_root_select' %}
           <div class="field">
             <label>Parent Level</label>
-            {% if a in ['Edit','View'] %}
+            {% if a == 'View' or (a == 'Edit' and (slug != 'level' or (row and (row.get('depth') or 0) != 0))) %}
               <input type="hidden" name="parent_level_id" id="parent_level_id" value="{{ data.get('parent_level_id') or '0' }}">
               <input type="hidden" name="parent_level_name" id="parent_level_name" value="{{ data.get('parent_level_name') or 'N/A' }}">
               <input type="text" value="{{ (data.get('parent_level_id') or '0')}} | {{ 'Root' if data.get('parent_level_name') == '-' else (data.get('parent_level_name')) }}" disabled>
@@ -26,7 +26,7 @@
             <select name="parent_level_id" id="f-parent_level_id" data-searchable
                     data-search-placeholder="Type to search parent level…">
               {% for p in parent_opts %}
-              <option value="{{ p['level_id'] }}" data-depth="{{ p.get('depth', -1) }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} | {{ p['level_name'] }}</option>
+              <option value="{{ p['level_id'] }}" data-depth="{{ p.get('depth', -1) }}" {{ 'selected' if (data.get('parent_level_id') or '') == p['level_id'] }}>{{ (p['level_id'] ~ ' | ') if p['level_id'] and p['level_id'] != '0' else '' }}{{ p['level_name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -35,6 +35,26 @@
           {% elif s.type == 'hier_cascade' %}
           <div class="field full">
             <label>{{ s.label }}</label>
+            {% if a == 'View' %}
+            <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:10px 14px;background:var(--fb-bg,#f0f2f5);border:1px solid var(--fb-divider,#dadde1);border-radius:6px">
+              <div>
+                <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Company</span>
+                <strong>{{ data.get('company_id') or '-' }}{% if data.get('company_name') and data.get('company_name') != '-' %} | {{ data.get('company_name') }}{% endif %}</strong>
+              </div>
+              <div>
+                <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Brand</span>
+                <strong>{{ data.get('brand_id') or '-' }}{% if data.get('brand_name') and data.get('brand_name') != '-' %} | {{ data.get('brand_name') }}{% endif %}</strong>
+              </div>
+              <div>
+                <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Type</span>
+                <strong>{{ data.get('type_id') or '-' }}{% if data.get('type_name') and data.get('type_name') != '-' %} | {{ data.get('type_name') }}{% endif %}</strong>
+              </div>
+              <div>
+                <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Flavor</span>
+                <strong>{{ data.get('flavor_id') or '-' }}{% if data.get('flavor_name') and data.get('flavor_name') != '-' %} | {{ data.get('flavor_name') }}{% endif %}</strong>
+              </div>
+            </div>
+            {% else %}
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(170px,1fr));gap:8px">
               <select id="h0" data-searchable data-search-placeholder="Type to search company…"><option value="">-- Company --</option></select>
               <select id="h1" data-searchable data-search-placeholder="Type to search brand…"><option value="">-- Brand --</option></select>
@@ -46,20 +66,25 @@
             <input type="hidden" name="brand_id" id="brand_id" value="{{ data.get('brand_id') or '' }}">
             <input type="hidden" name="type_id" id="type_id" value="{{ data.get('type_id') or '' }}">
             <input type="hidden" name="flavor_id" id="flavor_id" value="{{ data.get('flavor_id') or '' }}">
-            <div class="hint">{{ s.help }}</div>
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
           {% elif s.type == 'item_select' %}
           <div class="field {{ 'full' if not s.in_list }}">
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('item_id') }}</div>
+            {% if a == 'View' %}<div>{{ data.get('item_id') }} | {{ data.get('name') }}</div>
             {% else %}
             <select name="item_id" data-searchable data-search-placeholder="Type to search item (id / name / brand)…"
+                    {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select item --</option>
               {% for o in item_opts %}
               <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} | {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}){% endif %}</option>
               {% endfor %}
             </select>
+            {% if a == 'Edit' and s.readonly_on_edit %}
+            <input type="hidden" name="item_id" value="{{ data.get('item_id') }}">
+            {% endif %}
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -146,40 +171,42 @@
             {% else %}
               <div id="level-name-inputs">
                 {% if a == 'Create' %}
-                <div id="terr-select-wrap" style="margin-bottom:6px;{% if (data.get('parent_level_id') or '0') != '0' %}display:none;{% endif %}">
+                <div id="terr-select-wrap">
                   <select id="f-terr-select" data-searchable data-search-placeholder="Type to search Territory from National Structure…">
                     <option value="">-- Select Territory (National Structure depth 3) --</option>
                     {% for t in (top_level_terrs or []) %}
-                    <option value="{{ t['level_name'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
+                    <option value="{{ t['level_name'] }}" data-parent="{{ t['parent_level_id'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
                     {% endfor %}
                   </select>
                 </div>
-                {% elif a == 'Edit' and (row.get('depth') or 0) == 0 %}
-                <div id="terr-select-wrap" style="margin-bottom:6px">
-                  <select id="f-terr-select" data-searchable data-search-placeholder="Type to search Territory from National Structure…">
-                    <option value="">-- Select Territory (National Structure depth 3) --</option>
-                    {% for t in (top_level_terrs or []) %}
-                    <option value="{{ t['level_name'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
-                    {% endfor %}
-                  </select>
-                </div>
-                {% endif %}
                 <input type="text" name="level_name" id="f-level_name"
                        value="{{ '' if data.get('level_name') is none else data.get('level_name') }}"
-                       list="top-level-terr-list" placeholder="Enter level name or pick territory above"
-                       required autocomplete="off">
-                <datalist id="top-level-terr-list">
-                  {% for t in (top_level_terrs or []) %}
-                  <option value="{{ t['level_name'] }}">{{ t['level_id'] }} | {{ t['level_name'] }}</option>
-                  {% endfor %}
-                </datalist>
+                       placeholder="Enter town name"
+                       autocomplete="off"
+                       style="display:none;">
+                {% elif a == 'Edit' and (row.get('depth') or 0) == 0 %}
+                <div id="terr-select-wrap">
+                  <select id="f-terr-select" data-searchable data-search-placeholder="Type to search Territory from National Structure…">
+                    <option value="">-- Select Territory (National Structure depth 3) --</option>
+                    {% for t in (top_level_terrs or []) %}
+                    <option value="{{ t['level_name'] }}" data-parent="{{ t['parent_level_id'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <input type="hidden" name="level_name" id="f-level_name"
+                       value="{{ '' if data.get('level_name') is none else data.get('level_name') }}">
+                {% else %}
+                <input type="text" name="level_name" id="f-level_name"
+                       value="{{ '' if data.get('level_name') is none else data.get('level_name') }}"
+                       placeholder="Enter level name" required autocomplete="off">
+                {% endif %}
               </div>
             {% endif %}
             <div class="hint" id="level-name-hint">
               {% if a == 'Edit' and (row.get('depth') or 0) == 0 %}
-                Root Territory name sourced from National Structure (sm_top_level depth 3).
+                Territory name sourced from National Structure (sm_top_level depth 3). Parent Zone from National Structure (depth 2).
               {% else %}
-                {{ s.help or 'Level name. For Territory root, matches National Structure territory.' }}
+                {{ s.help or 'Level name. Sourced from National Structure (depth 3) for Territory.' }}
               {% endif %}
             </div>
           </div>
@@ -472,10 +499,69 @@
       var nameInp = document.getElementById("f-level_name");
       var hint = document.getElementById("level-name-hint");
 
+      var allTerrs = {{ (top_level_terrs or []) | tojson }};
+
+      function syncTerritories(zoneId, keepVal) {
+        if (!terrSel) return;
+        var curVal = (keepVal !== undefined) ? keepVal : (terrSel.value || (nameInp ? nameInp.value : ""));
+        terrSel.innerHTML = "";
+        if (!zoneId) {
+          var o0 = document.createElement("option");
+          o0.value = "";
+          o0.textContent = "-- Select Parent Zone first --";
+          terrSel.appendChild(o0);
+          terrSel.disabled = true;
+          if (nameInp) nameInp.value = "";
+          terrSel.dispatchEvent(new Event("ssms-refresh"));
+          return;
+        }
+
+        terrSel.disabled = false;
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "-- Select Territory (National Structure depth 3) --";
+        terrSel.appendChild(placeholder);
+
+        var matching = (allTerrs || []).filter(function (t) {
+          return t.parent_level_id === zoneId;
+        });
+
+        var matched = false;
+        matching.forEach(function (t) {
+          var opt = document.createElement("option");
+          opt.value = t.level_name;
+          opt.dataset.parent = t.parent_level_id;
+          opt.textContent = t.level_id + " | " + t.level_name;
+          if (curVal && curVal === t.level_name) {
+            opt.selected = true;
+            matched = true;
+          }
+          terrSel.appendChild(opt);
+        });
+
+        if (matching.length === 0) {
+          var emptyOpt = document.createElement("option");
+          emptyOpt.value = "";
+          emptyOpt.textContent = "-- No territories found for selected Zone --";
+          terrSel.appendChild(emptyOpt);
+        }
+
+        if (matched) {
+          terrSel.value = curVal;
+          if (nameInp) nameInp.value = curVal;
+        } else {
+          terrSel.value = "";
+          if (nameInp) nameInp.value = "";
+        }
+        terrSel.dispatchEvent(new Event("ssms-refresh"));
+      }
+
       if (terrSel && nameInp) {
         terrSel.addEventListener("change", function () {
           if (terrSel.value) {
             nameInp.value = terrSel.value;
+          } else {
+            nameInp.value = "";
           }
         });
       }
@@ -486,9 +572,13 @@
         var depth = opt ? parseInt(opt.getAttribute("data-depth") || "-1", 10) : -1;
         var pid = parentSel.value;
 
-        // Territory root is pid == "0" or depth == -1
-        if (pid === "0" || depth === -1) {
+        // Territory is depth == 2 (Zone parent from sm_top_level) or pid == "" / "0" or depth == -1
+        if (depth === 2 || pid === "0" || depth === -1) {
           if (terrWrap) terrWrap.style.display = "block";
+          if (nameInp) {
+            nameInp.style.display = "none";
+            nameInp.required = false;
+          }
           if (depotWrap) {
             depotWrap.style.display = "none";
             var ds = depotWrap.querySelector("select[name='depot_id']");
@@ -497,15 +587,27 @@
               ds.dispatchEvent(new Event("ssms-refresh"));
             }
           }
-          if (hint) hint.textContent = "Root Territory name sourced from National Structure (sm_top_level depth 3).";
+          if (hint) hint.textContent = "Select Parent Zone (depth 2) from National Structure to load Territory suggestions (depth 3).";
+          syncTerritories(pid, nameInp ? nameInp.value : "");
         } else if (depth === 0) {
           // Parent is Territory (depth 0) -> New node is Town (depth 1)
           if (terrWrap) terrWrap.style.display = "none";
+          if (nameInp) {
+            nameInp.style.display = "block";
+            nameInp.required = true;
+            nameInp.placeholder = "Enter town name";
+            if (terrSel && nameInp.value === terrSel.value) nameInp.value = "";
+          }
           if (depotWrap) depotWrap.style.display = "block";
           if (hint) hint.textContent = "Town name (prefix TW will be auto-assigned). Assign distributor here.";
         } else {
           // Parent is Town (depth 1) or Route (depth 2) -> New node is Route (depth 2) or Beat (depth 3)
           if (terrWrap) terrWrap.style.display = "none";
+          if (nameInp) {
+            nameInp.style.display = "block";
+            nameInp.required = true;
+            nameInp.placeholder = (depth === 1 ? "Enter route name" : "Enter beat name");
+          }
           if (depotWrap) {
             depotWrap.style.display = "none";
             var ds = depotWrap.querySelector("select[name='depot_id']");
@@ -516,6 +618,28 @@
           }
           if (hint) hint.textContent = (depth === 1 ? "Route" : "Beat") + " name (distributor will be auto-inherited from parent Town).";
         }
+      }
+
+      var form = parentSel ? parentSel.closest("form") : null;
+      if (form && terrSel && nameInp) {
+        form.addEventListener("submit", function (ev) {
+          var opt = parentSel ? parentSel.options[parentSel.selectedIndex] : null;
+          var depth = opt ? parseInt(opt.getAttribute("data-depth") || "-1", 10) : -1;
+          if (parentSel && (depth === 2 || parentSel.value === "0" || !parentSel.value)) {
+            if (!parentSel.value) {
+              ev.preventDefault();
+              alert("Please select a Parent Zone.");
+              return false;
+            }
+            if (terrSel && terrSel.value) {
+              nameInp.value = terrSel.value;
+            } else if (terrWrap && terrWrap.style.display !== "none") {
+              ev.preventDefault();
+              alert("Please select a Territory from National Structure.");
+              return false;
+            }
+          }
+        });
       }
 
       if (parentSel) {

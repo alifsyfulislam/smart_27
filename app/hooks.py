@@ -178,6 +178,8 @@ def hierarchy_restore(cid, rid, user=None):
 
 # ----------------------------------------------------------------- item
 def item_prepare(cid, data, existing=None, user=None):
+    if existing is not None:
+        data["item_id"] = existing["item_id"]
     item_id = (data.get("item_id") or "").strip()
     name = (data.get("name") or "").strip()
     if not item_id or not name:
@@ -274,6 +276,8 @@ def item_restore(cid, rid, user=None):
 
 # ----------------------------------------------------------------- batch
 def item_batch_prepare(cid, data, existing=None, user=None):
+    if existing is not None:
+        data["item_id"] = existing["item_id"]
     item_id = (data.get("item_id") or "").strip()
     batch_id = (data.get("batch_id") or "").strip()
     if not item_id or not batch_id:
@@ -582,7 +586,8 @@ def _next_field_level_code(cid, prefix):
         tail = (r["level_id"] or "")[len(prefix):]
         if tail.isdigit():
             max_no = max(max_no, int(tail))
-    return f"{prefix}{max_no + 1:04d}"
+    pad = 7 if prefix in ("R", "B") else 4
+    return f"{prefix}{max_no + 1:0{pad}d}"
 
 
 def level_prepare(cid, data, existing=None, user=None):
@@ -598,22 +603,40 @@ def level_prepare(cid, data, existing=None, user=None):
     if existing is not None:
         depth = int(existing.get("depth") or 0)
         if depth == 0:
-            # Editing Territory root: sync with sm_top_level depth 3
-            terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
-                        FROM sm_top_level
-                        WHERE cid=%s AND depth=3 AND status='ACTIVE'
-                          AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
-                        LIMIT 1""",
-                     (cid, name, name, clean_name, clean_name), one=True)
+            # Editing Territory root: sync with sm_top_level depth 3, parent zone from sm_top_level depth 2
+            zone_id = (data.get("parent_level_id") or "").strip()
+            zone = None
+            if zone_id and zone_id != "0":
+                zone = q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND depth=2 AND status='ACTIVE' AND level_id=%s",
+                         (cid, zone_id), one=True)
+            if zone:
+                terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                            FROM sm_top_level
+                            WHERE cid=%s AND depth=3 AND status='ACTIVE' AND parent_level_id=%s
+                              AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                            LIMIT 1""",
+                         (cid, zone["level_id"], name, name, clean_name, clean_name), one=True)
+                if not terr:
+                    return f"Territory '{clean_name}' does not belong to Zone '{zone['level_name']}' ({zone['level_id']})."
+            else:
+                terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                            FROM sm_top_level
+                            WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                              AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                            LIMIT 1""",
+                         (cid, name, name, clean_name, clean_name), one=True)
             if terr:
                 data["level_id"] = terr["level_id"]
                 data["level_name"] = terr["level_name"]
-                data["parent_level_id"] = terr["parent_level_id"]
-                data["parent_level_name"] = terr["parent_level_name"]
+                data["parent_level_id"] = zone["level_id"] if zone else terr["parent_level_id"]
+                data["parent_level_name"] = zone["level_name"] if zone else terr["parent_level_name"]
                 data["level0"] = terr["level_id"]
                 data["level0_name"] = terr["level_name"]
             else:
                 data["level_name"] = name
+                if zone:
+                    data["parent_level_id"] = zone["level_id"]
+                    data["parent_level_name"] = zone["level_name"]
             data["depot_id"] = "-"
             data["depot_name"] = "-"
             dup = q("""SELECT id FROM sm_level
@@ -657,28 +680,43 @@ def level_prepare(cid, data, existing=None, user=None):
 
     # CREATE MODE
     parent_id = (data.get("parent_level_id") or "0").strip() or "0"
-    if parent_id == "0":
+    zone = None
+    if parent_id != "0":
+        zone = q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND depth=2 AND status='ACTIVE' AND level_id=%s",
+                 (cid, parent_id), one=True)
+
+    if parent_id == "0" or zone:
         parent = None
         depth = 0
-        terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
-                    FROM sm_top_level
-                    WHERE cid=%s AND depth=3 AND status='ACTIVE'
-                      AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
-                    LIMIT 1""",
-                 (cid, name, name, clean_name, clean_name), one=True)
+        if zone:
+            terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                        FROM sm_top_level
+                        WHERE cid=%s AND depth=3 AND status='ACTIVE' AND parent_level_id=%s
+                          AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                        LIMIT 1""",
+                     (cid, zone["level_id"], name, name, clean_name, clean_name), one=True)
+            if not terr:
+                return f"Selected Territory '{clean_name}' does not belong to Zone '{zone['level_name']}' ({zone['level_id']})."
+        else:
+            terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                        FROM sm_top_level
+                        WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                          AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                        LIMIT 1""",
+                     (cid, name, name, clean_name, clean_name), one=True)
         if terr:
             code = terr["level_id"]
             name = terr["level_name"]
             data["level_name"] = name
-            parent_level_id = terr["parent_level_id"] or "0"
-            parent_level_name = terr["parent_level_name"] or "-"
+            parent_level_id = (zone["level_id"] if zone else terr["parent_level_id"]) or "0"
+            parent_level_name = (zone["level_name"] if zone else terr["parent_level_name"]) or "-"
         else:
             has_top_terrs = scalar("SELECT COUNT(*) FROM sm_top_level WHERE cid=%s AND depth=3 AND status='ACTIVE'", (cid,), 0)
             if has_top_terrs > 0:
                 return f"Root Field Structure level must match an active Territory (depth 3) from National Structure. Territory '{name}' was not found."
             code = _next_field_level_code(cid, "T")
-            parent_level_id = "0"
-            parent_level_name = "-"
+            parent_level_id = zone["level_id"] if zone else "0"
+            parent_level_name = zone["level_name"] if zone else "-"
 
         dup = q("""SELECT id FROM sm_level
                    WHERE cid=%s AND status='ACTIVE' AND (level_id=%s OR level_name=%s)
@@ -698,7 +736,16 @@ def level_prepare(cid, data, existing=None, user=None):
         if depth > 3:
             return "Cannot create a level below 'Beat' (depth 3) in Field Structure."
         prefix = FIELD_LEVEL_PREFIX[depth]
-        code = _next_field_level_code(cid, prefix)
+        custom_code = (data.get("level_id") or "").strip()
+        if custom_code and custom_code.upper().startswith(prefix):
+            tail = custom_code[len(prefix):]
+            if tail.isdigit():
+                pad = 7 if prefix in ("R", "B") else 4
+                code = f"{prefix}{int(tail):0{pad}d}"
+            else:
+                code = custom_code
+        else:
+            code = _next_field_level_code(cid, prefix)
         parent_level_id = parent_id
         parent_level_name = parent["level_name"] or "-"
 

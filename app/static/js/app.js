@@ -100,12 +100,16 @@
   document.querySelectorAll("select[data-searchable]").forEach(function (sel) {
     sel.style.display = "none";
     var box = document.createElement("div");
-    box.className = "searchselect";
+    box.className = "searchselect" + (sel.disabled ? " disabled" : "");
     var input = document.createElement("input");
     input.type = "text";
     input.className = "searchselect-input";
     input.autocomplete = "off";
     input.placeholder = sel.getAttribute("data-search-placeholder") || "Type to search…";
+    if (sel.disabled) {
+      input.disabled = true;
+      input.readOnly = true;
+    }
     var list = document.createElement("div");
     list.className = "searchselect-list";
     box.appendChild(input);
@@ -116,13 +120,14 @@
     function syncLabel() {
       var o = sel.options[sel.selectedIndex];
       if (sel.value && o) {
-        input.value = o.textContent;
+        input.value = (o.textContent || "").trim();
       } else {
         input.value = "";
       }
     }
     function close() { list.classList.remove("open"); }
     function choose(o) {
+      if (sel.disabled || input.disabled) return;
       sel.value = o.value;
       syncLabel();
       close();
@@ -133,12 +138,13 @@
       var f = (filter || "").trim().toLowerCase();
       var shown = 0;
       opts().forEach(function (o) {
-        if (!o.value && (o.textContent.startsWith("--") || !o.textContent.trim())) return;
-        var hay = (o.textContent + " " + o.value).toLowerCase();
+        var txt = (o.textContent || "").trim();
+        if (!o.value && (txt.startsWith("--") || !txt)) return;
+        var hay = (txt + " " + o.value).toLowerCase();
         if (f && hay.indexOf(f) === -1) return;
         var item = document.createElement("div");
         item.className = "searchselect-item" + (sel.value === o.value ? " selected" : "");
-        item.textContent = o.textContent;
+        item.textContent = txt;
         item.dataset.value = o.value;
         item.addEventListener("mousedown", function (ev) {  // before input blur
           ev.preventDefault();
@@ -155,6 +161,7 @@
       }
     }
     function openAll() {
+      if (sel.disabled || input.disabled) return;
       render("");
       list.classList.add("open");
       if (input.value) {
@@ -165,7 +172,16 @@
     syncLabel();
     // external code (hierarchy cascade AJAX, dependent store dropdown) may
     // rebuild the select's options — re-sync the visible label when told to
-    sel.addEventListener("ssms-refresh", function () { syncLabel(); });
+    sel.addEventListener("ssms-refresh", function () {
+      input.disabled = !!sel.disabled;
+      input.readOnly = !!sel.disabled;
+      if (sel.disabled) {
+        box.classList.add("disabled");
+      } else {
+        box.classList.remove("disabled");
+      }
+      syncLabel();
+    });
     input.addEventListener("focus", openAll);
     input.addEventListener("click", function () {
       if (!list.classList.contains("open")) openAll();

@@ -82,8 +82,8 @@ MODULES = {
             ("unit_type", "Unit Type", "cat", "ITEM_UNIT"),
         ],
         "form_fields": [
-            f("item_id", "Item ID", "text", required=True, in_list=True,
-              help="Comes from integration or can be created manually here."),
+            f("item_id", "Item ID", "text", required=True, in_list=True, readonly_on_edit=True,
+              help="Comes from integration or can be created manually here. Immutable on edit."),
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("short_name", "Short Name", "text"),
@@ -131,8 +131,8 @@ MODULES = {
             ("brand_id", "Brand", "item_brand"),
         ],
         "form_fields": [
-            f("item_id", "Item", "item_select", required=True, in_list=True,
-              help="Active items only — type to search by item id or name."),
+            f("item_id", "Item", "item_select", required=True, in_list=True, readonly_on_edit=True,
+              help="Active items only — type to search by item id or name. Immutable on edit."),
             f("batch_id", "Batch ID", "text", required=True, in_list=True,
               help="When an item is created manually/integration, a default batch '1' valid till 2100-12-31 is generated automatically."),
             f("name", "Name", "text"),
@@ -318,13 +318,10 @@ MODULES = {
             f("parent_level_id", "Parent Level", "hier_root_select", in_form=True,
               help="Root (level 0) is National (H). Levels: National(H) > Area(A) > Zone(Z) > Territory(T). Territory (depth 3) is a leaf."),
             f("level_name", "Level Name", "text", required=True, in_list=True),
-            f("image_path", "Image", "image",
-              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
-                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
             f("note", "Note", "textarea"),
         ],
         "create_hook": "top_level",
-        "excel_cols": ["parent_level_id", "level_name", "image_path", "note"],
+        "excel_cols": ["parent_level_id", "level_name", "note"],
         "unique_msg": "A national level with this name already exists under the same parent.",
     },
     "level": {
