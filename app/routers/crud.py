@@ -169,7 +169,7 @@ def _top_level_parent_opts():
 
 def _level_parent_opts():
     """Parent choices for Field Structure — root or any active node with depth < 3."""
-    return [{"level_id": "0", "level_name": "- Root (Territory) -"}] + list(q(
+    return [{"level_id": "0", "level_name": "- Root (Territory) -", "depth": -1}] + list(q(
         """SELECT id, level_id, level_name, depth FROM sm_level
            WHERE cid=%s AND status='ACTIVE' AND depth < 3
            ORDER BY depth, level_id""", (config.CID,)))
@@ -454,6 +454,12 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         if curr_town and curr_town not in ("-", "") and not any(o[0] == curr_town for o in towns):
             towns.append((curr_town, curr_town))
         field_opts["town_name"] = towns
+
+    elif slug == "level":
+        context["top_level_terrs"] = q(
+            """SELECT level_id, level_name FROM sm_top_level
+               WHERE cid=%s AND depth=3 AND status='ACTIVE'
+               ORDER BY level_name""", (config.CID,))
 
     context.update({
         "m": m, "slug": PERM2SLUG.get(m["perm"], m["perm"]),

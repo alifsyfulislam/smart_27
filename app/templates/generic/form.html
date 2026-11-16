@@ -26,7 +26,7 @@
             <select name="parent_level_id" id="f-parent_level_id" data-searchable
                     data-search-placeholder="Type to search parent level…">
               {% for p in parent_opts %}
-              <option value="{{ p['level_id'] }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} | {{ p['level_name'] }}</option>
+              <option value="{{ p['level_id'] }}" data-depth="{{ p.get('depth', -1) }}" {{ 'selected' if data.get('parent_level_id') == p['level_id'] }}>{{ p['level_id'] }} | {{ p['level_name'] }}</option>
               {% endfor %}
             </select>
             {% endif %}
@@ -64,11 +64,11 @@
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
           {% elif s.type == 'depot_select' %}
-          <div class="field">
+          <div class="field" id="field-wrap-{{ s.name }}" {% if slug == 'level' and ((a == 'Edit' and (row.get('depth') or 0) != 1) or (a == 'View' and (row.get('depth') or 0) != 1 and (not data.get('depot_id') or data.get('depot_id') == '-')) or (a == 'Create' and (data.get('parent_level_id') or '0') == '0')) %}style="display:none"{% endif %}>
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('depot_id') }}</div>
+            {% if a == 'View' %}<div>{{ data.get('depot_id') }}{% if data.get('depot_name') and data.get('depot_name') != '-' %} | {{ data.get('depot_name') }}{% endif %}</div>
             {% else %}
-            <select name="depot_id" data-searchable data-search-placeholder="Type to search distributor…"
+            <select name="depot_id" id="f-depot_id" data-searchable data-search-placeholder="Type to search distributor…"
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select distributor --</option>
               {% for o in depot_opts %}
@@ -97,7 +97,7 @@
           <div class="field">
             <label>{{ s.label }}</label>
             {% if a == 'View' %}
-              {% if data.get(s.name) %}
+              {% if data.get(s.name) and data.get(s.name) != '-' %}
               <a href="{{ data.get(s.name) }}" target="_blank" rel="noopener" title="Open full image">
                 <img class="img-preview" src="{{ data.get(s.name) }}" alt="{{ s.label }}"
                      onerror="this.classList.add('hidden')">
@@ -105,12 +105,12 @@
               <div class="hint mono">{{ data.get(s.name) }}</div>
               {% else %}<div>—</div>{% endif %}
             {% else %}
-              <img id="prev-{{ s.name }}" class="img-preview {{ 'hidden' if not data.get(s.name) }}"
-                   src="{{ data.get(s.name) or '' }}" alt=""
+              <img id="prev-{{ s.name }}" class="img-preview {{ 'hidden' if not data.get(s.name) or data.get(s.name) == '-' }}"
+                   src="{{ data.get(s.name) if data.get(s.name) and data.get(s.name) != '-' else '' }}" alt=""
                    onerror="this.classList.add('hidden')">
               <input type="file" name="{{ s.name }}_file" id="file-{{ s.name }}"
                      accept=".png,.jpg,.jpeg,.gif,.webp">
-              {% if a == 'Edit' and data.get(s.name) %}
+              {% if a == 'Edit' and data.get(s.name) and data.get(s.name) != '-' %}
               <div class="hint">Pick a new file to replace the current image, or leave empty to keep it.</div>
               {% endif %}
               {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
@@ -137,6 +137,51 @@
             {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
             {% else %}<textarea name="{{ s.name }}">{{ data.get(s.name) or '' }}</textarea>{% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif slug == 'level' and s.name == 'level_name' %}
+          <div class="field" id="field-wrap-level_name">
+            <label>{{ s.label }} <span class="req">*</span></label>
+            {% if a == 'View' %}
+              <div>{{ data.get('level_name') }}</div>
+            {% else %}
+              <div id="level-name-inputs">
+                {% if a == 'Create' %}
+                <div id="terr-select-wrap" style="margin-bottom:6px;{% if (data.get('parent_level_id') or '0') != '0' %}display:none;{% endif %}">
+                  <select id="f-terr-select" data-searchable data-search-placeholder="Type to search Territory from National Structure…">
+                    <option value="">-- Select Territory (National Structure depth 3) --</option>
+                    {% for t in (top_level_terrs or []) %}
+                    <option value="{{ t['level_name'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% elif a == 'Edit' and (row.get('depth') or 0) == 0 %}
+                <div id="terr-select-wrap" style="margin-bottom:6px">
+                  <select id="f-terr-select" data-searchable data-search-placeholder="Type to search Territory from National Structure…">
+                    <option value="">-- Select Territory (National Structure depth 3) --</option>
+                    {% for t in (top_level_terrs or []) %}
+                    <option value="{{ t['level_name'] }}" {{ 'selected' if data.get('level_name') == t['level_name'] }}>{{ t['level_id'] }} | {{ t['level_name'] }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                {% endif %}
+                <input type="text" name="level_name" id="f-level_name"
+                       value="{{ '' if data.get('level_name') is none else data.get('level_name') }}"
+                       list="top-level-terr-list" placeholder="Enter level name or pick territory above"
+                       required autocomplete="off">
+                <datalist id="top-level-terr-list">
+                  {% for t in (top_level_terrs or []) %}
+                  <option value="{{ t['level_name'] }}">{{ t['level_id'] }} | {{ t['level_name'] }}</option>
+                  {% endfor %}
+                </datalist>
+              </div>
+            {% endif %}
+            <div class="hint" id="level-name-hint">
+              {% if a == 'Edit' and (row.get('depth') or 0) == 0 %}
+                Root Territory name sourced from National Structure (sm_top_level depth 3).
+              {% else %}
+                {{ s.help or 'Level name. For Territory root, matches National Structure territory.' }}
+              {% endif %}
+            </div>
           </div>
           {% else %}
           <div class="field">
@@ -416,6 +461,69 @@
         if (wrap.querySelectorAll(".child-row").length > 1) btn.closest(".child-row").remove();
       });
     })();
+
+    // Field Structure (level): territory dynamic sync & town distributor visibility
+    {% if slug == 'level' %}
+    (function () {
+      var parentSel = document.getElementById("f-parent_level_id");
+      var depotWrap = document.getElementById("field-wrap-depot_id");
+      var terrWrap = document.getElementById("terr-select-wrap");
+      var terrSel = document.getElementById("f-terr-select");
+      var nameInp = document.getElementById("f-level_name");
+      var hint = document.getElementById("level-name-hint");
+
+      if (terrSel && nameInp) {
+        terrSel.addEventListener("change", function () {
+          if (terrSel.value) {
+            nameInp.value = terrSel.value;
+          }
+        });
+      }
+
+      function updateFieldStructureView() {
+        if (!parentSel) return;
+        var opt = parentSel.options[parentSel.selectedIndex];
+        var depth = opt ? parseInt(opt.getAttribute("data-depth") || "-1", 10) : -1;
+        var pid = parentSel.value;
+
+        // Territory root is pid == "0" or depth == -1
+        if (pid === "0" || depth === -1) {
+          if (terrWrap) terrWrap.style.display = "block";
+          if (depotWrap) {
+            depotWrap.style.display = "none";
+            var ds = depotWrap.querySelector("select[name='depot_id']");
+            if (ds) {
+              ds.value = "";
+              ds.dispatchEvent(new Event("ssms-refresh"));
+            }
+          }
+          if (hint) hint.textContent = "Root Territory name sourced from National Structure (sm_top_level depth 3).";
+        } else if (depth === 0) {
+          // Parent is Territory (depth 0) -> New node is Town (depth 1)
+          if (terrWrap) terrWrap.style.display = "none";
+          if (depotWrap) depotWrap.style.display = "block";
+          if (hint) hint.textContent = "Town name (prefix TW will be auto-assigned). Assign distributor here.";
+        } else {
+          // Parent is Town (depth 1) or Route (depth 2) -> New node is Route (depth 2) or Beat (depth 3)
+          if (terrWrap) terrWrap.style.display = "none";
+          if (depotWrap) {
+            depotWrap.style.display = "none";
+            var ds = depotWrap.querySelector("select[name='depot_id']");
+            if (ds) {
+              ds.value = "";
+              ds.dispatchEvent(new Event("ssms-refresh"));
+            }
+          }
+          if (hint) hint.textContent = (depth === 1 ? "Route" : "Beat") + " name (distributor will be auto-inherited from parent Town).";
+        }
+      }
+
+      if (parentSel) {
+        parentSel.addEventListener("change", updateFieldStructureView);
+        updateFieldStructureView();
+      }
+    })();
+    {% endif %}
   </script>
   {% endif %}
 {% endif %}

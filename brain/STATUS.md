@@ -16,7 +16,7 @@
 |---|---|---|
 | Master modules | 14 | `app/modules.py MODULES` / `MODULE_ORDER` |
 | Seeded permissions | 74 | `scripts/setup_database.py SEED_PERMISSIONS` |
-| Category-type values | 24 | `scripts/setup_database.py SEED_CATEGORY_TYPES` |
+| Category-type values | 29 | `scripts/setup_database.py SEED_CATEGORY_TYPES` |
 | Roles | 3 | SUPER_ADMIN, MANAGER, VIEWER |
 
 ## Run

@@ -104,28 +104,40 @@ SEED_CATEGORY_TYPES = [
     # type_name, cat_type_id, cat_type_name
     ("DISTRIBUTOR_CATEGORY", "DISTRIBUTOR", "Distributor"),
     ("DISTRIBUTOR_CATEGORY", "SUP DISTRIBUTOR", "Sup Distributor"),
+
     ("STORE_TYPE", "COMMERCIAL", "Commercial"),
     ("STORE_TYPE", "DAMAGE", "Damage"),
+
     ("ITEM_CATEGORY", "REGULAR", "Regular"),
     ("ITEM_CATEGORY", "SPECIAL", "Special"),
-    ("ITEM_CATEGORY", "FOCUS", "Focus"),
+    ("ITEM_CATEGORY", "BONUS", "Bonus"),
+    ("ITEM_CATEGORY", "OTHERS", "Others"),
+
     ("ITEM_UNIT", "PCS", "Pieces"),
     ("ITEM_UNIT", "KG", "Kilogram"),
-    ("ITEM_UNIT", "LTR", "Litre"),
-    ("ITEM_UNIT", "BOX", "Box"),
     ("ITEM_UNIT", "PACK", "Pack"),
+    ("ITEM_UNIT", "BAG", "Bag"),
+
+    ("ITEM_PACK", "EXTRA SMALL", "Extra Small"),
     ("ITEM_PACK", "SMALL", "Small"),
     ("ITEM_PACK", "MEDIUM", "Medium"),
     ("ITEM_PACK", "LARGE", "Large"),
-    ("OUTLET_CATEGORY", "OC001", "KR0"),
-    ("OUTLET_SUB_CATEGORY", "OSC001", "KR0-1"),
-    ("DESIGNATION", "HOS", "Head of Sales"),
-    ("DESIGNATION", "SOM", "Sales Operation Manager"),
-    ("DESIGNATION", "ASM", "Area Sales Manager"),
-    ("DESIGNATION", "ASE", "Area Sales Executive"),
-    ("DESIGNATION", "CE", "Customer Executive"),
-    ("DESIGNATION", "PSR", "Pre Sales Executive"),
-    ("DESIGNATION", "DM", "Delivery Man"),
+    ("ITEM_PACK", "EXTRA LARGE", "Extra Large"),
+
+    ("OUTLET_CATEGORY", "KRO", "KR0"),
+    ("OUTLET_CATEGORY", "WHOLESALE", "Wholesale"),
+    ("OUTLET_CATEGORY", "CANTEEN", "Canteen"),
+    ("OUTLET_CATEGORY", "HAWKER", "Hawker"),
+
+    ("OUTLET_SUB_CATEGORY", "KRO_1", "KR0_1"),
+
+    ("EMP_DESIGNATION", "HOS", "Head of Sales"),
+    ("EMP_DESIGNATION", "SOM", "Sales Operation Manager"),
+    ("EMP_DESIGNATION", "ASM", "Area Sales Manager"),
+    ("EMP_DESIGNATION", "ASE", "Area Sales Executive"),
+    ("EMP_DESIGNATION", "CE", "Customer Executive"),
+    ("EMP_DESIGNATION", "PSR", "Pre Sales Executive"),
+    ("EMP_DESIGNATION", "DM", "Delivery Man"),
 ]
 
 SEED_HIERARCHY = [
@@ -136,7 +148,7 @@ SEED_HIERARCHY = [
     ("BG001", "Kurkure", "MG001"),
     ("CG001", "Collet", "BG001"),
     ("FG001", "American Style Cream & Onion", "CG001"),
-    ("FG002", "Masala Munch", "CG001"),
+    ("FG002", "Chilli Chatka", "CG001"),
 ]
 
 ROLE_PERM_MATRIX = {

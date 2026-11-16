@@ -101,6 +101,9 @@ MODULES = {
             f("total_amt", "Total Amount", "float",
               help="Auto-calculated as Price + VAT Amount while you type; you can still type over it."),
             f("mrp", "MRP", "float", in_list=True),
+            f("image_path", "Image", "image",
+              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
+                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
             f("note", "Note", "textarea"),
         ],
         "create_hook": "item",
@@ -108,7 +111,7 @@ MODULES = {
                        "unit_type", "pack_size", "weight", "company_id", "brand_id",
                        "type_id", "flavor_id", "ctn_pcs_ratio", "sequence_no",
                        "stock_cover_days", "dist_price", "invoice_price", "mrp",
-                       "price", "vat_amt", "total_amt", "manufacturer", "note"],
+                       "price", "vat_amt", "total_amt", "manufacturer", "image_path", "note"],
         "unique_msg": "An item with this Item ID already exists.",
     },
     "item-batch": {
@@ -351,7 +354,7 @@ MODULES = {
         "unique_msg": "A field level with this name already exists under the same parent.",
     },
     "rep": {
-        "title": "Employee Master",
+        "title": "Employee",
         "icon": "fa-user-tie",
         "perm": "rep",
         "table": "sm_rep",

@@ -590,40 +590,105 @@ def level_prepare(cid, data, existing=None, user=None):
     if not name:
         return "Level name is required."
 
-    depot_id = (data.get("depot_id") or "").strip()
-    if depot_id and depot_id != "-":
-        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
-        data["depot_id"] = depot_id
-        data["depot_name"] = (depot["name"] if depot else "-") or "-"
-    else:
-        data["depot_id"] = "-"
-        data["depot_name"] = "-"
+    # Parse potential "ID | Name" format if passed from dropdown/datalist
+    clean_name = name
+    if " | " in clean_name:
+        clean_name = clean_name.split(" | ", 1)[1].strip()
 
     if existing is not None:
-        data["level_name"] = name
-        dup = q("""SELECT id FROM sm_level
-                   WHERE cid=%s AND status='ACTIVE' AND level_name=%s
-                     AND parent_level_id=%s AND id<>%s LIMIT 1""",
-                (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
-        if dup:
-            return "A field level with this name already exists under the same parent."
-        return None
+        depth = int(existing.get("depth") or 0)
+        if depth == 0:
+            # Editing Territory root: sync with sm_top_level depth 3
+            terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                        FROM sm_top_level
+                        WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                          AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                        LIMIT 1""",
+                     (cid, name, name, clean_name, clean_name), one=True)
+            if terr:
+                data["level_id"] = terr["level_id"]
+                data["level_name"] = terr["level_name"]
+                data["parent_level_id"] = terr["parent_level_id"]
+                data["parent_level_name"] = terr["parent_level_name"]
+                data["level0"] = terr["level_id"]
+                data["level0_name"] = terr["level_name"]
+            else:
+                data["level_name"] = name
+            data["depot_id"] = "-"
+            data["depot_name"] = "-"
+            dup = q("""SELECT id FROM sm_level
+                       WHERE cid=%s AND status='ACTIVE' AND (level_id=%s OR level_name=%s)
+                         AND id<>%s LIMIT 1""",
+                    (cid, data.get("level_id", existing["level_id"]), data["level_name"], existing["id"]), one=True)
+            if dup:
+                return f"A field territory with this code or name already exists: {data['level_name']}."
+            return None
+        elif depth == 1:
+            # Editing Town: distributor tagging is active
+            data["level_name"] = name
+            dup = q("""SELECT id FROM sm_level
+                       WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                         AND parent_level_id=%s AND id<>%s LIMIT 1""",
+                    (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
+            if dup:
+                return "A field level with this name already exists under the same parent."
+            depot_id = (data.get("depot_id") or "").strip()
+            if depot_id and depot_id != "-":
+                depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+                data["depot_id"] = depot_id
+                data["depot_name"] = (depot["name"] if depot else "-") or "-"
+            else:
+                data["depot_id"] = "-"
+                data["depot_name"] = "-"
+            return None
+        else:
+            # Editing Route (depth 2) or Beat (depth 3): keep inherited distributor
+            data["level_name"] = name
+            dup = q("""SELECT id FROM sm_level
+                       WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                         AND parent_level_id=%s AND id<>%s LIMIT 1""",
+                    (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
+            if dup:
+                return "A field level with this name already exists under the same parent."
+            if not data.get("depot_id") or data.get("depot_id") == "-":
+                data["depot_id"] = existing.get("depot_id") or "-"
+                data["depot_name"] = existing.get("depot_name") or "-"
+            return None
 
+    # CREATE MODE
     parent_id = (data.get("parent_level_id") or "0").strip() or "0"
     if parent_id == "0":
         parent = None
         depth = 0
-        terr = q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND depth=3 AND status='ACTIVE' AND (level_id=%s OR level_name=%s)",
-                 (cid, name, name), one=True)
+        terr = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                    FROM sm_top_level
+                    WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                      AND (level_id=%s OR level_name=%s OR level_id=%s OR level_name=%s)
+                    LIMIT 1""",
+                 (cid, name, name, clean_name, clean_name), one=True)
         if terr:
             code = terr["level_id"]
             name = terr["level_name"]
             data["level_name"] = name
+            parent_level_id = terr["parent_level_id"] or "0"
+            parent_level_name = terr["parent_level_name"] or "-"
         else:
             has_top_terrs = scalar("SELECT COUNT(*) FROM sm_top_level WHERE cid=%s AND depth=3 AND status='ACTIVE'", (cid,), 0)
             if has_top_terrs > 0:
                 return f"Root Field Structure level must match an active Territory (depth 3) from National Structure. Territory '{name}' was not found."
             code = _next_field_level_code(cid, "T")
+            parent_level_id = "0"
+            parent_level_name = "-"
+
+        dup = q("""SELECT id FROM sm_level
+                   WHERE cid=%s AND status='ACTIVE' AND (level_id=%s OR level_name=%s)
+                   LIMIT 1""",
+                (cid, code, name), one=True)
+        if dup:
+            return f"A field territory with this code or name already exists: '{name}' ({code})."
+
+        data["depot_id"] = "-"
+        data["depot_name"] = "-"
     else:
         parent = q("SELECT * FROM sm_level WHERE cid=%s AND level_id=%s",
                    (cid, parent_id), one=True)
@@ -634,20 +699,37 @@ def level_prepare(cid, data, existing=None, user=None):
             return "Cannot create a level below 'Beat' (depth 3) in Field Structure."
         prefix = FIELD_LEVEL_PREFIX[depth]
         code = _next_field_level_code(cid, prefix)
+        parent_level_id = parent_id
+        parent_level_name = parent["level_name"] or "-"
 
-    dup = q(f"""SELECT id FROM sm_level
-                WHERE cid=%s AND status='ACTIVE' AND level_name=%s
-                  {"AND parent_level_id=%s" if parent else "AND parent_level_id='0'"}
-                LIMIT 1""",
-            (cid, name) + ((parent_id,) if parent else ()), one=True)
-    if dup:
-        return "A field level with this name already exists under the same parent."
+        dup = q("""SELECT id FROM sm_level
+                   WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                     AND parent_level_id=%s
+                   LIMIT 1""",
+                (cid, name, parent_id), one=True)
+        if dup:
+            return "A field level with this name already exists under the same parent."
+
+        if depth == 1:
+            # Town: distributor is explicitly chosen on form
+            depot_id = (data.get("depot_id") or "").strip()
+            if depot_id and depot_id != "-":
+                depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+                data["depot_id"] = depot_id
+                data["depot_name"] = (depot["name"] if depot else "-") or "-"
+            else:
+                data["depot_id"] = "-"
+                data["depot_name"] = "-"
+        else:
+            # Route (depth 2) or Beat (depth 3): auto-inherit from parent
+            data["depot_id"] = parent.get("depot_id") or "-"
+            data["depot_name"] = parent.get("depot_name") or "-"
 
     data["level_id"] = code
     data["depth"] = depth
     data["is_leaf"] = "1"
-    data["parent_level_id"] = parent_id
-    data["parent_level_name"] = (parent["level_name"] if parent else "-") or "-"
+    data["parent_level_id"] = parent_level_id
+    data["parent_level_name"] = parent_level_name
     for i in range(4):
         if i < depth and parent:
             data[f"level{i}"] = parent.get(f"level{i}") or ""
@@ -683,6 +765,17 @@ def level_after_update(cid, old, new, user=None):
         depth = int(new.get("depth") or 0)
         x(f"UPDATE sm_level SET level{depth}_name=%s WHERE cid=%s AND level{depth}=%s",
           (new["level_name"], cid, new["level_id"]))
+
+    # If Town (depth 1) updated distributor, cascade to child routes and beats
+    if int(new.get("depth") or 0) == 1:
+        if (old.get("depot_id") or "-") != (new.get("depot_id") or "-"):
+            new_depot_id = new.get("depot_id") or "-"
+            new_depot_name = new.get("depot_name") or "-"
+            x("""UPDATE sm_level
+                 SET depot_id=%s, depot_name=%s
+                 WHERE cid=%s AND level1=%s""",
+              (new_depot_id, new_depot_name, cid, new["level_id"]))
+
     _recompute_level_is_leaf(cid, new.get("level_id"))
     _recompute_level_is_leaf(cid, new.get("parent_level_id"))
 
@@ -707,7 +800,13 @@ def level_restore(cid, rid, user=None):
     if not row:
         return None, "Record not found."
     pid = row.get("parent_level_id")
-    if pid and pid != "0":
+    if int(row.get("depth") or 0) == 0:
+        if pid and pid != "0":
+            parent = q("SELECT status FROM sm_top_level WHERE cid=%s AND level_id=%s",
+                       (cid, pid), one=True)
+            if parent and parent["status"] != "ACTIVE":
+                return None, f"Cannot restore — parent Zone '{pid}' in National Structure is not ACTIVE."
+    elif pid and pid != "0":
         parent = q("SELECT status FROM sm_level WHERE cid=%s AND level_id=%s",
                    (cid, pid), one=True)
         if not parent or parent["status"] != "ACTIVE":
