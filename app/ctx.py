@@ -26,7 +26,7 @@ CUSTOM_MENU = [
 ]
 
 GROUP_META = [
-    ("Top", "fa-house", 0),
+    ("Home", "fa-house", 0),
     ("Item Info", "fa-boxes-stacked", 1),
     ("Fieldforce Info", "fa-people-group", 2),
     ("Distributor Info", "fa-truck-ramp-box", 3),
@@ -98,7 +98,7 @@ def build_menu(user):
               for title, icon, order in GROUP_META}
     # dashboard
     if user and (has_perm(user, "dashboard.view") or int(user.get("is_super") or 0)):
-        groups["Top"]["entries"].append(
+        groups["Home"]["entries"].append(
             {"title": "Dashboard", "url": "/", "icon": "fa-gauge-high", "key": "dashboard"})
     # master modules
     for slug in MODULE_ORDER:
