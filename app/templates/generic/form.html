@@ -121,7 +121,8 @@
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
             {% else %}
-            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}>
+            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
+                    {% if s.searchable %}data-searchable data-search-placeholder="Type to search {{ s.label }}…"{% endif %}>
               {% for o in (field_opts.get(s.name) or s.options or []) %}
               <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
               {% endfor %}
@@ -144,8 +145,8 @@
               <div>{{ data.get(s.name) }}</div>
             {% else %}
               <input type="{{ 'number' if s.type in ('int','float') else 'date' if s.type == 'date' else 'text' }}"
-                     name="{{ s.name }}" value="{{ data.get(s.name) or '' }}"
-                     {{ 'step="0.01"' if s.type == 'float' }}
+                     name="{{ s.name }}" value="{{ '' if data.get(s.name) is none else data.get(s.name) }}"
+                     {% if s.type == 'float' %}step="any"{% endif %}
                      {{ 'readonly' if a == 'Edit' and s.readonly_on_edit }}
                      {{ 'required' if s.required and a == 'Create' }}>
             {% endif %}
@@ -338,7 +339,8 @@
       function calc() {
         var p = parseFloat(price.value), v = parseFloat(vat.value);
         if (isNaN(p) && isNaN(v)) return;
-        total.value = ((p || 0) + (v || 0)).toFixed(2);
+        var sum = (p || 0) + (v || 0);
+        total.value = parseFloat(sum.toFixed(4));
       }
       price.addEventListener("input", calc);
       vat.addEventListener("input", calc);

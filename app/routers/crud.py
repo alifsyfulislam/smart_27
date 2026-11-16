@@ -151,27 +151,28 @@ def _update(m, rid, data, user):
 
 
 def _hierarchy_parent_opts():
-    """Parent choices for the brand create form — ACTIVE Company nodes only
+    """Parent choices for the brand create form — Root (Company) or ACTIVE Company nodes
     (depth < 1); deeper levels are created as children from the edit page."""
-    return q("""SELECT id, level_id, level_name, level1_name, depth FROM sm_item_hierarchy
-                WHERE cid=%s AND status='ACTIVE' AND depth < 1
-                ORDER BY depth, level_id""", (config.CID,))
+    return [{"level_id": "0", "level_name": "- Root (Company) -"}] + list(q(
+        """SELECT id, level_id, level_name, level1_name, depth FROM sm_item_hierarchy
+           WHERE cid=%s AND status='ACTIVE' AND depth < 1
+           ORDER BY depth, level_id""", (config.CID,)))
 
 
 def _top_level_parent_opts():
     """Parent choices for National Structure — root or any active node with depth < 3."""
-    return [{"level_id": "0", "level_name": "- Root (National) -"}] + q(
+    return [{"level_id": "0", "level_name": "- Root (National) -"}] + list(q(
         """SELECT id, level_id, level_name, depth FROM sm_top_level
            WHERE cid=%s AND status='ACTIVE' AND depth < 3
-           ORDER BY depth, level_id""", (config.CID,))
+           ORDER BY depth, level_id""", (config.CID,)))
 
 
 def _level_parent_opts():
     """Parent choices for Field Structure — root or any active node with depth < 3."""
-    return [{"level_id": "0", "level_name": "- Root (Territory) -"}] + q(
+    return [{"level_id": "0", "level_name": "- Root (Territory) -"}] + list(q(
         """SELECT id, level_id, level_name, depth FROM sm_level
            WHERE cid=%s AND status='ACTIVE' AND depth < 3
-           ORDER BY depth, level_id""", (config.CID,))
+           ORDER BY depth, level_id""", (config.CID,)))
 
 
 def _hierarchy_children(slug, level_id):
@@ -443,6 +444,16 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         field_opts["area_id"] = [("", "-- Select Beat (Optional) --")] + [
             (r["level_id"], f"{r['level_id']} | {r['level_name']}")
             for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=3 AND status='ACTIVE' ORDER BY level_id", (config.CID,))]
+
+    elif slug == "distributor":
+        towns = [("", "-- Select Town --")] + [
+            (r["level_name"], f"{r['level_id']} | {r['level_name']}")
+            for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=1 AND status='ACTIVE' ORDER BY level_name", (config.CID,))
+        ]
+        curr_town = (data or {}).get("town_name")
+        if curr_town and curr_town not in ("-", "") and not any(o[0] == curr_town for o in towns):
+            towns.append((curr_town, curr_town))
+        field_opts["town_name"] = towns
 
     context.update({
         "m": m, "slug": PERM2SLUG.get(m["perm"], m["perm"]),

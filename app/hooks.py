@@ -204,7 +204,7 @@ def item_prepare(cid, data, existing=None, user=None):
         total = 0.0
     if not total:
         try:
-            data["total_amt"] = round(float(data.get("price") or 0) + float(data.get("vat_amt") or 0), 2)
+            data["total_amt"] = round(float(data.get("price") or 0) + float(data.get("vat_amt") or 0), 4)
         except (TypeError, ValueError):
             data["total_amt"] = 0.0
 
@@ -311,6 +311,21 @@ def depot_prepare(cid, data, existing=None, user=None):
         return "A distributor with this Depot ID already exists."
     if not (data.get("depot_category") or "").strip():
         data["depot_category"] = "DISTRIBUTOR"
+    town_name = (data.get("town_name") or "").strip()
+    town_id = (data.get("town_id") or "").strip()
+    lookup = town_name if (town_name and town_name != "-") else town_id
+    if lookup and lookup != "-":
+        town_row = q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=1 AND (level_name=%s OR level_id=%s) LIMIT 1",
+                     (cid, lookup, lookup), one=True)
+        if town_row:
+            data["town_id"] = town_row["level_id"]
+            data["town_name"] = town_row["level_name"]
+        else:
+            data["town_id"] = town_id or "-"
+            data["town_name"] = town_name or "-"
+    else:
+        data["town_id"] = "-"
+        data["town_name"] = "-"
     return None
 
 

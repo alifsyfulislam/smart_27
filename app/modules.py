@@ -17,14 +17,15 @@ STATUS_OPTIONS = [
 
 def f(name, label, type_="text", required=False, in_list=False, in_form=True,
       in_search=False, in_excel=True, options=None, cat=None, default=None,
-      width=None, help=None, readonly_on_edit=False, hidden_in_list_width=None):
+      width=None, help=None, readonly_on_edit=False, hidden_in_list_width=None,
+      searchable=False):
     """Build a field spec dict."""
     return {
         "name": name, "label": label, "type": type_, "required": required,
         "in_list": in_list, "in_form": in_form, "in_search": in_search,
         "in_excel": in_excel, "options": options, "cat": cat,
         "default": default, "width": width, "help": help,
-        "readonly_on_edit": readonly_on_edit,
+        "readonly_on_edit": readonly_on_edit, "searchable": searchable,
     }
 
 
@@ -176,8 +177,9 @@ MODULES = {
             f("address_bn", "Address (BN)", "textarea"),
             f("wh_address", "Warehouse Address", "textarea"),
             f("wh_address_bn", "Warehouse Address (BN)", "textarea"),
-            f("town_id", "Town ID", "text"),
-            f("town_name", "Town Name", "text", in_list=True),
+            f("town_id", "Town ID", "text", in_form=False),
+            f("town_name", "Town Name", "select", in_list=True, searchable=True,
+              help="Town from Field Structure (sm_level depth 1)."),
             f("latitude", "Latitude", "text"),
             f("longitude", "Longitude", "text"),
             f("sequence_no", "Sequence No", "int", default=1),
@@ -563,7 +565,8 @@ def values_from_form(m, form, existing=None, is_create=True):
                 values[name] = int(spec["default"] or 0)
         elif spec["type"] == "float":
             try:
-                values[name] = float(raw) if raw not in (None, "") else float(spec["default"] or 0)
+                clean_raw = str(raw).replace(",", "").strip() if raw not in (None, "") else ""
+                values[name] = float(clean_raw) if clean_raw else float(spec["default"] or 0)
             except (TypeError, ValueError):
                 values[name] = float(spec["default"] or 0)
         else:

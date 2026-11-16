@@ -49,11 +49,13 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
 - **Child Levels card** on the Edit/View page: lists existing child levels (view/edit links, status badges) and, on Edit, offers one name box plus "Add another" to create **one or many** children in a single submit (`POST /{slug}/add-children/{id}`, names deduped, per-name errors reported). Disabled for Flavors (depth 3).
 
 ### 2.4.2 Dynamic Form Dropdowns & Hierarchy Cascade
-- **Option display format**: All dynamically populated form selects (Brand parent picker, Item hierarchy cascade, Item in Item Batch, Distributor in Distributor Store, Store in Outlet) format selectable options as `ID | Name` (e.g. `BG001 | Kurkure`), replacing dash delimiters.
-- **Searchable single-select UX (`select[data-searchable]`)**: When focused or typed into, placeholder text (e.g., `-- Company --`, `-- Select item --`) never acts as a pre-applied search query. The options list displays all valid options when empty/focused, allowing instant typeahead filtering.
+- **Option display format**: All dynamically populated form selects (Brand parent picker, Item hierarchy cascade, Item in Item Batch, Distributor in Distributor Store, Store in Outlet, Town in Distributor) format selectable options as `ID | Name` (e.g. `BG001 | Kurkure`, `TW0001 | GULSHAN`), replacing dash delimiters.
+- **Searchable single-select UX (`select[data-searchable]`)**: When focused or typed into, placeholder text (e.g., `-- Company --`, `-- Select item --`, `Type to search Town Name…`) never acts as a pre-applied search query. The options list displays all valid options when empty/focused, allowing instant typeahead filtering.
 - **Hierarchy cascade (Item create & edit)**:
   - **Create**: Company dropdown initially populates from `/api/hierarchy/children?parent=0`. Selecting a level loads its active child levels for the next select (Company → Brand → Type → Flavor).
   - **Edit**: Existing item hierarchy values (`company_id`, `brand_id`, `type_id`, `flavor_id`) automatically hydrate sequentially from database values on page load, setting the respective values and updating visible dropdown labels across all four levels.
+- **Float Input Precision (Item create & edit)**: Numeric fields (`weight`, `invoice_price`, `price`, `vat_amt`, `total_amt`, `mrp`) accept arbitrary decimal precision using HTML5 `step="any"` without browser constraint errors, preserve `0.0` and `0` values across create/edit/view, and parse comma-separated floats cleanly.
+- **Distributor Town Selection**: `town_name` renders as a searchable dropdown dynamically populated from `sm_level` (`depth=1` and `status='ACTIVE'`). The backend `depot_prepare` hook automatically synchronizes `town_id` and `town_name`.
 
 ### 2.4.3 Fieldforce Modules & User Journeys (Fieldforce Info)
 - **National Structure (`sm_top_level`)**: 4-tier tree: National (depth 0, prefix `H`), Area (depth 1, prefix `A`), Zone (depth 2, prefix `Z`), Territory (depth 3, prefix `T`). Territory is max depth (leaf; cannot have children). Auto-incremental codes (`H0001`, `A0001`, `Z0001`, `T0001`), parent lineage `level0..level3`, tree visualization, accordion collapse, image attachment, and dynamic `is_leaf` recomputation.
@@ -88,7 +90,7 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 | `outlet.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `supervisor_level.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `rep_area.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
-| `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids |
+| `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids; depot syncs `town_id` and `town_name` with `sm_level` (depth 1 Town) |
 | `top_level.prepare` | Auto level code per prefix (`H`, `A`, `Z`, `T`), max depth 3 (Territory), name uniqueness under parent, path fill `level0..level3`, initial `is_leaf=1` |
 | `top_level.after_create/update/delete` | Leaf flag recomputation and subtree rename propagation |
 | `level.prepare` | Auto level code per prefix (`T`, `TW`, `R`, `B`), depth 0 validated against `sm_top_level` depth 3, max depth 3 (Beat), path fill, initial `is_leaf=1` |
