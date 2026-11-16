@@ -22,13 +22,13 @@ secondary-sales master data with login-based access control and full auditabilit
 - Recent 8 audit entries; quick actions (new level/item/batch/distributor, template downloads).
 
 ### 2.3 Sidebar navigation
-Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch) · **Distributor Info** (Distributor, Distributor Store) · **Outlet Info** (Outlet) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
+Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch) · **Fieldforce Info** (National Structure, Field Structure, Employee Master, Supervisor Area, PSR Area, PSR Visit Plan, Outlet Visit Plan) · **Distributor Info** (Distributor, Distributor Store) · **Outlet Info** (Outlet) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
 Accordion behavior — opening a group collapses the others (persisted in localStorage); a toggle
 collapses the sidebar to icon rail on desktop, drawer + overlay on mobile; smooth CSS transitions;
 Font Awesome icons; Facebook-style colors (#1877f2 primary, #f0f2f5 background, #050505/#65676b text).
 
 ### 2.4 Master modules (generic engine driven by `app/modules.py`)
-Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor Store**, **Outlet**, **Category Type**
+Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor Store**, **Outlet**, **National Structure**, **Supervisor Area**, **PSR Area**, **PSR Visit Plan**, **Outlet Visit Plan**, **Category Type**
 
 | Feature | Behavior |
 |---|---|
@@ -55,6 +55,15 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
   - **Create**: Company dropdown initially populates from `/api/hierarchy/children?parent=0`. Selecting a level loads its active child levels for the next select (Company → Brand → Type → Flavor).
   - **Edit**: Existing item hierarchy values (`company_id`, `brand_id`, `type_id`, `flavor_id`) automatically hydrate sequentially from database values on page load, setting the respective values and updating visible dropdown labels across all four levels.
 
+### 2.4.3 Fieldforce Modules & User Journeys (Fieldforce Info)
+- **National Structure (`sm_top_level`)**: 4-tier tree: National (depth 0, prefix `H`), Area (depth 1, prefix `A`), Zone (depth 2, prefix `Z`), Territory (depth 3, prefix `T`). Territory is max depth (leaf; cannot have children). Auto-incremental codes (`H0001`, `A0001`, `Z0001`, `T0001`), parent lineage `level0..level3`, tree visualization, accordion collapse, image attachment, and dynamic `is_leaf` recomputation.
+- **Field Structure (`sm_level`)**: 4-tier market coverage tree: Territory (depth 0, prefix `T`, sourced from `sm_top_level` depth 3 list), Town (depth 1, prefix `TW`), Route (depth 2, prefix `R`), Beat (depth 3, prefix `B`). Beat is max depth (leaf; cannot have children). Auto-incremental codes (`T0001`, `TW0001`, `R0000006`, `B0000033`), parent lineage `level0..level3`, depot linkage, and dynamic `is_leaf`.
+- **Employee Master (`sm_rep`)**: Employee master table with dual user types (`rep` for PSR, `sup` for Supervisor). Unique key on `(cid, rep_id)`. Immutable auto-incremental ID prefixed by designation: `HOS0001` (Head of Sales), `SOM0001` (Sales Operation Manager), `ASM0001` (Area Sales Manager), `ASE0001` (Area Sales Executive), `CE0001` (Customer Executive), `PSR0001` (Pre Sales Executive), `DM0001` (Delivery Man).
+- **Supervisor Area Assignment (`sm_supervisor_level`)**: Allows assigning a supervisor (`sm_rep.user_type='sup'`) to any hierarchy node across National (`sm_top_level`) or Field (`sm_level`) structures, storing `sup_id`, `level_id`, and `level_depth_no`.
+- **PSR Area Assignment & Cascading Beat Population (`sm_rep_area`)**: Field representative (`sm_rep.user_type='rep'`) assigned specifically to a Route (`sm_level` depth 2). The create/edit form presents a PSR picker and Route picker; on submission, the system resolves all active child Beats under the chosen Route and bulk-inserts individual records into `sm_rep_area`.
+- **PSR Visit Plan (`sm_visit_plan`)**: Extended beat-to-day schedule automatically populated upon Route/Beat assignment in `sm_rep_area`. Maps Beat to `order_col_day` (Saturday..Friday); automatically computes and persists `delivery_day` as the subsequent calendar day.
+- **Outlet Exceptional Visit Plan (`sm_client_visit_plan`)**: Exceptional scheduling interface for outlets (`client_id`) within an area (`area_id`), specifying visit frequency, active week indicators (`w1..w5`), and weekday matrix flags (`sat..fri`).
+
 ### 2.5 Administration
 - **Users**: create/edit (name, email, password reset, super flag, status, role checkboxes), soft delete/restore; cannot deactivate own account.
 - **Roles**: create/edit with permission checkboxes grouped by module; soft delete.
@@ -77,7 +86,17 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 | `item_batch.prepare` | Item existence, auto name, uniqueness per item |
 | `depot_store.prepare` | Depot existence, uniqueness per depot |
 | `outlet.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
+| `supervisor_level.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
+| `rep_area.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids |
+| `top_level.prepare` | Auto level code per prefix (`H`, `A`, `Z`, `T`), max depth 3 (Territory), name uniqueness under parent, path fill `level0..level3`, initial `is_leaf=1` |
+| `top_level.after_create/update/delete` | Leaf flag recomputation and subtree rename propagation |
+| `level.prepare` | Auto level code per prefix (`T`, `TW`, `R`, `B`), depth 0 validated against `sm_top_level` depth 3, max depth 3 (Beat), path fill, initial `is_leaf=1` |
+| `level.after_create/update/delete` | Leaf flag recomputation and subtree rename propagation |
+| `rep.prepare` | Generation of immutable `rep_id` from designation prefix sequence (`HOS`, `SOM`, `ASM`, `ASE`, `CE`, `PSR`, `DM`), `(cid, rep_id)` uniqueness validation, user_type (`rep`/`sup`) validation |
+| `rep_area.after_create` | Resolves all active child Beats under selected Route (`sm_level` depth 2), bulk-inserts Beat rows into `sm_rep_area`, and triggers creation of corresponding `sm_visit_plan` records |
+| `visit_plan.prepare` | Validates `order_col_day` (Saturday..Friday) and automatically sets `delivery_day` as the next calendar day |
+| `client_visit_plan.prepare` | Validates outlet existence, area match, and normalizes weekly (`w1..w5`) and day (`sat..fri`) flags |
 
 ## 4. Permissions catalogue (seed)
 

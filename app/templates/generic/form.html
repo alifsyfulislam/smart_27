@@ -19,7 +19,7 @@
           <div class="field">
             <label>Parent Level</label>
             {% if a in ['Edit','View'] %}
-              <input type="hidden" name="parent_level_id" id="parent_level_id" value="{{ data.get('parent_level_id') or 'MG001' }}">
+              <input type="hidden" name="parent_level_id" id="parent_level_id" value="{{ data.get('parent_level_id') or '0' }}">
               <input type="hidden" name="parent_level_name" id="parent_level_name" value="{{ data.get('parent_level_name') or 'N/A' }}">
               <input type="text" value="{{ (data.get('parent_level_id') or '0')}} | {{ 'Root' if data.get('parent_level_name') == '-' else (data.get('parent_level_name')) }}" disabled>
             {% else %}
@@ -175,7 +175,7 @@
   </div>
 </div>
 
-{% if slug == 'brand' and a in ('Edit', 'View') and row %}
+{% if slug in ('brand', 'top-level', 'level') and a in ('Edit', 'View') and row %}
 <div class="card" style="max-width:1000px">
   <div class="card-head">
     <h2><i class="fa-solid fa-sitemap"></i>
@@ -227,7 +227,7 @@
           Each name creates a new {{ next_level or 'child' }} level (auto-coded, audited) under {{ row['level_id'] }}.</div>
       </form>
       {% else %}
-      <div class="hint">This is a Flavor — the deepest level (Company &gt; Brand &gt; Type &gt; Flavor) — it cannot have children.</div>
+      <div class="hint">This is the deepest level (depth 3) — it cannot have children.</div>
       {% endif %}
     {% endif %}
   </div>

@@ -44,6 +44,11 @@ MAX_IMAGE_MB = 5
 
 # hierarchy depth -> label of the level that can be added as a child
 _NEXT_LEVEL = {0: "Brand", 1: "Type", 2: "Flavor"}
+_NEXT_LEVEL_BY_SLUG = {
+    "brand": {0: "Brand", 1: "Type", 2: "Flavor"},
+    "top-level": {0: "Area", 1: "Zone", 2: "Territory"},
+    "level": {0: "Town", 1: "Route", 2: "Beat"},
+}
 
 
 def _slugify(text):
@@ -153,10 +158,31 @@ def _hierarchy_parent_opts():
                 ORDER BY depth, level_id""", (config.CID,))
 
 
-def _hierarchy_children(level_id):
-    """Direct child levels of a hierarchy node (brand edit page section)."""
-    return q("""SELECT id, level_id, level_name, depth, is_leaf, status
-                FROM sm_item_hierarchy
+def _top_level_parent_opts():
+    """Parent choices for National Structure — root or any active node with depth < 3."""
+    return [{"level_id": "0", "level_name": "- Root (National) -"}] + q(
+        """SELECT id, level_id, level_name, depth FROM sm_top_level
+           WHERE cid=%s AND status='ACTIVE' AND depth < 3
+           ORDER BY depth, level_id""", (config.CID,))
+
+
+def _level_parent_opts():
+    """Parent choices for Field Structure — root or any active node with depth < 3."""
+    return [{"level_id": "0", "level_name": "- Root (Territory) -"}] + q(
+        """SELECT id, level_id, level_name, depth FROM sm_level
+           WHERE cid=%s AND status='ACTIVE' AND depth < 3
+           ORDER BY depth, level_id""", (config.CID,))
+
+
+def _hierarchy_children(slug, level_id):
+    """Direct child levels of a hierarchy node (brand / top-level / level edit page section)."""
+    table = "sm_item_hierarchy"
+    if slug == "top-level":
+        table = "sm_top_level"
+    elif slug == "level":
+        table = "sm_level"
+    return q(f"""SELECT id, level_id, level_name, depth, is_leaf, status
+                FROM `{table}`
                 WHERE cid=%s AND parent_level_id=%s
                 ORDER BY level_id""", (config.CID, level_id))
 
@@ -222,24 +248,33 @@ def _select_opts_for(slug):
         item_opts = q("""SELECT item_id, name, brand_name FROM sm_item
                          WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 300""",
                       (config.CID,))
-    if slug in ("distributor-store", "outlet"):
+    if slug in ("distributor-store", "outlet", "level", "rep"):
         depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
                           ORDER BY name LIMIT 300""", (config.CID,))
     return item_opts, depot_opts
 
 
 def _record_key(m, row):
-    key_map = {"brand": "level_id", "item": "item_id", "item-batch": "batch_id",
-               "distributor": "depot_id", "distributor-store": "store_id",
-               "category-type": "id"}
-    col = {v: k for k, v in key_map.items()}  # not used; direct below
+    key_map = {
+        "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
+        "top-level": "level_id", "level": "level_id", "rep": "rep_id",
+        "supervisor-level": "id", "rep-area": "id", "visit-plan": "id",
+        "client-visit-plan": "id",
+        "distributor": "depot_id", "distributor-store": "store_id",
+        "outlet": "client_id", "category-type": "id",
+    }
     return row.get(key_map.get(next((s for s, mm in MODULES.items() if mm is m), ""), "id")) or row["id"]
 
 
 def key_col_of(m):
-    return {"brand": "level_id", "item": "item_id", "item-batch": "batch_id",
-            "distributor": "depot_id", "distributor-store": "store_id",
-            "outlet": "client_id", "category-type": "id"}.get(m["perm"], "id")
+    return {
+        "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
+        "top_level": "level_id", "level": "level_id", "rep": "rep_id",
+        "supervisor_level": "id", "rep_area": "id", "visit_plan": "id",
+        "client_visit_plan": "id",
+        "distributor": "depot_id", "depot_store": "store_id",
+        "outlet": "client_id", "category_type": "id",
+    }.get(m["perm"], "id")
 
 
 def _filter_sql(m, request, qk=""):
@@ -317,7 +352,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
     # when searching/filtering, pull in the ancestor chain so matches keep
     # their tree context
     tree = None
-    if slug == "brand":
+    if slug in ("brand", "top-level", "level"):
         rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
                      ORDER BY depth ASC, level_id ASC""", params)
         if qk or any(filt_vals.values()):
@@ -344,7 +379,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         tree = _build_tree(rows)
     item_opts = None
     depot_opts = None
-    if slug in ("item-batch", "distributor-store", "outlet"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
         item_opts, depot_opts = _select_opts_for(slug)
     item_opts = item_opts or []
     depot_opts = depot_opts or []
@@ -375,6 +410,40 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
     for spec in m["form_fields"]:
         if spec["cat"]:
             field_opts[spec["name"]] = _cat_options(spec["cat"])
+
+    slug = PERM2SLUG.get(m["perm"], m["perm"])
+    if slug == "supervisor-level":
+        field_opts["sup_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
+                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='sup' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        top_lvls = [(r["level_id"], f"{r['level_id']} | {r['level_name']} (National)")
+                    for r in q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
+        fld_lvls = [(r["level_id"], f"{r['level_id']} | {r['level_name']} (Field)")
+                    for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
+        field_opts["level_id"] = top_lvls + fld_lvls
+
+    elif slug == "rep-area":
+        field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
+                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='rep' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        field_opts["area_id"] = [(r["level_id"], f"{r['level_id']} | {r['level_name']} ({'Route' if r['depth']==2 else 'Beat'})")
+                                 for r in q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND depth IN (2, 3) AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
+
+    elif slug == "visit-plan":
+        field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
+                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='rep' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        field_opts["area_id"] = [(r["level_id"], f"{r['level_id']} | {r['level_name']}")
+                                 for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=3 AND status='ACTIVE' ORDER BY level_id", (config.CID,))]
+        field_opts["delivery_man_id"] = [("", "-- None --")] + [
+            (r["rep_id"], f"{r['rep_id']} | {r['name']}")
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND designation_id='DM' AND status='ACTIVE' ORDER BY name", (config.CID,))
+        ]
+
+    elif slug == "client-visit-plan":
+        field_opts["client_id"] = [(r["client_id"], f"{r['client_id']} | {r['name']}")
+                                    for r in q("SELECT client_id, name FROM sm_client WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 500", (config.CID,))]
+        field_opts["area_id"] = [("", "-- Select Beat (Optional) --")] + [
+            (r["level_id"], f"{r['level_id']} | {r['level_name']}")
+            for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=3 AND status='ACTIVE' ORDER BY level_id", (config.CID,))]
+
     context.update({
         "m": m, "slug": PERM2SLUG.get(m["perm"], m["perm"]),
         "title": f"{m['title']} — {action}", "row": row, "data": data or {},
@@ -395,7 +464,11 @@ async def module_create_form(request: Request, slug: str):
     parent_opts, item_opts, depot_opts = [], [], []
     if slug == "brand":
         parent_opts = _hierarchy_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet"):
+    elif slug == "top-level":
+        parent_opts = _top_level_parent_opts()
+    elif slug == "level":
+        parent_opts = _level_parent_opts()
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
         item_opts, depot_opts = _select_opts_for(slug)
     if slug == "category-type":
         context["type_names"] = [r["type_name"] for r in
@@ -451,7 +524,11 @@ async def module_create(request: Request, slug: str):
         parent_opts = item_opts = depot_opts = []
         if slug == "brand":
             parent_opts = _hierarchy_parent_opts()
-        elif slug in ("item-batch", "distributor-store", "outlet"):
+        elif slug == "top-level":
+            parent_opts = _top_level_parent_opts()
+        elif slug == "level":
+            parent_opts = _level_parent_opts()
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -474,9 +551,9 @@ async def module_view(request: Request, slug: str, rid: int):
         set_flash(request, "danger", "Record not found.")
         return RedirectResponse(f"/{slug}", status_code=303)
     children, next_level = [], ""
-    if slug == "brand":
-        children = _hierarchy_children(row["level_id"])
-        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
+    if slug in ("brand", "top-level", "level"):
+        children = _hierarchy_children(slug, row["level_id"])
+        next_level = _NEXT_LEVEL_BY_SLUG.get(slug, {}).get(int(row["depth"] or 0), "")
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
@@ -496,11 +573,11 @@ async def module_edit_form(request: Request, slug: str, rid: int):
         set_flash(request, "danger", "Record not found.")
         return RedirectResponse(f"/{slug}", status_code=303)
     children, next_level = [], ""
-    if slug == "brand":
-        children = _hierarchy_children(row["level_id"])
-        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
+    if slug in ("brand", "top-level", "level"):
+        children = _hierarchy_children(slug, row["level_id"])
+        next_level = _NEXT_LEVEL_BY_SLUG.get(slug, {}).get(int(row["depth"] or 0), "")
     item_opts, depot_opts = ([], [])
-    if slug in ("item-batch", "distributor-store", "outlet"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
@@ -530,14 +607,14 @@ async def module_edit(request: Request, slug: str, rid: int):
             data[fkey] = (form.get(fkey) or (row.get(fkey) or "-")).strip()
     img_updates, img_writes, img_err = await _collect_image_uploads(m, form, data, existing=row)
     children, next_level = [], ""
-    if slug == "brand":
-        children = _hierarchy_children(row["level_id"])
-        next_level = _NEXT_LEVEL.get(int(row["depth"] or 0), "")
+    if slug in ("brand", "top-level", "level"):
+        children = _hierarchy_children(slug, row["level_id"])
+        next_level = _NEXT_LEVEL_BY_SLUG.get(slug, {}).get(int(row["depth"] or 0), "")
     hook = HOOKS.get(m["create_hook"], {})
     err = img_err or (hook["prepare"](config.CID, data, row, user["user_id"]) if hook.get("prepare") else None)
     if err:
         item_opts, depot_opts = ([], [])
-        if slug in ("item-batch", "distributor-store", "outlet"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -727,8 +804,8 @@ def module_export(request: Request, slug: str, page: int = 1, qk: str = "",
 
     wb = Workbook()
 
-    if slug == "brand":
-        # ------------------------------------------------------------- BRAND (Hierarchy Tree & Paths)
+    if slug in ("brand", "top-level", "level"):
+        # ------------------------------------------------------------- HIERARCHY TREE & PATHS (brand / top-level / level)
         rows = q(f"""SELECT t.* FROM `{m['table']}` t WHERE {wsql}
                      ORDER BY depth ASC, level_id ASC""", params)
         if qk or any(filt_vals.values()):
@@ -761,15 +838,23 @@ def module_export(request: Request, slug: str, page: int = 1, qk: str = "",
             return out
 
         flat_tree = _flatten_tree(tree)
-        level_labels = {0: "Company", 1: "Brand", 2: "Type", 3: "Flavor"}
+        if slug == "brand":
+            level_labels = {0: "Company", 1: "Brand", 2: "Type", 3: "Flavor"}
+            t0, t1, t2, t3 = ("COMPANY", "BRAND", "TYPE", "FLAVOR")
+        elif slug == "top-level":
+            level_labels = {0: "National", 1: "Area", 2: "Zone", 3: "Territory"}
+            t0, t1, t2, t3 = ("NATIONAL", "AREA", "ZONE", "TERRITORY")
+        else:
+            level_labels = {0: "Territory", 1: "Town", 2: "Route", 3: "Beat"}
+            t0, t1, t2, t3 = ("TERRITORY", "TOWN", "ROUTE", "BEAT")
 
         # Sheet 1: Hierarchy Tree
         ws1 = wb.active
         ws1.title = "HIERARCHY_TREE"
         ws1.append([
             "LEVEL TYPE", "LEVEL ID", "LEVEL NAME (HIERARCHY)", "RAW LEVEL NAME",
-            "PARENT ID", "PARENT NAME", "COMPANY (L0)", "BRAND (L1)", "TYPE (L2)",
-            "FLAVOR (L3)", "DEPTH", "IS LEAF", "STATUS", "NOTE"
+            "PARENT ID", "PARENT NAME", f"{t0} (L0)", f"{t1} (L1)", f"{t2} (L2)",
+            f"{t3} (L3)", "DEPTH", "IS LEAF", "STATUS", "NOTE"
         ])
         for node, d in flat_tree:
             depth_val = int(node.get("depth") or 0)
@@ -792,9 +877,9 @@ def module_export(request: Request, slug: str, page: int = 1, qk: str = "",
         # Sheet 2: Hierarchy Paths (Leaf paths for lookups / analysis)
         ws2 = wb.create_sheet(title="HIERARCHY_PATHS")
         ws2.append([
-            "LEAF CODE", "LEAF NAME", "LEAF TYPE", "COMPANY CODE", "COMPANY NAME",
-            "BRAND CODE", "BRAND NAME", "TYPE CODE", "TYPE NAME", "FLAVOR CODE",
-            "FLAVOR NAME", "STATUS"
+            "LEAF CODE", "LEAF NAME", "LEAF TYPE", f"{t0} CODE", f"{t0} NAME",
+            f"{t1} CODE", f"{t1} NAME", f"{t2} CODE", f"{t2} NAME", f"{t3} CODE",
+            f"{t3} NAME", "STATUS"
         ])
         for node, d in flat_tree:
             if str(node.get("is_leaf")) == "1":
@@ -810,7 +895,7 @@ def module_export(request: Request, slug: str, page: int = 1, qk: str = "",
                 ])
         _style_worksheet(ws2)
 
-        filename = f"brand_hierarchy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
+        filename = f"{slug.replace('-', '_')}_hierarchy_{datetime.now().strftime('%Y%m%d_%H%M%S')}.xlsx"
 
     else:
         # Non-brand modules: paginate or all
@@ -1028,7 +1113,7 @@ async def module_upload(request: Request, slug: str):
             if col == "status" and not val:
                 data[col] = "ACTIVE"
         # some hooks need extra keys even outside the template
-        if slug == "brand":
+        if slug in ("brand", "top-level", "level"):
             data.setdefault("parent_level_id", "0")
         try:
             err = await _do_create(request, slug, data, user, source=f"Excel upload row {i}")

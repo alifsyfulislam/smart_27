@@ -4,7 +4,7 @@ from fastapi import Request
 from . import config
 from .audit import log_change
 from .database import q
-from .modules import MODULES
+from .modules import MODULES, MODULE_ORDER
 from .security import has_perm, verify_password
 from .security import _PERM_CACHE
 
@@ -28,11 +28,12 @@ CUSTOM_MENU = [
 GROUP_META = [
     ("Top", "fa-house", 0),
     ("Item Info", "fa-boxes-stacked", 1),
-    ("Distributor Info", "fa-truck-ramp-box", 2),
-    ("Outlet Info", "fa-shop", 3),
-    ("Settings", "fa-cogs", 4),
-    ("Administration", "fa-gear", 5),
-    ("Records", "fa-clock-rotate-left", 6),
+    ("Fieldforce Info", "fa-people-group", 2),
+    ("Distributor Info", "fa-truck-ramp-box", 3),
+    ("Outlet Info", "fa-shop", 4),
+    ("Settings", "fa-cogs", 5),
+    ("Administration", "fa-gear", 6),
+    ("Records", "fa-clock-rotate-left", 7),
 ]
 
 
@@ -100,8 +101,7 @@ def build_menu(user):
         groups["Top"]["entries"].append(
             {"title": "Dashboard", "url": "/", "icon": "fa-gauge-high", "key": "dashboard"})
     # master modules
-    for slug in ("brand", "item", "item-batch", "distributor", "distributor-store",
-                 "outlet", "category-type"):
+    for slug in MODULE_ORDER:
         m = MODULES.get(slug)
         if not m:
             continue

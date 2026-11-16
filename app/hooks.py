@@ -5,6 +5,15 @@ from .database import q, x, scalar
 MAX_DEPTH = 3  # company(0) > brand(1) > type(2) > flavor(3)
 LEVEL_PREFIX = {0: "MG", 1: "BG", 2: "CG", 3: "FG"}
 
+TOP_LEVEL_PREFIX = {0: "H", 1: "A", 2: "Z", 3: "T"}
+FIELD_LEVEL_PREFIX = {0: "T", 1: "TW", 2: "R", 3: "B"}
+
+NEXT_DAY = {
+    "Saturday": "Sunday", "Sunday": "Monday", "Monday": "Tuesday",
+    "Tuesday": "Wednesday", "Wednesday": "Thursday", "Thursday": "Friday",
+    "Friday": "Saturday",
+}
+
 
 # ----------------------------------------------------------------- hierarchy
 def hierarchy_prepare(cid, data, existing=None, user=None):
@@ -424,6 +433,538 @@ def outlet_prepare(cid, data, existing=None, user=None):
     return None
 
 
+# ------------------------------------------------------------- top_level (National Structure)
+def _next_top_level_code(cid, prefix):
+    rows = q("SELECT level_id FROM sm_top_level WHERE cid=%s AND level_id LIKE %s",
+             (cid, prefix + "%"))
+    max_no = 0
+    for r in rows:
+        tail = (r["level_id"] or "")[len(prefix):]
+        if tail.isdigit():
+            max_no = max(max_no, int(tail))
+    return f"{prefix}{max_no + 1:04d}"
+
+
+def top_level_prepare(cid, data, existing=None, user=None):
+    name = (data.get("level_name") or "").strip()
+    if not name:
+        return "Level name is required."
+
+    if existing is not None:
+        data["level_name"] = name
+        dup = q("""SELECT id FROM sm_top_level
+                   WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                     AND parent_level_id=%s AND id<>%s LIMIT 1""",
+                (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
+        if dup:
+            return "A national level with this name already exists under the same parent."
+        return None
+
+    parent_id = (data.get("parent_level_id") or "0").strip() or "0"
+    if parent_id == "0":
+        parent = None
+        depth = 0
+    else:
+        parent = q("SELECT * FROM sm_top_level WHERE cid=%s AND level_id=%s",
+                   (cid, parent_id), one=True)
+        if not parent or parent["status"] != "ACTIVE":
+            return "Parent level not found or inactive."
+        depth = int(parent["depth"] or 0) + 1
+        if depth > 3:
+            return "Cannot create a level below 'Territory' (depth 3) in National Structure."
+
+    dup = q(f"""SELECT id FROM sm_top_level
+                WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                  {"AND parent_level_id=%s" if parent else "AND parent_level_id='0'"}
+                LIMIT 1""",
+            (cid, name) + ((parent_id,) if parent else ()), one=True)
+    if dup:
+        return "A national level with this name already exists under the same parent."
+
+    prefix = TOP_LEVEL_PREFIX[depth]
+    code = _next_top_level_code(cid, prefix)
+    data["level_id"] = code
+    data["depth"] = depth
+    data["is_leaf"] = "1"
+    data["parent_level_id"] = parent_id
+    data["parent_level_name"] = (parent["level_name"] if parent else "-") or "-"
+    for i in range(4):
+        if i < depth and parent:
+            data[f"level{i}"] = parent.get(f"level{i}") or ""
+            data[f"level{i}_name"] = parent.get(f"level{i}_name") or ""
+        elif i == depth:
+            data[f"level{i}"] = code
+            data[f"level{i}_name"] = name
+        else:
+            data[f"level{i}"] = "-"
+            data[f"level{i}_name"] = "-"
+    data["status"] = "ACTIVE"
+    return None
+
+
+def _recompute_top_level_is_leaf(cid, level_id):
+    if not level_id or level_id == "0":
+        return
+    n = scalar("SELECT COUNT(*) c FROM sm_top_level "
+               "WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+               (cid, level_id), 0)
+    x("UPDATE sm_top_level SET is_leaf=%s WHERE cid=%s AND level_id=%s",
+      ("0" if n else "1", cid, level_id))
+
+
+def top_level_after_create(cid, row, user=None):
+    _recompute_top_level_is_leaf(cid, row.get("parent_level_id"))
+
+
+def top_level_after_update(cid, old, new, user=None):
+    if (old.get("level_name") or "") != (new.get("level_name") or ""):
+        x("UPDATE sm_top_level SET parent_level_name=%s WHERE cid=%s AND parent_level_id=%s",
+          (new["level_name"], cid, new["level_id"]))
+        depth = int(new.get("depth") or 0)
+        x(f"UPDATE sm_top_level SET level{depth}_name=%s WHERE cid=%s AND level{depth}=%s",
+          (new["level_name"], cid, new["level_id"]))
+    _recompute_top_level_is_leaf(cid, new.get("level_id"))
+    _recompute_top_level_is_leaf(cid, new.get("parent_level_id"))
+
+
+def top_level_soft_delete(cid, rid, user=None):
+    row = q("SELECT * FROM sm_top_level WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    nchild = scalar("SELECT COUNT(*) c FROM sm_top_level WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+                    (cid, row["level_id"]), 0)
+    if nchild:
+        return None, (f"Cannot delete '{row['level_name']}' ({row['level_id']}) — it has "
+                      f"{nchild} active child level(s). Delete the child levels first.")
+    _, n = x("UPDATE sm_top_level SET status='PENDING', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status='ACTIVE'", (user, cid, rid))
+    _recompute_top_level_is_leaf(cid, row.get("parent_level_id"))
+    return n, None
+
+
+def top_level_restore(cid, rid, user=None):
+    row = q("SELECT * FROM sm_top_level WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    pid = row.get("parent_level_id")
+    if pid and pid != "0":
+        parent = q("SELECT status FROM sm_top_level WHERE cid=%s AND level_id=%s",
+                   (cid, pid), one=True)
+        if not parent or parent["status"] != "ACTIVE":
+            return None, f"Cannot restore — parent level '{pid}' is not ACTIVE."
+    _, n = x("UPDATE sm_top_level SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s", (user, cid, rid))
+    _recompute_top_level_is_leaf(cid, pid)
+    return n, None
+
+
+# ------------------------------------------------------------- level (Field Structure)
+def _next_field_level_code(cid, prefix):
+    rows = q("SELECT level_id FROM sm_level WHERE cid=%s AND level_id LIKE %s",
+             (cid, prefix + "%"))
+    max_no = 0
+    for r in rows:
+        tail = (r["level_id"] or "")[len(prefix):]
+        if tail.isdigit():
+            max_no = max(max_no, int(tail))
+    return f"{prefix}{max_no + 1:04d}"
+
+
+def level_prepare(cid, data, existing=None, user=None):
+    name = (data.get("level_name") or "").strip()
+    if not name:
+        return "Level name is required."
+
+    depot_id = (data.get("depot_id") or "").strip()
+    if depot_id and depot_id != "-":
+        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+        data["depot_id"] = depot_id
+        data["depot_name"] = (depot["name"] if depot else "-") or "-"
+    else:
+        data["depot_id"] = "-"
+        data["depot_name"] = "-"
+
+    if existing is not None:
+        data["level_name"] = name
+        dup = q("""SELECT id FROM sm_level
+                   WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                     AND parent_level_id=%s AND id<>%s LIMIT 1""",
+                (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
+        if dup:
+            return "A field level with this name already exists under the same parent."
+        return None
+
+    parent_id = (data.get("parent_level_id") or "0").strip() or "0"
+    if parent_id == "0":
+        parent = None
+        depth = 0
+        terr = q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND depth=3 AND status='ACTIVE' AND (level_id=%s OR level_name=%s)",
+                 (cid, name, name), one=True)
+        if terr:
+            code = terr["level_id"]
+            name = terr["level_name"]
+            data["level_name"] = name
+        else:
+            has_top_terrs = scalar("SELECT COUNT(*) FROM sm_top_level WHERE cid=%s AND depth=3 AND status='ACTIVE'", (cid,), 0)
+            if has_top_terrs > 0:
+                return f"Root Field Structure level must match an active Territory (depth 3) from National Structure. Territory '{name}' was not found."
+            code = _next_field_level_code(cid, "T")
+    else:
+        parent = q("SELECT * FROM sm_level WHERE cid=%s AND level_id=%s",
+                   (cid, parent_id), one=True)
+        if not parent or parent["status"] != "ACTIVE":
+            return "Parent level not found or inactive."
+        depth = int(parent["depth"] or 0) + 1
+        if depth > 3:
+            return "Cannot create a level below 'Beat' (depth 3) in Field Structure."
+        prefix = FIELD_LEVEL_PREFIX[depth]
+        code = _next_field_level_code(cid, prefix)
+
+    dup = q(f"""SELECT id FROM sm_level
+                WHERE cid=%s AND status='ACTIVE' AND level_name=%s
+                  {"AND parent_level_id=%s" if parent else "AND parent_level_id='0'"}
+                LIMIT 1""",
+            (cid, name) + ((parent_id,) if parent else ()), one=True)
+    if dup:
+        return "A field level with this name already exists under the same parent."
+
+    data["level_id"] = code
+    data["depth"] = depth
+    data["is_leaf"] = "1"
+    data["parent_level_id"] = parent_id
+    data["parent_level_name"] = (parent["level_name"] if parent else "-") or "-"
+    for i in range(4):
+        if i < depth and parent:
+            data[f"level{i}"] = parent.get(f"level{i}") or ""
+            data[f"level{i}_name"] = parent.get(f"level{i}_name") or ""
+        elif i == depth:
+            data[f"level{i}"] = code
+            data[f"level{i}_name"] = name
+        else:
+            data[f"level{i}"] = "-"
+            data[f"level{i}_name"] = "-"
+    data["status"] = "ACTIVE"
+    return None
+
+
+def _recompute_level_is_leaf(cid, level_id):
+    if not level_id or level_id == "0":
+        return
+    n = scalar("SELECT COUNT(*) c FROM sm_level "
+               "WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+               (cid, level_id), 0)
+    x("UPDATE sm_level SET is_leaf=%s WHERE cid=%s AND level_id=%s",
+      ("0" if n else "1", cid, level_id))
+
+
+def level_after_create(cid, row, user=None):
+    _recompute_level_is_leaf(cid, row.get("parent_level_id"))
+
+
+def level_after_update(cid, old, new, user=None):
+    if (old.get("level_name") or "") != (new.get("level_name") or ""):
+        x("UPDATE sm_level SET parent_level_name=%s WHERE cid=%s AND parent_level_id=%s",
+          (new["level_name"], cid, new["level_id"]))
+        depth = int(new.get("depth") or 0)
+        x(f"UPDATE sm_level SET level{depth}_name=%s WHERE cid=%s AND level{depth}=%s",
+          (new["level_name"], cid, new["level_id"]))
+    _recompute_level_is_leaf(cid, new.get("level_id"))
+    _recompute_level_is_leaf(cid, new.get("parent_level_id"))
+
+
+def level_soft_delete(cid, rid, user=None):
+    row = q("SELECT * FROM sm_level WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    nchild = scalar("SELECT COUNT(*) c FROM sm_level WHERE cid=%s AND parent_level_id=%s AND status='ACTIVE'",
+                    (cid, row["level_id"]), 0)
+    if nchild:
+        return None, (f"Cannot delete '{row['level_name']}' ({row['level_id']}) — it has "
+                      f"{nchild} active child level(s). Delete the child levels first.")
+    _, n = x("UPDATE sm_level SET status='PENDING', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status='ACTIVE'", (user, cid, rid))
+    _recompute_level_is_leaf(cid, row.get("parent_level_id"))
+    return n, None
+
+
+def level_restore(cid, rid, user=None):
+    row = q("SELECT * FROM sm_level WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    pid = row.get("parent_level_id")
+    if pid and pid != "0":
+        parent = q("SELECT status FROM sm_level WHERE cid=%s AND level_id=%s",
+                   (cid, pid), one=True)
+        if not parent or parent["status"] != "ACTIVE":
+            return None, f"Cannot restore — parent level '{pid}' is not ACTIVE."
+    _, n = x("UPDATE sm_level SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s", (user, cid, rid))
+    _recompute_level_is_leaf(cid, pid)
+    return n, None
+
+
+# ------------------------------------------------------------- rep (Employee Master)
+def _next_rep_code(cid, prefix):
+    rows = q("SELECT rep_id FROM sm_rep WHERE cid=%s AND rep_id LIKE %s",
+             (cid, prefix + "%"))
+    max_no = 0
+    for r in rows:
+        tail = (r["rep_id"] or "")[len(prefix):]
+        if tail.isdigit():
+            max_no = max(max_no, int(tail))
+    return f"{prefix}{max_no + 1:04d}"
+
+
+def rep_prepare(cid, data, existing=None, user=None):
+    name = (data.get("name") or "").strip()
+    if not name:
+        return "Employee name is required."
+
+    desig_id = (data.get("designation_id") or "").strip()
+    if not desig_id:
+        return "Designation is required."
+
+    desig = q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
+                 WHERE cid=%s AND type_name='DESIGNATION' AND cat_type_id=%s AND status='ACTIVE'""",
+              (cid, desig_id), one=True)
+    if not desig:
+        return f"Designation '{desig_id}' not found in active category definitions."
+    data["designation_id"] = desig["cat_type_id"]
+    data["designation_name"] = desig["cat_type_name"] or desig["cat_type_id"]
+
+    user_type = (data.get("user_type") or "rep").strip().lower()
+    if user_type not in ("rep", "sup"):
+        user_type = "rep"
+    data["user_type"] = user_type
+
+    depot_id = (data.get("depot_id") or "").strip()
+    if depot_id and depot_id != "-":
+        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+        data["depot_id"] = depot_id
+        data["depot_name"] = (depot["name"] if depot else "-") or "-"
+    else:
+        data["depot_id"] = "-"
+        data["depot_name"] = "-"
+
+    if existing is not None:
+        data["rep_id"] = existing["rep_id"]
+        data["rep_username"] = existing.get("rep_username") or existing["rep_id"]
+    else:
+        prefix = desig_id.upper()
+        rep_id = _next_rep_code(cid, prefix)
+        data["rep_id"] = rep_id
+        data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
+
+    if not (data.get("password") or "").strip():
+        data["password"] = "123456"
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
+# ------------------------------------------------------------- supervisor_level (Supervisor Area Assignment)
+def supervisor_level_prepare(cid, data, existing=None, user=None):
+    sup_id = (data.get("sup_id") or "").strip()
+    if not sup_id:
+        return "Supervisor ID is required."
+    sup = q("SELECT rep_id, name, user_type FROM sm_rep WHERE cid=%s AND rep_id=%s AND status='ACTIVE'",
+            (cid, sup_id), one=True)
+    if not sup:
+        return f"Supervisor '{sup_id}' not found or inactive."
+    if (sup.get("user_type") or "").lower() != "sup":
+        return f"Employee '{sup_id}' has user_type '{sup.get('user_type')}' — only supervisors (user_type='sup') can be assigned supervisor levels."
+    data["sup_id"] = sup["rep_id"]
+    data["sup_name"] = sup["name"]
+
+    level_id = (data.get("level_id") or "").strip()
+    if not level_id:
+        return "Hierarchy level ID is required."
+    lvl = q("SELECT level_id, level_name, depth FROM sm_top_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
+            (cid, level_id), one=True)
+    if not lvl:
+        lvl = q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
+                (cid, level_id), one=True)
+    if not lvl:
+        return f"Hierarchy level '{level_id}' not found in active National or Field structure."
+    data["level_id"] = lvl["level_id"]
+    data["level_name"] = lvl["level_name"]
+    data["level_depth_no"] = int(lvl.get("depth") or 0)
+
+    dup_where = "AND id<>%s" if existing else ""
+    dup_params = (cid, data["sup_id"], data["level_id"]) + ((existing["id"],) if existing else ())
+    dup = q(f"SELECT id FROM sm_supervisor_level WHERE cid=%s AND sup_id=%s AND level_id=%s AND status='ACTIVE' {dup_where} LIMIT 1",
+            dup_params, one=True)
+    if dup:
+        return f"Supervisor '{sup_id}' is already assigned to level '{level_id}'."
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
+# ------------------------------------------------------------- rep_area (PSR Area Assignment)
+def rep_area_prepare(cid, data, existing=None, user=None):
+    rep_id = (data.get("rep_id") or "").strip()
+    if not rep_id:
+        return "Representative ID is required."
+    rep = q("SELECT rep_id, name, user_type FROM sm_rep WHERE cid=%s AND rep_id=%s AND status='ACTIVE'",
+            (cid, rep_id), one=True)
+    if not rep:
+        return f"Representative '{rep_id}' not found or inactive."
+    data["rep_id"] = rep["rep_id"]
+    data["rep_name"] = rep["name"]
+    data["rep_category"] = rep.get("user_type") or "rep"
+
+    area_id = (data.get("area_id") or "").strip()
+    if not area_id:
+        return "Area (Route or Beat) is required."
+    area = q("SELECT level_id, level_name, depth, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
+             (cid, area_id), one=True)
+    if not area:
+        return f"Area '{area_id}' not found in active Field Structure."
+    data["area_id"] = area["level_id"]
+    data["area_name"] = area["level_name"]
+    data["depot_id"] = (area.get("depot_id") or "-") or "-"
+    data["depot_name"] = (area.get("depot_name") or "-") or "-"
+
+    dup_where = "AND id<>%s" if existing else ""
+    dup_params = (cid, data["rep_id"], data["area_id"]) + ((existing["id"],) if existing else ())
+    dup = q(f"SELECT id FROM sm_rep_area WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE' {dup_where} LIMIT 1",
+            dup_params, one=True)
+    if dup:
+        return f"Representative '{rep_id}' is already assigned to area '{area_id}'."
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
+def rep_area_after_create(cid, row, user=None):
+    area_id = row.get("area_id")
+    if not area_id:
+        return
+    lvl = q("SELECT depth FROM sm_level WHERE cid=%s AND level_id=%s", (cid, area_id), one=True)
+    if not lvl:
+        return
+    depth = int(lvl.get("depth") or 0)
+    if depth == 2:  # Route assigned — cascade to child beats
+        beats = q("""SELECT level_id, level_name, depot_id, depot_name
+                     FROM sm_level
+                     WHERE cid=%s AND parent_level_id=%s AND depth=3 AND status='ACTIVE'""",
+                  (cid, area_id))
+        for b in beats:
+            exists = q("SELECT id FROM sm_rep_area WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE'",
+                       (cid, row["rep_id"], b["level_id"]), one=True)
+            if not exists:
+                x("""INSERT INTO sm_rep_area (cid, rep_id, rep_name, rep_category, area_id, area_name, depot_id, depot_name, status, created_on, created_by)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, %s, 'ACTIVE', NOW(), %s)""",
+                  (cid, row["rep_id"], row["rep_name"], row.get("rep_category", "rep"),
+                   b["level_id"], b["level_name"], b.get("depot_id") or "-", b.get("depot_name") or "-", user))
+            vp_exists = q("SELECT id FROM sm_visit_plan WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE'",
+                          (cid, row["rep_id"], b["level_id"]), one=True)
+            if not vp_exists:
+                x("""INSERT INTO sm_visit_plan (cid, rep_id, rep_name, area_id, area_name, depot_id, depot_name, order_col_day, delivery_day, seq_no, status, created_on, created_by)
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, 'Saturday', 'Sunday', 1, 'ACTIVE', NOW(), %s)""",
+                  (cid, row["rep_id"], row["rep_name"], b["level_id"], b["level_name"],
+                   b.get("depot_id") or "-", b.get("depot_name") or "-", user))
+    elif depth == 3:  # Direct beat assigned
+        vp_exists = q("SELECT id FROM sm_visit_plan WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE'",
+                      (cid, row["rep_id"], area_id), one=True)
+        if not vp_exists:
+            x("""INSERT INTO sm_visit_plan (cid, rep_id, rep_name, area_id, area_name, depot_id, depot_name, order_col_day, delivery_day, seq_no, status, created_on, created_by)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'Saturday', 'Sunday', 1, 'ACTIVE', NOW(), %s)""",
+              (cid, row["rep_id"], row["rep_name"], area_id, row.get("area_name") or area_id,
+               row.get("depot_id") or "-", row.get("depot_name") or "-", user))
+
+
+# ------------------------------------------------------------- visit_plan (PSR Visit Plan)
+def visit_plan_prepare(cid, data, existing=None, user=None):
+    rep_id = (data.get("rep_id") or "").strip()
+    if not rep_id:
+        return "Representative ID is required."
+    rep = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s AND status='ACTIVE'",
+            (cid, rep_id), one=True)
+    if not rep:
+        return f"Representative '{rep_id}' not found or inactive."
+    data["rep_id"] = rep["rep_id"]
+    data["rep_name"] = rep["name"]
+
+    area_id = (data.get("area_id") or "").strip()
+    if not area_id:
+        return "Area (Beat) is required."
+    area = q("SELECT level_id, level_name, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
+             (cid, area_id), one=True)
+    if not area:
+        return f"Beat '{area_id}' not found in Field Structure."
+    data["area_id"] = area["level_id"]
+    data["area_name"] = area["level_name"]
+    data["depot_id"] = (area.get("depot_id") or "-") or "-"
+    data["depot_name"] = (area.get("depot_name") or "-") or "-"
+
+    dm_id = (data.get("delivery_man_id") or "").strip()
+    if dm_id and dm_id != "-":
+        dm = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s AND status='ACTIVE'", (cid, dm_id), one=True)
+        if dm:
+            data["delivery_man_id"] = dm["rep_id"]
+            data["delivery_man_name"] = dm["name"]
+        else:
+            data["delivery_man_id"] = "-"
+            data["delivery_man_name"] = "-"
+    else:
+        data["delivery_man_id"] = "-"
+        data["delivery_man_name"] = "-"
+
+    order_day = (data.get("order_col_day") or "Saturday").strip()
+    if order_day not in NEXT_DAY:
+        return f"Invalid order collection day '{order_day}'."
+    data["order_col_day"] = order_day
+    data["delivery_day"] = NEXT_DAY[order_day]
+
+    dup_where = "AND id<>%s" if existing else ""
+    dup_params = (cid, data["rep_id"], data["area_id"], data["order_col_day"]) + ((existing["id"],) if existing else ())
+    dup = q(f"SELECT id FROM sm_visit_plan WHERE cid=%s AND rep_id=%s AND area_id=%s AND order_col_day=%s AND status='ACTIVE' {dup_where} LIMIT 1",
+            dup_params, one=True)
+    if dup:
+        return f"Representative '{rep_id}' already has a visit plan for beat '{area_id}' on '{order_day}'."
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
+# ------------------------------------------------------------- client_visit_plan (Outlet Exceptional Visit Plan)
+def client_visit_plan_prepare(cid, data, existing=None, user=None):
+    client_id = (data.get("client_id") or "").strip()
+    if not client_id:
+        return "Outlet ID (client_id) is required."
+    clt = q("SELECT client_id, name FROM sm_client WHERE cid=%s AND client_id=%s AND status='ACTIVE'",
+            (cid, client_id), one=True)
+    if not clt:
+        return f"Outlet '{client_id}' not found or inactive."
+    data["client_id"] = clt["client_id"]
+
+    area_id = (data.get("area_id") or "").strip()
+    data["area_id"] = area_id or "-"
+
+    freq = (data.get("frequency") or "WEEKLY").strip().upper()
+    data["frequency"] = freq
+
+    for col in ("w1", "w2", "w3", "w4", "w5", "sat", "sun", "mon", "tue", "wed", "thu", "fri"):
+        val = (data.get(col) or "").strip()
+        data[col] = "1" if val in ("1", "Y", "yes", "true", "True") else "-"
+
+    dup_where = "AND id<>%s" if existing else ""
+    dup_params = (cid, data["client_id"], data["area_id"], data["frequency"]) + ((existing["id"],) if existing else ())
+    dup = q(f"SELECT id FROM sm_client_visit_plan WHERE cid=%s AND client_id=%s AND area_id=%s AND frequency=%s AND status='ACTIVE' {dup_where} LIMIT 1",
+            dup_params, one=True)
+    if dup:
+        return f"A visit plan for outlet '{client_id}', area '{area_id}', frequency '{freq}' already exists."
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
 # ----------------------------------------------------------------- registry
 HOOKS = {
     "hierarchy": {
@@ -448,6 +989,28 @@ HOOKS = {
     "depot_store": {"prepare": depot_store_prepare},
     "outlet": {"prepare": outlet_prepare},
     "category_type": {"prepare": category_type_prepare},
+    "top_level": {
+        "prepare": top_level_prepare,
+        "after_create": top_level_after_create,
+        "after_update": top_level_after_update,
+        "soft_delete": top_level_soft_delete,
+        "restore": top_level_restore,
+    },
+    "level": {
+        "prepare": level_prepare,
+        "after_create": level_after_create,
+        "after_update": level_after_update,
+        "soft_delete": level_soft_delete,
+        "restore": level_restore,
+    },
+    "rep": {"prepare": rep_prepare},
+    "supervisor_level": {"prepare": supervisor_level_prepare},
+    "rep_area": {
+        "prepare": rep_area_prepare,
+        "after_create": rep_area_after_create,
+    },
+    "visit_plan": {"prepare": visit_plan_prepare},
+    "client_visit_plan": {"prepare": client_visit_plan_prepare},
 }
 
 

@@ -59,6 +59,13 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR4.7 Category values for type names map from `sm_category_type` groups (DISTRIBUTOR_CATEGORY, STORE_TYPE, ITEM_CATEGORY, ITEM_UNIT, ITEM_PACK, OUTLET_CATEGORY, OUTLET_SUB_CATEGORY — see `SEED_CATEGORY_TYPES`).
 
 - FR4.8 Outlet (`sm_client`): uniqueness cid+client_id; category/sub-category resolution; auto-generated customer_type (`category_id|category_name`); depot and store validation against `sm_depot` and `sm_depot_store`.
+- FR4.9 National Structure (`sm_top_level`): 4-tier tree: National (depth 0, prefix `H`), Area (depth 1, prefix `A`), Zone (depth 2, prefix `Z`), Territory (depth 3, prefix `T`). Territory is max depth (leaf); auto-incremental codes (`H0001`, `A0001`, `Z0001`, `T0001`), parent lineage `level0..level3`, image attachment, and dynamic `is_leaf` recomputation.
+- FR4.10 Field Structure (`sm_level`): 4-tier market coverage: Territory (depth 0, prefix `T`, sourced from `sm_top_level` depth 3), Town (depth 1, prefix `TW`), Route (depth 2, prefix `R`), Beat (depth 3, prefix `B`). Beat is max depth (leaf); auto-incremental codes (`T0001`, `TW0001`, `R0000006`, `B0000033`), parent lineage `level0..level3`, depot linkage, and dynamic `is_leaf`.
+- FR4.11 Employee Master (`sm_rep`): Managed via integration or manual creation; unique on `(cid, rep_id)`. Dual user types: `rep` (PSR) and `sup` (Supervisor). Auto-incremental, immutable `rep_id` prefixed by designation: `HOS0001`, `SOM0001`, `ASM0001`, `ASE0001`, `CE0001`, `PSR0001`, `DM0001`.
+- FR4.12 Supervisor Area Assignment (`sm_supervisor_level`): Allows assigning supervisors (`sm_rep` with `user_type='sup'`) to any hierarchy node across National or Field structures (`sup_id`, `level_id`, `level_depth_no`).
+- FR4.13 PSR Area Assignment & Cascading Beat Population (`sm_rep_area`): Reps (`sm_rep` with `user_type='rep'`) assigned exclusively to Route (`sm_level` depth 2). Form takes PSR and Route; saving triggers automated resolution of all active Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`.
+- FR4.14 PSR Visit Plan (`sm_visit_plan`): Concurrently populated upon Route/Beat assignment in `sm_rep_area`. Maps Beat to `order_col_day` (Saturday..Friday); automatically derives `delivery_day` as the next calendar day.
+- FR4.15 Outlet Exceptional Visit Plan (`sm_client_visit_plan`): Enables custom outlet scheduling by mapping an outlet (`client_id`) within an area (`area_id`) with visit frequency, weekly cycle flags (`w1`..`w5`), and weekday matrix flags (`sat`..`fri`).
 
 ### FR5 Audit
 - FR5.1 `sm_audit_log` rows: table_name, record_key (business id), action, old_values/new_values JSON snapshots, changed_by, user_ip, note.
@@ -80,6 +87,14 @@ Tables (scripts/ddl.sql, exact names/columns from requirements):
 | `sm_item`, `sm_item_batch` | provided; `sm_item_batch` + `status` |
 | `sm_depot`, `sm_depot_store` | provided; `sm_depot_store` + `status` |
 | `sm_category_type` | + `status` |
+| `sm_client` | provided client/outlet master + `status` |
+| `sm_top_level` | National structure hierarchy (National > Area > Zone > Territory) with lineage `level0..level3`, `is_leaf`, `depth`, `image_path` |
+| `sm_level` | Field structure hierarchy (Territory > Town > Route > Beat) with lineage `level0..level8`, `is_leaf`, `depth`, `depot_id` |
+| `sm_rep` | Fieldforce employee master with dual user types (`rep`, `sup`), designation-based immutable auto IDs, credentials, and sync metadata. Unique `(cid`, `rep_id)` |
+| `sm_supervisor_level` | Supervisor area assignments mapping `sup_id` to any hierarchy node (`level_id`, `level_depth_no`) |
+| `sm_rep_area` | PSR area assignments mapping `rep_id` to Route and cascaded active Beats (`area_id`, `depot_id`) |
+| `sm_visit_plan` | PSR visit scheduling mapping rep, beat/area, `order_col_day`, and auto-derived `delivery_day` |
+| `sm_client_visit_plan` | Outlet exceptional visit plan mapping `client_id`, `area_id`, frequency, week flags (`w1`..`w5`), and weekday matrix (`sat`..`fri`) |
 | `sm_acl_user/role/permission`, `sm_acl_user_role`, `sm_acl_user_permission`, `sm_acl_role_permission` | new ACL tables (varchar business keys FK-free, cid-scoped unique) |
 | `sm_audit_log` | new central change log (longtext JSON snapshots) |
 

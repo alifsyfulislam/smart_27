@@ -4,7 +4,7 @@ Prompt templates an operator or agent can reuse against the running SSMS applica
 
 ## 1. Daily operations check
 > Verify SSMS health: confirm the server answers 200 on `/`, `/brand`, `/item`, `/item-batch`,
-> `/distributor`, `/distributor-store`, `/outlet`, `/category-type`, `/users`, `/roles`, `/permissions`,
+> `/distributor`, `/distributor-store`, `/client-visit-plan`, `/visit-plan`, `/rep-area`, `/supervisor-level`, `/rep`, `/level`, `/top-level`, `/outlet`, `/category-type`, `/users`, `/roles`, `/permissions`,
 > `/audit-log` after logging in with admin credentials. Report any non-200 response and the
 > new `sm_audit_log` rows since the last check.
 
@@ -41,6 +41,48 @@ Prompt templates an operator or agent can reuse against the running SSMS applica
 
 ## 8. Onboard an outlet
 > In the Outlet Info → Outlet module, create outlet `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an national structure
+> In the Fieldforce Info → National Structure module, create national structure `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an field structure
+> In the Fieldforce Info → Field Structure module, create field structure `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an employee master
+> In the Fieldforce Info → Employee Master module, create employee master `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an supervisor area
+> In the Fieldforce Info → Supervisor Area module, create supervisor area `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an psr area
+> In the Fieldforce Info → PSR Area module, create psr area `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an psr visit plan
+> In the Fieldforce Info → PSR Visit Plan module, create psr visit plan `<client_id>` named `<name>` under
+> distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
+> `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
+> names are resolved, and a CREATE row appears in `sm_audit_log`.
+
+## 8. Onboard an outlet visit plan
+> In the Fieldforce Info → Outlet Visit Plan module, create outlet visit plan `<client_id>` named `<name>` under
 > distributor `<depot_id>` and store `<store_id>`, with category `<category_id>`. Confirm
 > `customer_type` is auto-generated as `<category_id>|<category_name>`, distributor and store
 > names are resolved, and a CREATE row appears in `sm_audit_log`.

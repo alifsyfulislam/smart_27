@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit 25e4bc5 · Date: 2026-11-13 -->
+<!-- Synced with repo state at commit 84e6d8b · Date: 2026-11-14 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
@@ -74,11 +74,20 @@
 - **Searchable Select Component:** Focus or click on a searchable single select must display all options matching an empty search query rather than filtering out entries matching placeholder text.
 - **Hierarchy Cascade Auto-Hydration:** In Item edit, previously saved hierarchy levels (`company_id`, `brand_id`, `type_id`, `flavor_id`) must sequentially auto-hydrate from database values, ensuring stored associations are preserved and visible.
 
+### 3.5 Fieldforce Architecture & Invariants (BR14–BR20)
+- **National Structure (`sm_top_level`, BR14):** 4-tier tree: National (depth 0, prefix `H`) > Area (depth 1, prefix `A`) > Zone (depth 2, prefix `Z`) > Territory (depth 3, prefix `T`, leaf). Auto-codes (`H0001`, `A0001`, `Z0001`, `T0001`), lineage `level0..level3`, dynamic `is_leaf`.
+- **Field Structure (`sm_level`, BR15):** 4-tier market coverage tree: Territory (depth 0, prefix `T`, from `sm_top_level` depth 3) > Town (depth 1, prefix `TW`) > Route (depth 2, prefix `R`) > Beat (depth 3, prefix `B`, leaf). Auto-codes (`T0001`, `TW0001`, `R0000006`, `B0000033`), lineage `level0..level3`, depot linkage, dynamic `is_leaf`.
+- **Employee Master (`sm_rep`, BR16):** Dual user types: `rep` (PSR) and `sup` (Supervisor). Unique `(cid, rep_id)`. Immutable auto-incremental ID prefixed by designation: `HOS0001`, `SOM0001`, `ASM0001`, `ASE0001`, `CE0001`, `PSR0001`, `DM0001`.
+- **Supervisor Area Assignment (`sm_supervisor_level`, BR17):** Assigns supervisors (`user_type='sup'`) to any hierarchy node across National (`sm_top_level`) or Field (`sm_level`) structures (`sup_id`, `level_id`, `level_depth_no`).
+- **PSR Area Assignment & Cascading Beat Population (`sm_rep_area`, BR18):** PSR reps (`user_type='rep'`) assignable only to Route (`sm_level` depth 2). Saving resolves all active Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`.
+- **PSR Visit Plan (`sm_visit_plan`, BR19):** Auto-populated concurrently with `sm_rep_area` assignment. Maps Beat to `order_col_day` (Saturday..Friday); automatically derives `delivery_day` as the subsequent calendar day.
+- **Outlet Exceptional Visit Plan (`sm_client_visit_plan`, BR20):** Exceptional outlet scheduling by mapping `client_id` in `area_id` with visit frequency, weekly cycle (`w1`..`w5`), and weekday matrix (`sat`..`fri`).
+
 ---
 
 ## 4. Master Module Directory & Technical Specification
 
-SSMS currently registers **7 master data modules**, plus ACL and Audit engines:
+SSMS currently registers **14 master data modules**, plus ACL and Audit engines:
 
 | Module Slug | Title / Group | Database Table | Primary / Unique Keys | Permissions | Hooks (`app/hooks.py`) |
 |---|---|---|---|---|---|
@@ -89,6 +98,13 @@ SSMS currently registers **7 master data modules**, plus ACL and Audit engines:
 | `distributor-store` | Distributor Store / *Distributor Info* | `sm_depot_store` | `id`, (`cid`, `depot_id`, `store_id`) | `depot_store.{view,create,edit,delete,import}` | `depot_store_prepare` |
 | `outlet` | Outlet / *Outlet Info* | `sm_client` | `id`, (`cid`, `client_id`) | `outlet.{view,create,edit,delete,import}` | `outlet_prepare` |
 | `category-type` | Module Category / *Settings* | `sm_category_type` | `id`, (`cid`, `type_name`, `cat_type_id`) | `category_type.{view,create,edit,delete,import}` | `category_type_prepare` |
+| `top-level` | National Structure / *Fieldforce Info* | `sm_top_level` | `id`, (`cid`, `level_id`) | `top_level.{view,create,edit,delete,import}` | `top_level_prepare`, `_recompute_top_level_is_leaf` |
+| `level` | Field Structure / *Fieldforce Info* | `sm_level` | `id`, (`cid`, `level_id`) | `level.{view,create,edit,delete,import}` | `level_prepare`, `_recompute_level_is_leaf` |
+| `rep` | Employee Master / *Fieldforce Info* | `sm_rep` | `id`, (`cid`, `rep_id`) | `rep.{view,create,edit,delete,import}` | `rep_prepare` |
+| `supervisor-level` | Supervisor Area / *Fieldforce Info* | `sm_supervisor_level` | `id` | `supervisor_level.{view,create,edit,delete,import}` | `supervisor_level_prepare` |
+| `rep-area` | PSR Area / *Fieldforce Info* | `sm_rep_area` | `id` | `rep_area.{view,create,edit,delete,import}` | `rep_area_prepare`, `rep_area_after_create` |
+| `visit-plan` | PSR Visit Plan / *Fieldforce Info* | `sm_visit_plan` | `id` | `visit_plan.{view,create,edit,delete,import}` | `visit_plan_prepare` |
+| `client-visit-plan` | Outlet Visit Plan / *Fieldforce Info* | `sm_client_visit_plan` | `id` | `client_visit_plan.{view,create,edit,delete,import}` | `client_visit_plan_prepare` |
 | `acl` (screens) | Users, Roles, Permissions | `sm_acl_user`, `sm_acl_role`, `sm_acl_permission` | `user_id`, `role_id`, `perm_id` | `acl.view`, `acl.manage` | Handled in `app/routers/acl_admin.py` |
 | `audit-log` | Audit Log / *Records* | `sm_audit_log` | `id` | `audit.view` | Handled in `app/audit.py` |
 
@@ -177,10 +193,17 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 | **T-007** | **P3** | `api` | `ready` | REST API routes for planned Flutter mobile application. |
 | **T-008** | **P3** | `category_type` | `ready` | Backlog: Additional category type groups (town master, approval flags). |
 | **T-009** | **P3** | `core` | `ready` | Backlog: Automated test suite (pytest + httpx) for continuous verification. |
+| **T-013** | **P1** | `top_level` | `done` | Fieldforce: National Structure (`sm_top_level`) — 4-tier hierarchy National(H) > Area(A) > Zone(Z) > Territory(T) with lineage columns, auto-incremental codes, and leaf invariants (verified V-006). |
+| **T-014** | **P1** | `level` | `done` | Fieldforce: Field Structure (`sm_level`) — 4-tier hierarchy Territory(T) > Town(TW) > Route(R) > Beat(B) with depth 0 from top_level depth 3, auto-codes, and leaf invariants (verified V-006). |
+| **T-015** | **P1** | `rep` | `done` | Fieldforce: Employee Master (`sm_rep`) — dual user types (`rep`, `sup`), dynamic designation-based auto IDs (`HOS/SOM/ASM/ASE/CE/PSR/DM`), unique `(cid, rep_id)` (verified V-006). |
+| **T-016** | **P2** | `supervisor_level` | `done` | Fieldforce: Supervisor Area Assignment (`sm_supervisor_level`) — assigns supervisors to any National or Field hierarchy node (verified V-006). |
+| **T-017** | **P1** | `rep_area` | `done` | Fieldforce: PSR Area Assignment (`sm_rep_area`) — assigns PSR to Route and cascades all active Beats into `sm_rep_area` and `sm_visit_plan` (verified V-006). |
+| **T-018** | **P1** | `visit_plan` | `done` | Fieldforce: PSR Visit Plan (`sm_visit_plan`) — day-wise scheduling (`order_col_day` -> next-day `delivery_day`) (verified V-006). |
+| **T-019** | **P2** | `client_visit_plan` | `done` | Fieldforce: Outlet Exceptional Visit Plan (`sm_client_visit_plan`) — weekly (`w1..w5`) and weekday (`sat..fri`) visit schedule matrix (verified V-006). |
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-014)
+## 8. Architectural Decision Summary (D-001 to D-015)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -196,13 +219,14 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-012:** Filtered Excel Data Export with Hierarchy Synchronization (`GET /{slug}/export`, `/{slug}/download`) implemented as synchronous `def module_export` executed via threadpool, exporting styled sheets (`HIERARCHY_TREE`, `HIERARCHY_PATHS`, `ITEMS` with synced levels).
 - **D-013:** Compact High-Density Table Layout & Typeahead Multi-Select Filter Components: minimal table cell padding (5px 8px), tight card headers and search bars, zero-CDN vanilla JS/CSS multi-select dropdowns (`.ms-dropdown`) with real-time text search, multi-key/comma-separated query serialization, and SQL `IN (...)` filtering synchronized across list views, pagination, and Excel export.
 - **D-014:** Standardized `ID | Name` Dynamic Option Formatting & Sequential Hierarchy Hydration: Standardized dynamic dropdown options across master forms and filters to canonical `ID | Name` (e.g. `BG001 | Kurkure` instead of legacy dash ` — ` delimiters). Fixed searchable select component in `app.js` (`select[data-searchable]`) to display all valid options on focus/click without placeholder occlusion. Implemented asynchronous sequential cascade hydration loop (`0 -> company -> brand -> type -> flavor`) in `app/templates/generic/form.html` to auto-hydrate saved hierarchy selections from DB values during Edit without clearing child tiers. Corrected `form.html` select field disable logic from `s.name != 'status'` to `s.readonly_on_edit`, restoring editability for category and pack attributes.
+- **D-015:** Fieldforce Info Suite Architecture: 7 master modules (top-level, level, rep, supervisor-level, rep-area, visit-plan, client-visit-plan). Dynamic designations from `sm_category_type` (type_name='DESIGNATION'); immutable auto-incrementing `rep_id` (`HOS0001`, `PSR0001`); 4-tier lineage with auto-prefixes (`H/A/Z/T` and `T/TW/R/B`) and dynamic `is_leaf`; auto-cascading Beat associations and next-day visit plans from Route assignment in `sm_rep_area`; central audit logging and soft-delete (`status='PENDING'`) enforced across all 7 modules.
 
 ---
 
 ## 9. System Health & Audit Checkpoint
 
 - **Context Checker Status:** **PASS (15/15 checks clean)**.
+- **Active Master Modules:** 14 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
 - **Known Technical Debt / Pending Actions:**
-  1. Complete T-001 (Outlet documentation and memory backfill).
-  2. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore` (Step 15 from Phase 4).
-  3. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).
+  1. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore`.
+  2. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).

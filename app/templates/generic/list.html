@@ -88,7 +88,7 @@
   {% endif %}
 
   <div class="table-wrap">
-    {% if slug == 'brand' %}
+    {% if slug in ('brand', 'top-level', 'level') %}
     {% if tree %}
     <div class="tree">
       {% for node in tree recursive %}
@@ -101,7 +101,7 @@
              style="color:{{ '#2c7d13' if node['is_leaf'] == '1' else '#1877f2' }};flex:none"></i>
           <span class="tcode">{{ node['level_id'] }}</span>
           <span class="tname">{{ node['level_name'] }}</span>
-          <span class="tmeta">Parent: {{ node['parent_level_id'] }} &middot; Depth: {{ node['depth'] }}</span>
+          <span class="tmeta">Parent: {{ node['parent_level_id'] }} &middot; Depth: {{ node['depth'] }}{% if node.get('depot_name') %} &middot; Dist: {{ node['depot_name'] }}{% endif %}</span>
           <span class="badge {{ 'active' if node['status'] == 'ACTIVE' else 'inactive' }}">{{ node['status'] }}</span>
           <span class="tacts">
             {% if perms.get('view') %}
@@ -142,7 +142,7 @@
         {% for r in rows %}
         <tr>
           {% for cname, clabel in fcols %}
-          {% if slug == 'brand' and cname == 'level_name' %}
+          {% if slug in ('brand', 'top-level', 'level') and cname == 'level_name' %}
           <td><span class="hier-pad" style="padding-left:calc({{ r['depth'] or 0 }} * 22px)">
               <i class="fa-solid {{ 'fa-leaf is' if r['is_leaf'] == '1' else 'fa-folder' }}" style="color:{{ '#2c7d13' if r['is_leaf'] == '1' else '#1877f2' }}"></i>
               <b>{{ r[cname] }}</b></span></td>
@@ -182,7 +182,7 @@
     {% endif %}
   </div>
 
-  {% if slug == 'brand' %}
+  {% if slug in ('brand', 'top-level', 'level') %}
   <div class="pager">
     <span class="info">{{ total }} node(s) — full hierarchy tree</span>
     {% if perms.get('view') %}

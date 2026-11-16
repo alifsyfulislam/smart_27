@@ -34,6 +34,13 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Distributor | `/distributor` | auto default stores Commercial + Damage (BR5) |
 | Distributor Store | `/distributor-store` | store types from category master |
 | Outlet | `/outlet` | client_id uniqueness, auto customer_type, distributor & store linking |
+| National Structure | `/top-level` | client_id uniqueness, auto customer_type, distributor & store linking |
+| Field Structure | `/level` | client_id uniqueness, auto customer_type, distributor & store linking |
+| Employee Master | `/rep` | client_id uniqueness, auto customer_type, distributor & store linking |
+| Supervisor Area | `/supervisor-level` | client_id uniqueness, auto customer_type, distributor & store linking |
+| PSR Area | `/rep-area` | client_id uniqueness, auto customer_type, distributor & store linking |
+| PSR Visit Plan | `/visit-plan` | client_id uniqueness, auto customer_type, distributor & store linking |
+| Outlet Visit Plan | `/client-visit-plan` | client_id uniqueness, auto customer_type, distributor & store linking |
 | Category Type | `/category-type` | value definitions for other modules |
 | Users / Roles / Permissions | `/users` `/roles` `/permissions` | full ACL management |
 | Audit Log | `/audit-log` | app-written central change log with filters |
