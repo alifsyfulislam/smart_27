@@ -17,6 +17,7 @@
 --                          other tables for MariaDB 10.4 compatibility)
 --   * rack master        : sm_rack (Rack module under Item Info, T-029)
 --   * stock balance      : sm_depot_stock_balance (Distributor Info, T-030)
+--   * depot rack stock   : sm_depot_rack_stock_balance (Distributor Info, T-045)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS `smart_27`.`sm_item_hierarchy` (
@@ -703,5 +704,35 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_depot_stock_balance` (
   `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `UNQ_DEPOT_STORE_ITEM_BATCH` (`cid`, `depot_id`, `store_id`, `item_id`, `batch_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------
+-- Depot Rack Stock (sm_depot_rack_stock_balance): Distributor Info sub-module
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `smart_27`.`sm_depot_rack_stock_balance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT 'SMART',
+  `depot_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `depot_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `client_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `client_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rack_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rack_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rack_code` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rack_url` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'ACTIVE',
+  `d_r_condition` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `issue_date` date DEFAULT NULL,
+  `expiary_date` date DEFAULT NULL,
+  `field1` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `field2` int DEFAULT NULL,
+  `note` varchar(512) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `rack_list` (`cid`,`depot_id`,`client_id`),
+  KEY `cid_rack_code` (`rack_code`,`cid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 

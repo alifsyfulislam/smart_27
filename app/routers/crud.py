@@ -31,7 +31,7 @@ router = APIRouter()
 _GROUP_BY_MODULE = {
     "brand": "Item Info", "item": "Item Info", "item-batch": "Item Info", "rack": "Item Info",
     "distributor": "Distributor Info", "distributor-store": "Distributor Info",
-    "depot-stock-balance": "Distributor Info",
+    "depot-stock-balance": "Distributor Info", "depot-rack-stock-balance": "Distributor Info",
     "category-type": "Settings",
 }
 
@@ -116,6 +116,9 @@ def _access(request, slug, action):
     m = get(slug)
     if not m:
         return None, user, RedirectResponse("/", status_code=303)
+    if m.get("no_create") and action == "create":
+        set_flash(request, "danger", f"Creating is not allowed for {m['title']}.")
+        return None, user, RedirectResponse(f"/{slug}", status_code=303)
     if m.get("no_edit") and action == "edit":
         set_flash(request, "danger", f"Editing is not allowed for {m['title']}.")
         return None, user, RedirectResponse(f"/{slug}", status_code=303)
@@ -133,6 +136,7 @@ def _access(request, slug, action):
     context["perms"] = {
         a: (
             False if (
+                (a == "create" and m.get("no_create")) or
                 (a == "edit" and m.get("no_edit")) or
                 (a == "delete" and m.get("no_delete")) or
                 (a == "import" and m.get("no_import"))
@@ -223,10 +227,10 @@ def _build_tree(rows):
 
 
 def _cat_options(type_name):
-    return [(r["cat_type_id"], f"{r['cat_type_id']} | {r['cat_type_name']}" if r["cat_type_name"] else r["cat_type_id"])
+    return [(r["cat_type_id"], f"{r['cat_type_id']} | {r['cat_type_name']}" if r["cat_type_name"] and r["cat_type_name"] != r["cat_type_id"] else r["cat_type_id"])
             for r in q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
                           WHERE cid=%s AND type_name=%s AND status='ACTIVE'
-                          ORDER BY cat_type_id""", (config.CID, type_name))]
+                          ORDER BY id ASC""", (config.CID, type_name))]
 
 
 def _brand_opts_from_hierarchy():
@@ -254,6 +258,14 @@ def _depot_options():
                           ORDER BY depot_id""", (config.CID,))]
 
 
+def _item_options():
+    """Item filter options — ACTIVE items."""
+    return [(r["item_id"], f"{r['item_id']} | {r['name']}" if r["name"] else r["item_id"])
+            for r in q("""SELECT item_id, name FROM sm_item
+                          WHERE cid=%s AND status='ACTIVE'
+                          ORDER BY item_id""", (config.CID,))]
+
+
 def _filter_options(m):
     out = []
     for f in m["filters"]:
@@ -266,6 +278,8 @@ def _filter_options(m):
             opts = _brand_opts_from_items()
         elif kind == "depot":
             opts = _depot_options()
+        elif kind == "item":
+            opts = _item_options()
         else:
             opts = STATUS_OPTIONS
         out.append({"name": name, "label": label, "options": opts})
@@ -279,7 +293,7 @@ def _select_opts_for(slug):
         item_opts = q("""SELECT item_id, name, brand_name FROM sm_item
                          WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 300""",
                       (config.CID,))
-    if slug in ("distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+    if slug in ("distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
         depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
                           ORDER BY name LIMIT 300""", (config.CID,))
     return item_opts, depot_opts
@@ -288,7 +302,7 @@ def _select_opts_for(slug):
 def _record_key(m, row):
     key_map = {
         "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
-        "rack": "rack_id", "depot-stock-balance": "id",
+        "rack": "rack_id", "depot-stock-balance": "id", "depot-rack-stock-balance": "id",
         "top-level": "level_id", "level": "level_id", "rep": "rep_id",
         "supervisor-level": "id", "rep-area": "id", "visit-plan": "id",
         "client-visit-plan": "id",
@@ -301,7 +315,7 @@ def _record_key(m, row):
 def key_col_of(m):
     return {
         "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
-        "rack": "rack_id", "depot_stock_balance": "id",
+        "rack": "rack_id", "depot_stock_balance": "id", "depot_rack_stock_balance": "id",
         "top_level": "level_id", "level": "level_id", "rep": "rep_id",
         "supervisor_level": "id", "rep_area": "id", "visit_plan": "id",
         "client_visit_plan": "id",
@@ -412,7 +426,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         tree = _build_tree(rows)
     item_opts = None
     depot_opts = None
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
         item_opts, depot_opts = _select_opts_for(slug)
     item_opts = item_opts or []
     depot_opts = depot_opts or []
@@ -446,8 +460,10 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
 
     slug = PERM2SLUG.get(m["perm"], m["perm"])
     if slug == "supervisor-level":
-        field_opts["sup_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
-                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='sup' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        field_opts["sup_id"] = [("", "-- Select Supervisor --")] + [
+            (r["rep_id"], f"{r['rep_id']} | {r['name']}")
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='sup' AND status='ACTIVE' ORDER BY name", (config.CID,))
+        ]
         max_top = q("SELECT COALESCE(MAX(depth), 3) as max_d FROM sm_top_level WHERE cid=%s", (config.CID,), one=True)
         max_top_depth = int(max_top["max_d"]) if max_top and max_top.get("max_d") is not None else 3
 
@@ -496,11 +512,27 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
     elif slug == "visit-plan":
         field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
                                  for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='rep' AND status='ACTIVE' ORDER BY name", (config.CID,))]
-        field_opts["area_id"] = [(r["level_id"], f"{r['level_id']} | {r['level_name']}")
-                                 for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=3 AND status='ACTIVE' ORDER BY level_id", (config.CID,))]
-        field_opts["delivery_man_id"] = [("", "-- None --")] + [
+        
+        fld_rows = q("""SELECT level_id, level_name, depth, parent_level_id, parent_level_name, depot_id, depot_name 
+                        FROM sm_level 
+                        WHERE cid=%s AND depth IN (2, 3) AND status='ACTIVE' 
+                        ORDER BY depth, level_id""", (config.CID,))
+        opts = []
+        for r in fld_rows:
+            d = int(r.get("depth") or 0)
+            if d == 2:
+                depot_suffix = f" (Depot: {r['depot_name']})" if r.get("depot_name") and r["depot_name"] != "-" else ""
+                label = f"[Route] {r['level_id']} | {r['level_name']}{depot_suffix}"
+                opts.append((r["level_id"], label, "tier_route", 2, "Route (Depth 2)"))
+            elif d == 3:
+                parent_suffix = f" (Route: {r['parent_level_id']} - {r['parent_level_name']})" if r.get("parent_level_name") else f" (Route: {r['parent_level_id']})"
+                label = f"[Beat] {r['level_id']} | {r['level_name']}{parent_suffix}"
+                opts.append((r["level_id"], label, "tier_beat", 3, "Beat (Depth 3)"))
+        field_opts["area_id"] = opts
+
+        field_opts["delivery_man_id"] = [("", "-- Select Delivery Man --")] + [
             (r["rep_id"], f"{r['rep_id']} | {r['name']}")
-            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND designation_id='DM' AND status='ACTIVE' ORDER BY name", (config.CID,))
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='dm' OR designation_id='DM') AND status='ACTIVE' ORDER BY name", (config.CID,))
         ]
 
     elif slug == "client-visit-plan":
@@ -550,7 +582,7 @@ async def module_create_form(request: Request, slug: str):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
         item_opts, depot_opts = _select_opts_for(slug)
     if slug == "category-type":
         context["type_names"] = [r["type_name"] for r in
@@ -610,7 +642,7 @@ async def module_create(request: Request, slug: str):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -665,7 +697,7 @@ async def module_edit_form(request: Request, slug: str, rid: int):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
@@ -709,7 +741,7 @@ async def module_edit(request: Request, slug: str, rid: int):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(

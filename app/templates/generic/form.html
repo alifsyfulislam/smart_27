@@ -15,7 +15,9 @@
     <form method="post" {% if has_image %}enctype="multipart/form-data"{% endif %} action="{{ '/%s/create' % slug if a == 'Create' else ('/%s/edit/%s' % (slug, row['id']) if a == 'Edit' else '#') }}">
       <div class="form-grid">
         {% for s in m.form_fields %}
-          {% if a == 'Create' and s.hide_on_create %}
+          {% if s.in_form is defined and not s.in_form and (a != 'View' or s.name in ('town_id', 'name')) %}
+            {# skip fields marked not in form #}
+          {% elif a == 'Create' and s.hide_on_create %}
             <input type="hidden" name="{{ s.name }}" id="f-{{ s.name }}" value="">
           {% elif s.type == 'hier_root_select' %}
           <div class="field">
@@ -170,64 +172,100 @@
               {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
             {% endif %}
           </div>
-          {% elif slug == 'supervisor-level' and s.name == 'level_id' %}
-          <div class="field" id="field-wrap-hierarchy_tier">
-            <label>Hierarchy Tier Filter</label>
-            {% if a == 'View' %}
-              <div>{{ 'Depth ' ~ data.get('level_depth_no') if data.get('level_depth_no') is not none else '—' }}</div>
+          {% elif s.type == 'select' %}
+            {% if slug == 'supervisor-level' and s.name == 'level_id' %}
+            <div class="field" id="field-wrap-hierarchy_tier">
+              <label>Hierarchy Tier Filter</label>
+              {% if a == 'View' %}
+                <div>{{ 'Depth ' ~ data.get('level_depth_no') if data.get('level_depth_no') is not none else '—' }}</div>
+              {% else %}
+                <select id="f-hierarchy_tier">
+                  <option value="">-- All Hierarchy Tiers --</option>
+                  <optgroup label="National Structure">
+                    <option value="tier_top_0">National / Head (Depth 0)</option>
+                    <option value="tier_top_1">Area (Depth 1)</option>
+                    <option value="tier_top_2">Zone (Depth 2)</option>
+                    <option value="tier_top_3">Territory (Depth 3)</option>
+                  </optgroup>
+                  <optgroup label="Field Structure">
+                    <option value="tier_fld_1">Town (Depth 4)</option>
+                    <option value="tier_fld_2">Route (Depth 5)</option>
+                    <option value="tier_fld_3">Beat (Depth 6)</option>
+                  </optgroup>
+                </select>
+                <div class="hint">Select a tier to narrow down the Hierarchy Level list below.</div>
+              {% endif %}
+            </div>
+            <div class="field" id="field-wrap-level_id">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}
+                <div>{{ data.get('level_id') }} — {{ data.get('level_name') or '' }} (Depth: {{ data.get('level_depth_no') }})</div>
+              {% else %}
+                <select name="level_id" id="f-level_id" required
+                        data-searchable data-search-placeholder="Type to search Hierarchy Level (ID / Name)…">
+                  <option value="">-- Select Hierarchy Level --</option>
+                  {% for o in (field_opts.get('level_id') or []) %}
+                  <option value="{{ o[0] }}"
+                          data-tier="{{ o[2] if o|length > 2 else '' }}"
+                          data-depth="{{ o[3] if o|length > 3 else '' }}"
+                          data-depth-label="{{ o[4] if o|length > 4 else '' }}"
+                          {{ 'selected' if (data.get('level_id')|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
+                  {% endfor %}
+                </select>
+                <div id="sup-level-depth-badge" class="hint" style="margin-top: 4px; font-weight: 600; color: #1e40af;"></div>
+                {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+              {% endif %}
+            </div>
+            {% elif slug == 'visit-plan' and s.name == 'area_id' %}
+            <div class="field" id="field-wrap-visit_plan_tier">
+              <label>Hierarchy Level Tier Filter</label>
+              {% if a == 'View' %}
+                <div>{{ 'Beat' if (data.get('area_id') or '').startswith('B') else ('Route' if (data.get('area_id') or '').startswith('R') else '—') }}</div>
+              {% else %}
+                <select id="f-visit_plan_tier">
+                  <option value="">-- All (Routes & Beats) --</option>
+                  <option value="tier_route">Route (Depth 2)</option>
+                  <option value="tier_beat">Beat (Depth 3)</option>
+                </select>
+                <div class="hint">Filter hierarchy levels between Routes and Beats.</div>
+              {% endif %}
+            </div>
+            <div class="field" id="field-wrap-area_id">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}
+                <div>{{ data.get('area_id') }} — {{ data.get('area_name') or '' }}</div>
+              {% else %}
+                <select name="area_id" id="f-area_id" required
+                        data-searchable data-search-placeholder="Type to search Route or Beat (ID / Name / Parent)…">
+                  <option value="">-- Select Route / Beat --</option>
+                  {% for o in (field_opts.get('area_id') or []) %}
+                  <option value="{{ o[0] }}"
+                          data-tier="{{ o[2] if o|length > 2 else '' }}"
+                          data-depth="{{ o[3] if o|length > 3 else '' }}"
+                          data-depth-label="{{ o[4] if o|length > 4 else '' }}"
+                          {{ 'selected' if (data.get('area_id')|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
+                  {% endfor %}
+                </select>
+                <div id="visit-plan-level-badge" class="hint" style="margin-top: 4px; font-weight: 600; color: #1e40af;"></div>
+                {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+              {% endif %}
+            </div>
             {% else %}
-              <select id="f-hierarchy_tier">
-                <option value="">-- All Hierarchy Tiers --</option>
-                <optgroup label="National Structure">
-                  <option value="tier_top_0">National / Head (Depth 0)</option>
-                  <option value="tier_top_1">Area (Depth 1)</option>
-                  <option value="tier_top_2">Zone (Depth 2)</option>
-                  <option value="tier_top_3">Territory (Depth 3)</option>
-                </optgroup>
-                <optgroup label="Field Structure">
-                  <option value="tier_fld_1">Town (Depth 4)</option>
-                  <option value="tier_fld_2">Route (Depth 5)</option>
-                  <option value="tier_fld_3">Beat (Depth 6)</option>
-                </optgroup>
-              </select>
-              <div class="hint">Select a tier to narrow down the Hierarchy Level list below.</div>
-            {% endif %}
-          </div>
-          <div class="field" id="field-wrap-level_id">
-            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}
-              <div>{{ data.get('level_id') }} — {{ data.get('level_name') or '' }} (Depth: {{ data.get('level_depth_no') }})</div>
-            {% else %}
-              <select name="level_id" id="f-level_id" required
-                      data-searchable data-search-placeholder="Type to search Hierarchy Level (ID / Name)…">
-                <option value="">-- Select Hierarchy Level --</option>
-                {% for o in (field_opts.get('level_id') or []) %}
-                <option value="{{ o[0] }}"
-                        data-tier="{{ o[2] if o|length > 2 else '' }}"
-                        data-depth="{{ o[3] if o|length > 3 else '' }}"
-                        data-depth-label="{{ o[4] if o|length > 4 else '' }}"
-                        {{ 'selected' if (data.get('level_id')|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
+            <div class="field">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
+              {% else %}
+              <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
+                      {% if s.searchable %}data-searchable data-search-placeholder="{{ s.placeholder or ('Type to search ' ~ s.label ~ '…') }}"{% endif %}>
+                {% for o in (field_opts.get(s.name) or s.options or []) %}
+                <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
                 {% endfor %}
               </select>
-              <div id="sup-level-depth-badge" class="hint" style="margin-top: 4px; font-weight: 600; color: #1e40af;"></div>
+              {% if a == 'Edit' and s.readonly_on_edit %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
+              {% endif %}
               {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+            </div>
             {% endif %}
-          </div>
-          {% elif s.type == 'select' %}
-          <div class="field">
-            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
-            {% else %}
-            <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
-                    {% if s.searchable %}data-searchable data-search-placeholder="Type to search {{ s.label }}…"{% endif %}>
-              {% for o in (field_opts.get(s.name) or s.options or []) %}
-              <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
-              {% endfor %}
-            </select>
-            {% if a == 'Edit' and s.readonly_on_edit %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
-            {% endif %}
-            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
-          </div>
           {% elif s.type == 'textarea' %}
           <div class="field full">
             <label>{{ s.label }}</label>
@@ -711,7 +749,7 @@
             if (terrSel && nameInp.value === terrSel.value) nameInp.value = "";
           }
           if (depotWrap) depotWrap.style.display = "block";
-          if (hint) hint.textContent = "Town name (prefix TW will be auto-assigned). Assign distributor here.";
+          if (hint) hint.textContent = "Town name (prefix TW will be auto-assigned).";
         } else {
           // Parent is Town (depth 1) or Route (depth 2) -> New node is Route (depth 2) or Beat (depth 3)
           if (terrWrap) terrWrap.style.display = "none";
@@ -728,7 +766,7 @@
               ds.dispatchEvent(new Event("ssms-refresh"));
             }
           }
-          if (hint) hint.textContent = (depth === 1 ? "Route" : "Beat") + " name (distributor will be auto-inherited from parent Town).";
+          if (hint) hint.textContent = (depth === 1 ? "Route" : "Beat") + " name.";
         }
       }
 
@@ -918,6 +956,76 @@
 
       levelSelect.addEventListener("change", updateDepthBadge);
       updateDepthBadge();
+    })();
+    {% endif %}
+    {% if slug == 'visit-plan' %}
+    // visit-plan: hierarchy level tier filter (Route / Beat) + badge
+    (function () {
+      var tierSelect = document.getElementById("f-visit_plan_tier");
+      var areaSelect = document.getElementById("f-area_id");
+      var badge = document.getElementById("visit-plan-level-badge");
+      if (!areaSelect) return;
+
+      var masterOpts = Array.from(areaSelect.options);
+
+      function updateBadge() {
+        if (!badge) return;
+        var selectedOpt = areaSelect.options[areaSelect.selectedIndex];
+        if (selectedOpt && selectedOpt.value && selectedOpt.dataset.depthLabel) {
+          badge.textContent = "Selected: " + selectedOpt.dataset.depthLabel;
+        } else {
+          badge.textContent = "";
+        }
+      }
+
+      function filterByTier(tier) {
+        var currentVal = areaSelect.value;
+        areaSelect.innerHTML = "";
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        if (tier && tierSelect && tierSelect.selectedIndex >= 0) {
+          placeholder.textContent = "-- Select Level in " + tierSelect.options[tierSelect.selectedIndex].text + " --";
+        } else {
+          placeholder.textContent = "-- Select Route / Beat --";
+        }
+        areaSelect.appendChild(placeholder);
+
+        masterOpts.forEach(function (o) {
+          if (!o.value) return;
+          if (!tier || o.dataset.tier === tier) {
+            areaSelect.appendChild(o.cloneNode(true));
+          }
+        });
+
+        if (currentVal && areaSelect.querySelector('option[value="' + currentVal + '"]')) {
+          areaSelect.value = currentVal;
+        } else {
+          areaSelect.value = "";
+        }
+
+        areaSelect.dispatchEvent(new Event("ssms-refresh"));
+        updateBadge();
+      }
+
+      if (tierSelect) {
+        tierSelect.addEventListener("change", function () {
+          filterByTier(tierSelect.value);
+        });
+
+        var initialVal = "{{ data.get('area_id') or '' }}";
+        if (initialVal) {
+          var matchingOpt = masterOpts.find(function (o) { return o.value === initialVal; });
+          if (matchingOpt && matchingOpt.dataset.tier) {
+            tierSelect.value = matchingOpt.dataset.tier;
+            filterByTier(matchingOpt.dataset.tier);
+            areaSelect.value = initialVal;
+            areaSelect.dispatchEvent(new Event("ssms-refresh"));
+          }
+        }
+      }
+
+      areaSelect.addEventListener("change", updateBadge);
+      updateBadge();
     })();
     {% endif %}
   </script>

@@ -8,7 +8,7 @@
     {% if perms.get('import') %}
       <a class="btn" href="/{{ slug }}/template"><i class="fa-solid fa-file-excel"></i> Download Template</a>
     {% endif %}
-    {% if perms.get('create') %}
+    {% if perms.get('create') and not m.get('no_create') %}
       <a class="btn btn-green" href="/{{ slug }}/create"><i class="fa-solid fa-plus"></i> Create</a>
     {% endif %}
   </div>

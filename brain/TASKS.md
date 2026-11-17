@@ -11,6 +11,10 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-044 | done | level, rep, visit-plan | - | P1 | 2026-11-18 | Field Structure: remove Distributor in Town form; Employee: rename title to Employee and remove Distributor from form; PSR Visit Plan: remove Distributor from form (V-025, D-039)
+- T-043 | done | depot-stock-balance, item, item-batch, distributor, distributor-store | - | P1 | 2026-11-18 | Auto-provision sm_depot_stock_balance (qty=0, block_qty=0) on 4 triggers (item, batch, depot, store); remove create permission (81->80 seeded perms); add All Item filter on list (V-024, D-038)
+- T-042 | done | visit-plan, supervisor-level, item-batch, distributor | - | P1 | 2026-11-18 | Distributor option and WEEK_DAYS order collection day in visit-plan; auto-calculated delivery day (Thu/Fri->Sat); custom search placeholders; removed order day filter; redundant fields hidden in item-batch (Name) and distributor (Town ID); label renamed to Town (V-023, D-037)
+- T-041 | done | visit-plan | - | P1 | 2026-11-18 | PSR Visit Plan Route/Beat hierarchy tier filter, sidebar consolidation (hiding rep-area), and full lifecycle auto-synchronization to sm_rep_area (V-022, D-036)
 - T-040 | done | supervisor-level | - | P1 | 2026-11-17 | Supervisor Area Hierarchy Tier Filter & searchable dropdown on create/edit and unified level_depth_no calculation (V-021, D-035)
 - T-039 | done | rep | T-038 | P1 | 2026-11-17 | Employee create rep_id hidden and rep_username unique on (cid, rep_username) added across form, list, hooks, ddl, and DB (V-020, D-034)
 - T-038 | done | rep | T-037 | P1 | 2026-11-17 | Employee dob and doj non-mandatory across create, edit, and Excel import (V-019, D-033)

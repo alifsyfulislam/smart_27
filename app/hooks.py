@@ -12,7 +12,7 @@ FIELD_LEVEL_PREFIX = {0: "T", 1: "TW", 2: "R", 3: "B"}
 
 NEXT_DAY = {
     "Saturday": "Sunday", "Sunday": "Monday", "Monday": "Tuesday",
-    "Tuesday": "Wednesday", "Wednesday": "Thursday", "Thursday": "Friday",
+    "Tuesday": "Wednesday", "Wednesday": "Thursday", "Thursday": "Saturday",
     "Friday": "Saturday",
 }
 
@@ -232,20 +232,26 @@ def item_after_create(cid, row, user=None):
     """Every item automatically gets a default batch: batch_id '1',
     expiary_date 2100-12-31 (per requirements). The batch mirrors the
     item's own status.
-    Auto-provisions sm_depot_stock_balance rows across all stores with qty 0."""
+    Auto-provisions sm_depot_stock_balance rows across:
+    particular item * all its item_batches * all depot * all depot_store with qty 0."""
     user = user or "SYSTEM"
     x("""INSERT INTO sm_item_batch
          (cid, item_id, name, batch_id, expiary_date, status, note, created_on, created_by)
          VALUES (%s,%s,%s,'1','2100-12-31',%s,'Default batch (auto)',NOW(),%s)
          ON DUPLICATE KEY UPDATE name=VALUES(name)""",
       (cid, row["item_id"], row["name"], (row.get("status") or "ACTIVE"), user))
-    # Auto-provision stock rows across all stores
+    # Auto-provision stock rows: particular item * all its item_batches * all depot * all depot_store
+    batches = q("SELECT batch_id, expiary_date FROM sm_item_batch WHERE cid=%s AND item_id=%s", (cid, row["item_id"]))
+    if not batches:
+        batches = [{"batch_id": "1", "expiary_date": "2100-12-31"}]
     stores = q("SELECT depot_id, store_id, store_name FROM sm_depot_store WHERE cid=%s", (cid,))
     for st in stores:
-        x("""INSERT IGNORE INTO sm_depot_stock_balance
-             (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
-             VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
-          (cid, st["depot_id"], st["store_id"], st.get("store_name", "-"), row["item_id"], user))
+        for b in batches:
+            exp = str(b.get("expiary_date") or "2100-12-31")
+            x("""INSERT IGNORE INTO sm_depot_stock_balance
+                 (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,0,0,NOW(),%s)""",
+              (cid, st["depot_id"], st["store_id"], st.get("store_name", "-"), row["item_id"], b["batch_id"], exp, user))
 
 
 def _cascade_item_status(cid, item_id, status, user=None):
@@ -296,8 +302,7 @@ def item_batch_prepare(cid, data, existing=None, user=None):
     item = q("SELECT name FROM sm_item WHERE cid=%s AND item_id=%s", (cid, item_id), one=True)
     if not item:
         return f"Item '{item_id}' not found."
-    if not (data.get("name") or "").strip():
-        data["name"] = item["name"] or "-"
+    data["name"] = item["name"] or "-"
     exp = data.get("expiary_date")
     if not exp:
         return "Expiry date is required."
@@ -309,6 +314,24 @@ def item_batch_prepare(cid, data, existing=None, user=None):
     if q(dup_sql, dup_params, one=True):
         return "This batch already exists for the item."
     return None
+
+
+def item_batch_after_create(cid, row, user=None):
+    """When a new batch is created:
+    particular item * particular item_batch * all depot * all depot_store
+    Insert rows into sm_depot_stock_balance with qty=0, block_qty=0."""
+    user = user or "SYSTEM"
+    item_id = row.get("item_id")
+    batch_id = row.get("batch_id")
+    exp = str(row.get("expiary_date") or "2100-12-31")
+    if not item_id or not batch_id:
+        return
+    stores = q("SELECT depot_id, store_id, store_name FROM sm_depot_store WHERE cid=%s", (cid,))
+    for st in stores:
+        x("""INSERT IGNORE INTO sm_depot_stock_balance
+             (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
+             VALUES (%s,%s,%s,%s,%s,%s,%s,0,0,NOW(),%s)""",
+          (cid, st["depot_id"], st["store_id"], st.get("store_name", "-"), item_id, batch_id, exp, user))
 
 
 # ----------------------------------------------------------------- rack
@@ -404,7 +427,8 @@ def depot_restore(cid, rid, user=None):
 def depot_after_create(cid, row, user=None):
     """Every distributor automatically gets two default stores:
        {depot_id}140 -> Commercial, {depot_id}170 -> Damage (per requirements).
-       Auto-provisions sm_depot_stock_balance rows across default stores * all items with qty 0."""
+       Auto-provisions sm_depot_stock_balance rows across:
+       particular depot * all its depot_stores * all item * all item_batch with qty 0."""
     user = user or "SYSTEM"
     pairs = [(f"{row['depot_id']}140", "Commercial", "COMMERCIAL"),
              (f"{row['depot_id']}170", "Damage", "DAMAGE")]
@@ -414,14 +438,18 @@ def depot_after_create(cid, row, user=None):
              VALUES (%s,%s,%s,%s,%s,'ACTIVE','Default store (auto)',NOW(),%s)
              ON DUPLICATE KEY UPDATE store_name=VALUES(store_name)""",
           (cid, row["depot_id"], store_id, store_name[:100], store_type, user))
-    # Auto-provision stock rows across default stores * all items
-    items = q("SELECT item_id FROM sm_item WHERE cid=%s", (cid,))
-    for store_id, store_name, _ in pairs:
-        for it in items:
+    # Auto-provision stock rows across particular depot * all its depot_stores * all item * all item_batch
+    stores = q("SELECT store_id, store_name FROM sm_depot_store WHERE cid=%s AND depot_id=%s", (cid, row["depot_id"]))
+    if not stores:
+        stores = [{"store_id": s[0], "store_name": s[1]} for s in pairs]
+    batches = q("SELECT item_id, batch_id, expiary_date FROM sm_item_batch WHERE cid=%s", (cid,))
+    for st in stores:
+        for b in batches:
+            exp = str(b.get("expiary_date") or "2100-12-31")
             x("""INSERT IGNORE INTO sm_depot_stock_balance
                  (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
-                 VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
-              (cid, row["depot_id"], store_id, store_name, it["item_id"], user))
+                 VALUES (%s,%s,%s,%s,%s,%s,%s,0,0,NOW(),%s)""",
+              (cid, row["depot_id"], st["store_id"], st.get("store_name", "-"), b["item_id"], b["batch_id"], exp, user))
 
 
 # ----------------------------------------------------------------- store
@@ -446,15 +474,17 @@ def depot_store_prepare(cid, data, existing=None, user=None):
 
 
 def depot_store_after_create(cid, row, user=None):
-    """When a new distributor store is created, auto-provisions sm_depot_stock_balance
-    rows for that store * all items with quantity 0, block_qty 0."""
+    """When a new distributor store is created:
+    particular depot * particular depot_store * item * item_batch
+    auto-provisions sm_depot_stock_balance rows with quantity 0, block_qty 0."""
     user = user or "SYSTEM"
-    items = q("SELECT item_id FROM sm_item WHERE cid=%s", (cid,))
-    for it in items:
+    batches = q("SELECT item_id, batch_id, expiary_date FROM sm_item_batch WHERE cid=%s", (cid,))
+    for b in batches:
+        exp = str(b.get("expiary_date") or "2100-12-31")
         x("""INSERT IGNORE INTO sm_depot_stock_balance
              (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
-             VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
-          (cid, row["depot_id"], row["store_id"], row.get("store_name", "-"), it["item_id"], user))
+             VALUES (%s,%s,%s,%s,%s,%s,%s,0,0,NOW(),%s)""",
+          (cid, row["depot_id"], row["store_id"], row.get("store_name", "-"), b["item_id"], b["batch_id"], exp, user))
 
 
 # ----------------------------------------------------------------- stock balance
@@ -497,6 +527,11 @@ def depot_stock_balance_prepare(cid, data, existing=None, user=None):
     except (TypeError, ValueError):
         data["block_qty"] = 0
 
+    return None
+
+
+# ----------------------------------------------------------------- depot rack stock balance
+def depot_rack_stock_balance_prepare(cid, data, existing=None, user=None):
     return None
 
 
@@ -789,14 +824,18 @@ def level_prepare(cid, data, existing=None, user=None):
                     (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
             if dup:
                 return "A field level with this name already exists under the same parent."
-            depot_id = (data.get("depot_id") or "").strip()
-            if depot_id and depot_id != "-":
-                depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
-                data["depot_id"] = depot_id
-                data["depot_name"] = (depot["name"] if depot else "-") or "-"
+            if existing and "depot_id" not in data:
+                data["depot_id"] = existing.get("depot_id") or "-"
+                data["depot_name"] = existing.get("depot_name") or "-"
             else:
-                data["depot_id"] = "-"
-                data["depot_name"] = "-"
+                depot_id = (data.get("depot_id") or "").strip()
+                if depot_id and depot_id != "-":
+                    depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+                    data["depot_id"] = depot_id
+                    data["depot_name"] = (depot["name"] if depot else "-") or "-"
+                else:
+                    data["depot_id"] = existing.get("depot_id") or "-" if existing else "-"
+                    data["depot_name"] = existing.get("depot_name") or "-" if existing else "-"
             return None
         else:
             # Editing Route (depth 2) or Beat (depth 3): keep inherited distributor
@@ -1053,14 +1092,18 @@ def rep_prepare(cid, data, existing=None, user=None):
     doj = doj.split()[0].strip() if " " in doj else doj
     data["doj"] = doj if doj and doj != "-" else None
 
-    depot_id = (data.get("depot_id") or "").strip()
-    if depot_id and depot_id != "-":
-        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
-        data["depot_id"] = depot_id
-        data["depot_name"] = (depot["name"] if depot else "-") or "-"
+    if existing and "depot_id" not in data:
+        data["depot_id"] = existing.get("depot_id") or "-"
+        data["depot_name"] = existing.get("depot_name") or "-"
     else:
-        data["depot_id"] = "-"
-        data["depot_name"] = "-"
+        depot_id = (data.get("depot_id") or "").strip()
+        if depot_id and depot_id != "-":
+            depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+            data["depot_id"] = depot_id
+            data["depot_name"] = (depot["name"] if depot else "-") or "-"
+        else:
+            data["depot_id"] = existing.get("depot_id") or "-" if existing else "-"
+            data["depot_name"] = existing.get("depot_name") or "-" if existing else "-"
 
     if existing is not None:
         data["rep_id"] = existing["rep_id"]
@@ -1223,6 +1266,51 @@ def rep_area_after_create(cid, row, user=None):
 
 
 # ------------------------------------------------------------- visit_plan (PSR Visit Plan)
+def _sync_visit_plan_to_rep_area(cid, rep_id, area_id, status="ACTIVE", note="-", user=None,
+                                 override_depot_id=None, override_depot_name=None):
+    """Synchronize visit plan rep and route/beat into sm_rep_area."""
+    if not rep_id or not area_id:
+        return
+    rep = q("SELECT rep_id, name, user_type FROM sm_rep WHERE cid=%s AND rep_id=%s", (cid, rep_id), one=True)
+    if not rep:
+        return
+    rep_name = rep.get("name") or "-"
+    rep_cat = rep.get("user_type") or "rep"
+
+    area = q("SELECT level_id, level_name, depth, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s",
+             (cid, area_id), one=True)
+    if not area:
+        return
+    depth = int(area.get("depth") or 0)
+
+    area_depot_id = override_depot_id if (override_depot_id and override_depot_id != "-") else (area.get("depot_id") or "-")
+    area_depot_name = override_depot_name if (override_depot_name and override_depot_name != "-") else (area.get("depot_name") or "-")
+
+    targets = [(area["level_id"], area["level_name"], area_depot_id, area_depot_name)]
+    if depth == 2:  # Route: also cascade child beats
+        beats = q("""SELECT level_id, level_name, depot_id, depot_name 
+                     FROM sm_level 
+                     WHERE cid=%s AND parent_level_id=%s AND depth=3 AND status='ACTIVE'""",
+                  (cid, area_id))
+        for b in beats:
+            b_depot_id = override_depot_id if (override_depot_id and override_depot_id != "-") else (b.get("depot_id") or area_depot_id)
+            b_depot_name = override_depot_name if (override_depot_name and override_depot_name != "-") else (b.get("depot_name") or area_depot_name)
+            targets.append((b["level_id"], b["level_name"], b_depot_id, b_depot_name))
+
+    for target_id, target_name, depot_id, depot_name in targets:
+        exists = q("SELECT id, status FROM sm_rep_area WHERE cid=%s AND rep_id=%s AND area_id=%s",
+                   (cid, rep_id, target_id), one=True)
+        if not exists:
+            x("""INSERT INTO sm_rep_area (cid, rep_id, rep_name, rep_category, area_id, area_name, depot_id, depot_name, status, note, created_on, created_by)
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)""",
+              (cid, rep_id, rep_name, rep_cat, target_id, target_name, depot_id, depot_name, status, note or "-", user))
+        else:
+            x("""UPDATE sm_rep_area 
+                 SET status=%s, rep_name=%s, area_name=%s, depot_id=%s, depot_name=%s, note=%s, updated_on=NOW(), updated_by=%s 
+                 WHERE id=%s""",
+              (status, rep_name, target_name, depot_id, depot_name, note or "-", user, exists["id"]))
+
+
 def visit_plan_prepare(cid, data, existing=None, user=None):
     rep_id = (data.get("rep_id") or "").strip()
     if not rep_id:
@@ -1236,15 +1324,28 @@ def visit_plan_prepare(cid, data, existing=None, user=None):
 
     area_id = (data.get("area_id") or "").strip()
     if not area_id:
-        return "Area (Beat) is required."
-    area = q("SELECT level_id, level_name, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
+        return "Hierarchy Level ID (Route or Beat) is required."
+    area = q("SELECT level_id, level_name, depth, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
              (cid, area_id), one=True)
-    if not area:
-        return f"Beat '{area_id}' not found in Field Structure."
+    if not area or int(area.get("depth") or 0) not in (2, 3):
+        return f"Hierarchy level '{area_id}' must be an active Route (depth 2) or Beat (depth 3) in Field Structure."
     data["area_id"] = area["level_id"]
     data["area_name"] = area["level_name"]
-    data["depot_id"] = (area.get("depot_id") or "-") or "-"
-    data["depot_name"] = (area.get("depot_name") or "-") or "-"
+    user_depot = (data.get("depot_id") or "").strip()
+    if user_depot and user_depot != "-":
+        depot = q("SELECT depot_id, name FROM sm_depot WHERE cid=%s AND depot_id=%s AND status='ACTIVE'", (cid, user_depot), one=True)
+        if depot:
+            data["depot_id"] = depot["depot_id"]
+            data["depot_name"] = depot["name"]
+        else:
+            data["depot_id"] = user_depot
+            data["depot_name"] = user_depot
+    elif existing and existing.get("depot_id") and existing.get("depot_id") != "-":
+        data["depot_id"] = existing["depot_id"]
+        data["depot_name"] = existing.get("depot_name") or "-"
+    else:
+        data["depot_id"] = (area.get("depot_id") or "-") or "-"
+        data["depot_name"] = (area.get("depot_name") or "-") or "-"
 
     dm_id = (data.get("delivery_man_id") or "").strip()
     if dm_id and dm_id != "-":
@@ -1270,11 +1371,93 @@ def visit_plan_prepare(cid, data, existing=None, user=None):
     dup = q(f"SELECT id FROM sm_visit_plan WHERE cid=%s AND rep_id=%s AND area_id=%s AND order_col_day=%s AND status='ACTIVE' {dup_where} LIMIT 1",
             dup_params, one=True)
     if dup:
-        return f"Representative '{rep_id}' already has a visit plan for beat '{area_id}' on '{order_day}'."
+        return f"Representative '{rep_id}' already has a visit plan for level '{area_id}' on '{order_day}'."
 
     if not (data.get("status") or "").strip():
         data["status"] = "ACTIVE"
     return None
+
+
+def visit_plan_after_create(cid, row, user=None):
+    rep_id = row.get("rep_id")
+    area_id = row.get("area_id")
+    if not rep_id or not area_id:
+        return
+    _sync_visit_plan_to_rep_area(cid, rep_id, area_id, status=row.get("status") or "ACTIVE", note=row.get("note") or "-", user=user,
+                                 override_depot_id=row.get("depot_id"), override_depot_name=row.get("depot_name"))
+
+
+def visit_plan_after_update(cid, old, new, user=None):
+    new_rep = new.get("rep_id")
+    new_area = new.get("area_id")
+    new_status = new.get("status") or "ACTIVE"
+    if new_rep and new_area:
+        _sync_visit_plan_to_rep_area(cid, new_rep, new_area, status=new_status, note=new.get("note") or "-", user=user,
+                                     override_depot_id=new.get("depot_id"), override_depot_name=new.get("depot_name"))
+
+    old_rep = old.get("rep_id")
+    old_area = old.get("area_id")
+    if (old_rep != new_rep or old_area != new_area or new_status != "ACTIVE") and old_rep and old_area:
+        remaining = q("""SELECT id FROM sm_visit_plan 
+                         WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE' AND id<>%s LIMIT 1""",
+                      (cid, old_rep, old_area, new.get("id") or 0), one=True)
+        if not remaining:
+            lvl = q("SELECT depth FROM sm_level WHERE cid=%s AND level_id=%s", (cid, old_area), one=True)
+            areas_to_deact = [old_area]
+            if lvl and int(lvl.get("depth") or 0) == 2:
+                beats = q("SELECT level_id FROM sm_level WHERE cid=%s AND parent_level_id=%s AND depth=3", (cid, old_area))
+                for b in beats:
+                    child_rem = q("""SELECT id FROM sm_visit_plan 
+                                     WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE' AND id<>%s LIMIT 1""",
+                                  (cid, old_rep, b["level_id"], new.get("id") or 0), one=True)
+                    if not child_rem:
+                        areas_to_deact.append(b["level_id"])
+            target_status = new_status if new_status != "ACTIVE" else "PENDING"
+            for a_id in areas_to_deact:
+                x("UPDATE sm_rep_area SET status=%s, updated_on=NOW(), updated_by=%s WHERE cid=%s AND rep_id=%s AND area_id=%s",
+                  (target_status, user, cid, old_rep, a_id))
+
+
+def visit_plan_soft_delete(cid, rid, user=None):
+    row = q("SELECT * FROM sm_visit_plan WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return 0, "Record not found."
+    _, n = x("UPDATE sm_visit_plan SET status='PENDING', updated_on=NOW(), updated_by=%s WHERE cid=%s AND id=%s",
+             (user, cid, rid))
+    rep_id = row.get("rep_id")
+    area_id = row.get("area_id")
+    if rep_id and area_id:
+        remaining = q("""SELECT id FROM sm_visit_plan 
+                         WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE' AND id<>%s LIMIT 1""",
+                      (cid, rep_id, area_id, rid), one=True)
+        if not remaining:
+            lvl = q("SELECT depth FROM sm_level WHERE cid=%s AND level_id=%s", (cid, area_id), one=True)
+            areas_to_deact = [area_id]
+            if lvl and int(lvl.get("depth") or 0) == 2:
+                beats = q("SELECT level_id FROM sm_level WHERE cid=%s AND parent_level_id=%s AND depth=3", (cid, area_id))
+                for b in beats:
+                    child_rem = q("""SELECT id FROM sm_visit_plan 
+                                     WHERE cid=%s AND rep_id=%s AND area_id=%s AND status='ACTIVE' AND id<>%s LIMIT 1""",
+                                  (cid, rep_id, b["level_id"], rid), one=True)
+                    if not child_rem:
+                        areas_to_deact.append(b["level_id"])
+            for a_id in areas_to_deact:
+                x("UPDATE sm_rep_area SET status='PENDING', updated_on=NOW(), updated_by=%s WHERE cid=%s AND rep_id=%s AND area_id=%s",
+                  (user, cid, rep_id, a_id))
+    return n, None
+
+
+def visit_plan_restore(cid, rid, user=None):
+    row = q("SELECT * FROM sm_visit_plan WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return 0, "Record not found."
+    _, n = x("UPDATE sm_visit_plan SET status='ACTIVE', updated_on=NOW(), updated_by=%s WHERE cid=%s AND id=%s",
+             (user, cid, rid))
+    rep_id = row.get("rep_id")
+    area_id = row.get("area_id")
+    if rep_id and area_id:
+        _sync_visit_plan_to_rep_area(cid, rep_id, area_id, status="ACTIVE", note=row.get("note") or "-", user=user)
+    return n, None
 
 
 # ------------------------------------------------------------- client_visit_plan (Outlet Exceptional Visit Plan)
@@ -1326,7 +1509,10 @@ HOOKS = {
         "soft_delete": item_soft_delete,
         "restore": item_restore,
     },
-    "item_batch": {"prepare": item_batch_prepare},
+    "item_batch": {
+        "prepare": item_batch_prepare,
+        "after_create": item_batch_after_create,
+    },
     "rack": {"prepare": rack_prepare},
     "depot": {
         "prepare": depot_prepare,
@@ -1340,6 +1526,7 @@ HOOKS = {
         "after_create": depot_store_after_create,
     },
     "depot_stock_balance": {"prepare": depot_stock_balance_prepare},
+    "depot_rack_stock_balance": {"prepare": depot_rack_stock_balance_prepare},
     "outlet": {"prepare": outlet_prepare},
     "category_type": {"prepare": category_type_prepare},
     "top_level": {
@@ -1362,7 +1549,13 @@ HOOKS = {
         "prepare": rep_area_prepare,
         "after_create": rep_area_after_create,
     },
-    "visit_plan": {"prepare": visit_plan_prepare},
+    "visit_plan": {
+        "prepare": visit_plan_prepare,
+        "after_create": visit_plan_after_create,
+        "after_update": visit_plan_after_update,
+        "soft_delete": visit_plan_soft_delete,
+        "restore": visit_plan_restore,
+    },
     "client_visit_plan": {"prepare": client_visit_plan_prepare},
 }
 

@@ -93,7 +93,7 @@ SEED_PERMISSIONS = [
     ("rack.delete", "Soft delete racks", "rack"),
     ("rack.import", "Excel upload racks", "rack"),
     ("depot_stock_balance.view", "View distributor stock", "depot_stock_balance"),
-    ("depot_stock_balance.create", "Create distributor stock", "depot_stock_balance"),
+    ("depot_rack_stock_balance.view", "View depot rack stock", "depot_rack_stock_balance"),
     ("acl.view", "View access control", "acl"),
     ("acl.manage", "Manage users, roles and permissions", "acl"),
     ("audit.view", "View central audit log", "audit"),
@@ -149,6 +149,14 @@ SEED_CATEGORY_TYPES = [
     ("EMP_USER_TYPE", "rep", "Pre Sales Executive / PSR"),
     ("EMP_USER_TYPE", "sup", "Supervisor / Manager"),
     ("EMP_USER_TYPE", "dm", "Delivery Man / DM"),
+
+    ("WEEK_DAYS", "Saturday", "Saturday"),
+    ("WEEK_DAYS", "Sunday", "Sunday"),
+    ("WEEK_DAYS", "Monday", "Monday"),
+    ("WEEK_DAYS", "Tuesday", "Tuesday"),
+    ("WEEK_DAYS", "Wednesday", "Wednesday"),
+    ("WEEK_DAYS", "Thursday", "Thursday"),
+    ("WEEK_DAYS", "Friday", "Friday"),
 ]
 
 SEED_HIERARCHY = [
@@ -168,7 +176,7 @@ ROLE_PERM_MATRIX = {
                 ("dashboard", "brand", "item", "item_batch", "distributor",
                  "depot_store", "outlet", "category_type", "audit",
                  "top_level", "level", "rep", "supervisor_level", "rep_area", "visit_plan", "client_visit_plan",
-                 "rack", "depot_stock_balance") and p[0].split(".")[-1] != "import"],
+                 "rack", "depot_stock_balance", "depot_rack_stock_balance") and p[0].split(".")[-1] != "import"],
     "VIEWER": [p[0] for p in SEED_PERMISSIONS if p[0].endswith(".view")],
 }
 
