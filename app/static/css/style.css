@@ -141,6 +141,15 @@ a:hover { text-decoration: underline; }
 .field input:focus, .field select:focus, .field textarea:focus {
   outline: none; border-color: var(--fb-primary); box-shadow: 0 0 0 2px rgba(24,119,242,.2);
 }
+.field input:read-only, .field input[readonly], .field textarea:read-only {
+  background: var(--fb-bg, #f0f2f5);
+  color: var(--fb-muted, #65676b);
+  cursor: not-allowed;
+}
+.field input:read-only:focus, .field input[readonly]:focus, .field textarea:read-only:focus {
+  border-color: var(--fb-divider);
+  box-shadow: none;
+}
 .field textarea { min-height: 64px; resize: vertical; }
 .field.full { grid-column: 1 / -1; }
 _search-bar { }

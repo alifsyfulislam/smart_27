@@ -246,10 +246,11 @@
               <input type="{{ 'number' if s.type in ('int','float') else 'date' if s.type == 'date' else 'password' if s.type == 'password' else 'text' }}"
                      name="{{ s.name }}" id="f-{{ s.name }}"
                      value="{{ '' if s.type == 'password' or data.get(s.name) is none else data.get(s.name) }}"
-                     {% if s.type == 'password' %}{% if a == 'Edit' %}placeholder="Leave empty to keep current password"{% else %}placeholder="Enter password (default: 123456)"{% endif %}{% endif %}
+                     {% if s.type == 'password' %}{% if a == 'Edit' %}placeholder="Leave empty to keep current password"{% else %}placeholder="Enter password (default: 123456)"{% endif %}{% elif s.placeholder %}placeholder="{{ s.placeholder }}"{% elif s.readonly %}placeholder="(Auto-generated on save)"{% endif %}
                      {% if s.type == 'float' %}step="any"{% endif %}
-                     {{ 'readonly' if a == 'Edit' and s.readonly_on_edit }}
-                     {{ 'required' if s.required and a == 'Create' }}>
+                     {{ 'readonly' if s.readonly or (a == 'Edit' and s.readonly_on_edit) }}
+                     {{ 'tabindex="-1"' if s.readonly }}
+                     {{ 'required' if s.required and a == 'Create' and not s.readonly }}>
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -774,6 +775,26 @@
         }
 
         desigSel.dispatchEvent(new Event("ssms-refresh"));
+        if (typeof updateRepIdHint === "function") {
+          updateRepIdHint();
+        }
+      }
+
+      var repIdInput = document.getElementById("f-rep_id");
+      var updateRepIdHint = null;
+      if (repIdInput) {
+        repIdInput.readOnly = true;
+        {% if a == 'Create' %}
+        updateRepIdHint = function () {
+          var desig = desigSel ? desigSel.value : "";
+          if (desig) {
+            repIdInput.placeholder = "(Auto-generated: " + desig + "xxxx on save)";
+          } else {
+            repIdInput.placeholder = "(Auto-generated on save)";
+          }
+        };
+        desigSel.addEventListener("change", updateRepIdHint);
+        {% endif %}
       }
 
       userTypeSel.addEventListener("change", function () {

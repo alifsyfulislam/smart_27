@@ -1067,7 +1067,7 @@ def rep_prepare(cid, data, existing=None, user=None):
         data["rep_username"] = existing.get("rep_username") or existing["rep_id"]
     else:
         raw_rep_id = data.get("rep_id")
-        if raw_rep_id is not None and str(raw_rep_id).strip():
+        if raw_rep_id is not None and str(raw_rep_id).strip() and not str(raw_rep_id).strip().startswith("("):
             rep_id = str(raw_rep_id).strip()
             dup = q("SELECT id FROM sm_rep WHERE cid=%s AND rep_id=%s", (cid, rep_id), one=True)
             if dup:

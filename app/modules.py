@@ -17,15 +17,16 @@ STATUS_OPTIONS = [
 
 def f(name, label, type_="text", required=False, in_list=False, in_form=True,
       in_search=False, in_excel=True, options=None, cat=None, default=None,
-      width=None, help=None, readonly_on_edit=False, hidden_in_list_width=None,
-      searchable=False):
+      width=None, help=None, readonly_on_edit=False, readonly=False,
+      hidden_in_list_width=None, searchable=False, placeholder=None):
     """Build a field spec dict."""
     return {
         "name": name, "label": label, "type": type_, "required": required,
         "in_list": in_list, "in_form": in_form, "in_search": in_search,
         "in_excel": in_excel, "options": options, "cat": cat,
         "default": default, "width": width, "help": help,
-        "readonly_on_edit": readonly_on_edit, "searchable": searchable,
+        "readonly_on_edit": readonly_on_edit, "readonly": readonly,
+        "searchable": searchable, "placeholder": placeholder,
     }
 
 
@@ -445,19 +446,15 @@ MODULES = {
               help="Sourced dynamically from Settings > Module Category (type EMP_USER_TYPE). Controls allowed designations."),
             f("designation_id", "Designation", "select", cat="EMP_DESIGNATION", required=True, in_list=True, searchable=True,
               help="Cascaded from User Type: 'rep' -> PSR only, 'dm' -> DM only, 'sup' -> all except PSR & DM."),
-            f("rep_id", "Employee ID", "text", readonly_on_edit=True, in_list=True,
-              help="Auto-generated on save from Designation (e.g. PSR0001, DM0001, HOS0001). Immutable on edit."),
+            f("rep_id", "Employee ID", "text", readonly=True, in_list=True, placeholder="(Auto-generated on save)",
+              help="Auto-generated on save from Designation (e.g. PSR0001, DM0001, HOS0001). Immutable."),
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
-            f("image_path", "Photo / Image", "image",
-              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
-                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
             f("mobile_no", "Mobile No", "text", in_list=True),
             f("alt_mobile_no", "Alt Mobile No", "text"),
             f("email", "Email", "text"),
-            f("depot_id", "Distributor", "depot_select", in_list=True, help="Assigned distributor (sm_depot), if applicable."),
-            f("dob", "Date of Birth", "date", required=True),
-            f("doj", "Date of Joining", "date", required=True),
+            f("dob", "Date of Birth", "date"),
+            f("doj", "Date of Joining", "date"),
             f("nid", "NID", "text"),
             f("tin", "TIN", "text"),
             f("address", "Address", "textarea"),
@@ -465,10 +462,14 @@ MODULES = {
             f("password", "Password", "password",
               help="Plain text entered here is automatically encrypted with MD5 on save."),
             f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE", in_list=True),
+            f("depot_id", "Distributor", "depot_select", in_list=True, help="Assigned distributor (sm_depot), if applicable."),
+            f("image_path", "Photo / Image", "image",
+              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
+                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
             f("note", "Note", "textarea"),
         ],
         "create_hook": "rep",
-        "excel_cols": ["user_type", "designation_id", "name", "name_bn", "mobile_no", "alt_mobile_no", "email", "depot_id", "dob", "doj", "nid", "tin", "address", "address_bn", "image_path", "note"],
+        "excel_cols": ["user_type", "designation_id", "name", "name_bn", "mobile_no", "alt_mobile_no", "email", "dob", "doj", "nid", "tin", "address", "address_bn", "depot_id", "image_path", "note"],
         "unique_msg": "An employee with this ID already exists.",
     },
     "supervisor-level": {
