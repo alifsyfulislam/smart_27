@@ -11,6 +11,7 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-045 | done | depot-rack-stock-balance | - | P1 | 2026-11-18 | Distributor Rack Stock: read-only distributor rack inventory balance & tracking master module sm_depot_rack_stock_balance (no_create, no_edit, no_delete, no_import; perm depot_rack_stock_balance.view, 80->81 seeded perms) under Distributor Info (V-026, D-040)
 - T-044 | done | level, rep, visit-plan | - | P1 | 2026-11-18 | Field Structure: remove Distributor in Town form; Employee: rename title to Employee and remove Distributor from form; PSR Visit Plan: remove Distributor from form (V-025, D-039)
 - T-043 | done | depot-stock-balance, item, item-batch, distributor, distributor-store | - | P1 | 2026-11-18 | Auto-provision sm_depot_stock_balance (qty=0, block_qty=0) on 4 triggers (item, batch, depot, store); remove create permission (81->80 seeded perms); add All Item filter on list (V-024, D-038)
 - T-042 | done | visit-plan, supervisor-level, item-batch, distributor | - | P1 | 2026-11-18 | Distributor option and WEEK_DAYS order collection day in visit-plan; auto-calculated delivery day (Thu/Fri->Sat); custom search placeholders; removed order day filter; redundant fields hidden in item-batch (Name) and distributor (Town ID); label renamed to Town (V-023, D-037)

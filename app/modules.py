@@ -300,7 +300,7 @@ MODULES = {
         "unique_msg": "Stock balance entry could not be created.",
     },
     "depot-rack-stock-balance": {
-        "title": "Depot Rack Stock",
+        "title": "Distributor Rack Stock",
         "icon": "fa-layer-group",
         "perm": "depot_rack_stock_balance",
         "table": "sm_depot_rack_stock_balance",

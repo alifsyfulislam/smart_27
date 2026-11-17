@@ -4,7 +4,7 @@ Prompt templates an operator or agent can reuse against the running SSMS applica
 
 ## 1. Daily operations check
 > Verify SSMS health: confirm the server answers 200 on `/`, `/brand`, `/item`, `/item-batch`, `/rack`,
-> `/distributor`, `/distributor-store`, `/depot-stock-balance`, `/client-visit-plan`, `/visit-plan`, `/rep-area`, `/supervisor-level`, `/rep`, `/level`, `/top-level`, `/outlet`, `/category-type`, `/users`, `/roles`, `/permissions`,
+> `/distributor`, `/distributor-store`, `/depot-stock-balance`, `/depot-rack-stock-balance`, `/client-visit-plan`, `/visit-plan`, `/rep-area`, `/supervisor-level`, `/rep`, `/level`, `/top-level`, `/outlet`, `/category-type`, `/users`, `/roles`, `/permissions`,
 > `/audit-log` after logging in with admin credentials. Report any non-200 response and the
 > new `sm_audit_log` rows since the last check.
 

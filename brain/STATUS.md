@@ -5,7 +5,7 @@
 - **Stack:** FastAPI web app (Jinja2 server-rendered), PyMySQL raw SQL, MariaDB 10.4 `smart_27` at localhost (root, empty password). Python venv at `./venv`.
 - **Later phase:** Flutter mobile app will consume the same data model; integration feeds land in `intr_flag` flows — not built yet.
 
-## State as of 2026-11-17 (counts verified by `scripts/check_context.py`)
+## State as of 2026-11-18 (counts verified by `scripts/check_context.py`)
 - v1.0.0 complete and verified end-to-end (V-001): login, dashboard, 6 master modules, ACL admin, audit log.
 - Brand UX verified (V-002): parent picker, image upload, child-levels card, tree list, `is_leaf` invariant (D-009).
 - Outlet module verified (T-001): registry `app/modules.py:221`, hook `outlet_prepare` (D-010).
@@ -15,12 +15,13 @@
 - Employee Master Refinement verified (V-017 / T-036, V-018 / T-037, V-019 / T-038, V-020 / T-039, V-025 / T-044): renamed to "Employee", dynamic `EMP_USER_TYPE` category definitions (rep, sup, dm, category-type count 29 → 32), cascading dropdown (user_type first -> filtered designation: rep->PSR, dm->DM, sup->all except PSR/DM), auto-incremental non-editable `rep_id` prefixed by designation (PSR0001, DM0001, etc.) & nullable for external integration, hidden `rep_id` on create form with required unique `rep_username` on `(cid, rep_username)`, optional dob/doj across create/edit/import, MD5 password hashing with edit retention, photo upload (`image_path`), and logical form rearrangement with distributor removed from create/edit forms.
 - Master Form Refinements & Visit Plan Weekday Logistics verified (V-023 / T-042): Sourced order collection days dynamically from `WEEK_DAYS` category types (category-type count 32 → 39); hidden `delivery_day` from forms with automatic next-working-day mapping (Thursday/Friday -> Saturday); searchable delivery man & supervisor inputs with custom search placeholders; removed collection day filter from visit plan list; hidden redundant `name` input from `item-batch` forms with auto-fill from item; hidden redundant `town_id` input from `distributor` forms with auto-lookup from `sm_level` and renamed label to "Town".
 - Field Structure, Employee & Visit Plan Form Simplification verified (V-025 / T-044): removed Distributor (`depot_id`) input from Field Structure Town create/edit forms (`in_form=False`) with edit preservation in `level_prepare`; renamed module title to "Employee" and removed Distributor from Employee create/edit forms with edit preservation in `rep_prepare`; removed Distributor from PSR Visit Plan create/edit forms with edit preservation or field area inheritance in `visit_plan_prepare`.
+- Distributor Rack Stock Module verified (V-026 / T-045): Registered 17th master data module `depot-rack-stock-balance` (table `sm_depot_rack_stock_balance`, title "Distributor Rack Stock") under Distributor Info; strictly read-only tracking (`no_create: True`, `no_edit: True`, `no_delete: True`, `no_import: True`) with view permission `depot_rack_stock_balance.view` (seeded permissions 80 → 81); status and distributor dropdown filters with search across distributor, rack, outlet, and status.
 
 ## Verified counts (re-run the checker, don't trust this list on drift)
 | What | Count | Canonical source |
 |---|---|---|
-| Master modules | 16 | `app/modules.py MODULES` / `MODULE_ORDER` |
-| Seeded permissions | 80 | `scripts/setup_database.py SEED_PERMISSIONS` |
+| Master modules | 17 | `app/modules.py MODULES` / `MODULE_ORDER` |
+| Seeded permissions | 81 | `scripts/setup_database.py SEED_PERMISSIONS` |
 | Category-type values | 39 | `scripts/setup_database.py SEED_CATEGORY_TYPES` |
 | Roles | 3 | SUPER_ADMIN, MANAGER, VIEWER |
 

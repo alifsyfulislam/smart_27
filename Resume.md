@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit 914e6a9 · Date: 2026-11-17 -->
+<!-- Synced with repo state at commit 8bfce51 · Date: 2026-11-18 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
@@ -35,7 +35,7 @@
 2. **Central Application-Written Audit (`sm_audit_log`)**  
    Every state modification is recorded via `app/audit.py:log_change`. No database triggers are permitted. Audit failures must be non-blocking.
 3. **Strict Granular Access Control (ACL)**  
-   Every route must enforce `require_perm(user, "module.action")`. Permissions follow `{module}.{action}` syntax (80 canonical seeded permissions). Super administrators (`is_super=1`) bypass checks.
+   Every route must enforce `require_perm(user, "module.action")`. Permissions follow `{module}.{action}` syntax (81 canonical seeded permissions). Super administrators (`is_super=1`) bypass checks.
 4. **Frozen Schema Names & Intentional Anomalies**  
    Column and table names in `scripts/ddl.sql` are strictly frozen to preserve legacy compatibility, including the historical spelling `expiary_date` in `sm_item_batch`.
 5. **No External CDNs**  
@@ -75,6 +75,7 @@
 - **Default Item Batch (BR3):** Creating an item automatically creates default batch `batch_id='1'` with expiry `2100-12-31` (`app/hooks.py item_after_create`).
 - **Default Distributor Stores (BR5):** Creating a distributor (depot) automatically creates two default stores: `{depot_id}140` (Commercial) and `{depot_id}170` (Damage) (`app/hooks.py depot_after_create`).
 - **Distributor Stock Invariants (`sm_depot_stock_balance`, BR22, D-025, D-030, D-038):** Master under Distributor Info recording batch quantities across distributor and store (renamed from Distributor Stock Balance). Strictly non-creatable (`no_create=True`), non-editable (`no_edit=True`), non-deletable (`no_delete=True`), and non-importable (`no_import=True`): action buttons and templates suppressed across UI; GET/POST routes for create, edit, delete, restore, and upload rejected with 303 redirect; create permission `depot_stock_balance.create` removed (seed catalogue reduced to 80 permissions). Has no `status` column; unique on `(cid, depot_id, store_id, item_id, batch_id)`. Provides "All Item" filter dropdown alongside "All Distributor" on the list view. Auto-provisions zero-quantity stock records (`quantity=0`, `block_qty=0`) via 4 hooks: on Item create/Excel import (across all its batches × all stores), on Item Batch create (across that batch × all stores), on Distributor create (across all its stores × all items and batches), and on Distributor Store create (across that store × all items and batches).
+- **Distributor Rack Stock Tracking (`sm_depot_rack_stock_balance`, BR26, D-040):** Read-only tracking master module registered under Distributor Info for outlet display rack allocations. Strictly read-only (`no_create=True`, `no_edit=True`, `no_delete=True`, `no_import=True`): direct GET/POST routes for creation and editing redirect to the list view (303), and mutation routes (delete, upload) are disallowed (405); single view permission `depot_rack_stock_balance.view` (total seeded permissions: 81). Supports status and distributor dropdown filters and text search across distributor, rack, outlet, and status.
 - **Distributor Store Hardening (`sm_depot_store`, BR23, D-026, D-027):** Dedicated Distributor (`depot_id`) dropdown filter on `/distributor-store` list view. Non-editable Distributor selector on `/distributor-store/edit/{id}` with `readonly_on_edit=True` (disabled select + hidden input fallback + `depot_store_prepare` backend guard).
 - **Distributor Master Hardening (`sm_depot`, BR24, D-029):** Non-editable Distributor ID (`depot_id`) on `/distributor/edit/{id}` with `readonly_on_edit=True` and `depot_prepare` backend guard.
 
@@ -103,7 +104,7 @@
 
 ## 4. Master Module Directory & Technical Specification
 
-SSMS currently registers **16 master data modules**, plus ACL and Audit engines:
+SSMS currently registers **17 master data modules**, plus ACL and Audit engines:
 
 | Module Slug | Title / Group | Database Table | Primary / Unique Keys | Permissions | Hooks (`app/hooks.py`) |
 |---|---|---|---|---|---|
@@ -114,6 +115,7 @@ SSMS currently registers **16 master data modules**, plus ACL and Audit engines:
 | `distributor` | Distributor / *Distributor Info* | `sm_depot` | `id`, (`cid`, `depot_id`) | `distributor.{view,create,edit,delete,import}` | `depot_prepare`, `depot_after_create`, `depot_after_update`, `depot_soft_delete`, `depot_restore` |
 | `distributor-store` | Distributor Store / *Distributor Info* | `sm_depot_store` | `id`, (`cid`, `depot_id`, `store_id`) | `distributor_store.{view,create,edit,delete,import}` | `depot_store_prepare` |
 | `depot-stock-balance` | Distributor Stock / *Distributor Info* | `sm_depot_stock_balance` | `id`, (`cid`, `depot_id`, `store_id`, `item_id`, `batch_id`) | `depot_stock_balance.{view}` | `depot_stock_balance_prepare` |
+| `depot-rack-stock-balance` | Distributor Rack Stock / *Distributor Info* | `sm_depot_rack_stock_balance` | `id` | `depot_rack_stock_balance.{view}` | `depot_rack_stock_balance_prepare` |
 | `outlet` | Outlet / *Outlet Info* | `sm_client` | `id`, (`cid`, `client_id`) | `outlet.{view,create,edit,delete,import}` | `outlet_prepare` |
 | `category-type` | Module Category / *Settings* | `sm_category_type` | `id`, (`cid`, `type_name`, `cat_type_id`) | `category_type.{view,create,edit,delete,import}` | `category_type_prepare` |
 | `top-level` | National Structure / *Fieldforce Info* | `sm_top_level` | `id`, (`cid`, `level_id`) | `top_level.{view,create,edit,delete,import}` | `top_level_prepare`, `_recompute_top_level_is_leaf` |
@@ -188,7 +190,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ## 7. Current Task Register & Status
 
-### Active Milestones Verified (V-001 to V-019)
+### Active Milestones Verified (V-001 to V-026)
 - **V-001 (2026-11-05 · fb0e803):** Core v1.0.0 end-to-end verified (Login, dashboard, 6 master modules, ACL admin, audit log).
 - **V-002 (2026-11-09 · 8b10af5):** Brand UX verified (Tree list, accordion per level, parent picker, image upload, multi-child addition, `is_leaf` invariant).
 - **V-003 (2026-11-13 · 00f28df):** Excel data download & hierarchy export verified across all 7 master modules (HIERARCHY_TREE, HIERARCHY_PATHS, ITEMS with synced levels, openpyxl styling).
@@ -244,10 +246,35 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
   - In `app/hooks.py` (`rep_prepare`), added uniqueness validation for `rep_username` across `(cid, rep_username)` on create and edit (excluding current record).
   - Added unique key `UNQ_REP_USERNAME (cid, rep_username)` on `sm_rep` in MariaDB and `scripts/ddl.sql`.
   - Verified live via HTTP against port 8027: `GET /rep/create` renders hidden `rep_id` and visible required `rep_username`; `POST /rep/create` persists unique username with auto-generated ID; duplicate username is rejected with `"Username '...' already exists."`; `GET /rep/edit/{id}` renders visible readonly `rep_id` and editable `rep_username`; `GET /rep/view/{id}` renders both; `GET /rep` list renders Username column header and data.
+- **V-021 (2026-11-17 · HEAD):** Supervisor Level Hierarchy Tier Filter & Unified Depth Calculation (T-040):
+  - `GET /supervisor-level/create` renders two-step Hierarchy Tier Filter (`#f-hierarchy_tier`), searchable select with `data-searchable`, and live calculated depth indicator (`#sup-level-depth-badge`).
+  - Unified `level_depth_no` calculation verified across all 7 hierarchy tiers via live HTTP POST: Head `H0001` -> depth 0; Area `A0001` -> depth 1; Zone `Z0001` -> depth 2; Territory `T0001` -> depth 3; Town `TW0001` -> depth 4 (3+1); Route `R0000001` -> depth 5 (3+2); Beat `B0000001` -> depth 6 (3+3).
+  - All test assertions passed with central audit logging.
+- **V-022 (2026-11-18 · HEAD):** PSR Visit Plan Hierarchy Tier Filter, Sidebar Consolidation & PSR Area Auto-Sync (T-041):
+  - Sidebar navigation confirmed: PSR Area (`rep-area`) is consolidated and removed from sidebar menu while PSR Visit Plan (`visit-plan`) remains present.
+  - `GET /visit-plan/create` renders Hierarchy Level Tier Filter (`#f-visit_plan_tier`) with Route (Depth 2) and Beat (Depth 3) options, searchable select (`#f-area_id`), and live level badge.
+  - Beat plan create auto-provisions active matching row in `sm_rep_area`; Route plan create auto-provisions Route in `sm_rep_area` and auto-cascades child beats into `sm_rep_area` with `status='ACTIVE'`. Full lifecycle sync verified for edit, soft delete, restore, and Excel upload.
+- **V-023 (2026-11-18 · HEAD):** Master Form Refinements & Visit Plan Weekday Logistics (T-042):
+  - `GET /visit-plan/create` renders Distributor (`depot_id`) select dropdown, dynamic Order Collection Day options from `WEEK_DAYS` category types (`Saturday`..`Friday`), hides `delivery_day` from form inputs, and renders Delivery Man searchable select.
+  - Automatic next-working-day delivery derivation verified (Sat..Wed -> next day, Thu & Fri -> Sat). Redundant Name hidden in `item-batch` and auto-populated from item; redundant Town ID hidden in `distributor` (renamed label to "Town") and auto-populated from `sm_level` depth 1.
+- **V-024 (2026-11-18 · HEAD):** Automated Stock Balance Provisioning & Read-Only Balance Master (T-043):
+  - `GET /depot-stock-balance` renders without "New Stock Balance" button; provides "All Distributor" and "All Item" filters; creation blocked with 303 redirect. Seed permission `depot_stock_balance.create` removed (seed catalogue reduced to 80 permissions).
+  - Four automated zero-quantity (`qty=0, block_qty=0`) provisioning triggers verified live: Item create/import across all stores, Item Batch create across all stores, Distributor create across default stores × all items, and Distributor Store create across that store × all items.
+- **V-025 (2026-11-18 · HEAD):** Field Structure, Employee & Visit Plan Form Simplification (T-044):
+  - Field Structure (`/level/create`, `/level/edit/{id}`): distributor input (`depot_id`) removed from HTML forms (`in_form=False`); `level_prepare` preserves existing distributor on edit.
+  - Employee (`/rep/create`, `/rep/edit/{id}`, `/rep`): module title renamed to "Employee" across sidebar and views; distributor input removed from forms; `rep_prepare` preserves existing distributor on edit.
+  - PSR Visit Plan (`/visit-plan/create`, `/visit-plan/edit/{id}`): distributor input removed from forms; `visit_plan_prepare` preserves existing distributor on edit or inherits from field area.
+- **V-026 (2026-11-18 · 8bfce51):** Distributor Rack Stock Read-Only Tracking Master (T-045):
+  - Registered 17th master data module `depot-rack-stock-balance` (table `sm_depot_rack_stock_balance`, title "Distributor Rack Stock") under Distributor Info.
+  - Read-only tracking mode strictly enforced: `no_create=True`, `no_edit=True`, `no_delete=True`, `no_import=True` with single view permission `depot_rack_stock_balance.view` (total seeded permissions: 81).
+  - Direct routes `/create` and `/edit/{id}` redirect (303) to `/depot-rack-stock-balance`; `/delete/{id}` and `/upload` return 405 Method Not Allowed.
+  - List view verified with status and distributor dropdown filters and text search across distributor, rack, outlet, and status.
 
 ### Task Register Snapshot (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
+|---|---|---|---|---|
+| **T-045** | **P1** | `depot-rack-stock-balance` | `done` | Register 17th master module Distributor Rack Stock (`sm_depot_rack_stock_balance`), read-only view permission, route guarding, and doc sync (V-026, D-040). |
 |---|---|---|---|---|
 | **T-044** | **P1** | `level`, `rep`, `visit-plan` | `done` | Field Structure: remove Distributor in Town form; Employee: rename title to Employee and remove Distributor from form; PSR Visit Plan: remove Distributor from form (V-025, D-039). |
 | **T-043** | **P1** | `depot-stock-balance` | `done` | Auto-provision sm_depot_stock_balance on 4 triggers (item, batch, depot, store); remove create permission (81->80 seeded perms); add All Item filter on list (V-024, D-038). |
@@ -285,7 +312,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-033)
+## 8. Architectural Decision Summary (D-001 to D-040)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -326,14 +353,17 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-037:** Master Form Streamlining & Visit Plan Weekday Logistics: Added Distributor (`depot_id`) option to visit plan; sourced `order_col_day` from `WEEK_DAYS` category types; removed `delivery_day` from forms and auto-derived delivery days (Thu/Fri -> Sat); added search placeholders for Delivery Man and Supervisor; removed order collection day filter from visit plan list; hid redundant Name in `item-batch` and Town ID in `distributor` (renamed label to "Town").
 - **D-038:** Automated Stock Balance Provisioning & Read-Only Balance Master: Added `no_create: True` to `MODULES["depot-stock-balance"]`; removed `depot_stock_balance.create` from seed catalogue (reducing total permissions from 81 to 80); added "All Item" filter dropdown alongside Distributor filter on `/depot-stock-balance` list; implemented automated stock provisioning with `qty=0, block_qty=0` across 4 lifecycle triggers: Item create, Item Batch create, Distributor create, and Distributor Store create.
 - **D-039:** Field Structure, Employee & Visit Plan Form Simplification: Removed Distributor (`depot_id`) input from Town create/edit forms (`in_form=False`) and preserved existing mapping on edit; renamed Employee master title to "Employee" (from "Employee(rep/sup/dm)") and removed Distributor from create/edit forms; removed Distributor from PSR Visit Plan create/edit forms and preserved existing or inherited from field area.
+- **D-040:** Distributor Rack Stock Read-Only Tracking Master: Registered 17th master data module `depot-rack-stock-balance` (table `sm_depot_rack_stock_balance`, title "Distributor Rack Stock") under Distributor Info; strictly read-only tracking (`no_create: True`, `no_edit: True`, `no_delete: True`, `no_import: True`) with view permission `depot_rack_stock_balance.view` (seeded permissions 80 → 81); status and distributor dropdown filters with search across distributor, rack, outlet, and status.
 
 ---
 
 ## 9. System Health & Audit Checkpoint
 
 - **Context Checker Status:** **PASS (15/15 checks clean)** via `scripts/check_context.py`.
-- **Active Master Modules:** 16 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
-- **Verification Milestones:** 25 verification milestones verified live (V-001 through V-025).
+- **Active Master Modules:** 17 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
+- **Seeded Permissions:** 81 canonical permissions (`scripts/setup_database.py SEED_PERMISSIONS`).
+- **Category-Type Definitions:** 39 dynamic category types (`scripts/setup_database.py SEED_CATEGORY_TYPES`).
+- **Verification Milestones:** 26 verification milestones verified live (V-001 through V-026).
 - **Known Technical Debt / Pending Actions:**
   1. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore`.
   2. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).

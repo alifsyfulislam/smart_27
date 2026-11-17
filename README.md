@@ -35,6 +35,7 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Distributor | `/distributor` | auto default stores Commercial + Damage (BR5), status cascade to child stores |
 | Distributor Store | `/distributor-store` | store types from category master, distributor filter & immutable distributor |
 | Distributor Stock | `/depot-stock-balance` | inventory balances with depot/store/item/batch selection, auto-provisioned, non-editable/deletable/importable |
+| Distributor Rack Stock | `/depot-rack-stock-balance` | read-only distributor rack inventory balance & tracking across outlets |
 | Outlet | `/outlet` | client_id uniqueness, auto customer_type, distributor & store linking |
 | National Structure | `/top-level` | client_id uniqueness, auto customer_type, distributor & store linking |
 | Field Structure | `/level` | client_id uniqueness, auto customer_type, distributor & store linking |
