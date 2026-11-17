@@ -424,7 +424,7 @@ MODULES = {
         "unique_msg": "A field level with this name already exists under the same parent.",
     },
     "rep": {
-        "title": "Employee(rep/sup/dm)",
+        "title": "Employee (rep/sup/dm)",
         "icon": "fa-user-tie",
         "perm": "rep",
         "table": "sm_rep",
