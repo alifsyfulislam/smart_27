@@ -1120,14 +1120,20 @@ def supervisor_level_prepare(cid, data, existing=None, user=None):
         return "Hierarchy level ID is required."
     lvl = q("SELECT level_id, level_name, depth FROM sm_top_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
             (cid, level_id), one=True)
-    if not lvl:
+    if lvl:
+        data["level_id"] = lvl["level_id"]
+        data["level_name"] = lvl["level_name"]
+        data["level_depth_no"] = int(lvl.get("depth") or 0)
+    else:
         lvl = q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'",
                 (cid, level_id), one=True)
-    if not lvl:
-        return f"Hierarchy level '{level_id}' not found in active National or Field structure."
-    data["level_id"] = lvl["level_id"]
-    data["level_name"] = lvl["level_name"]
-    data["level_depth_no"] = int(lvl.get("depth") or 0)
+        if not lvl:
+            return f"Hierarchy level '{level_id}' not found in active National or Field structure."
+        data["level_id"] = lvl["level_id"]
+        data["level_name"] = lvl["level_name"]
+        max_top = q("SELECT COALESCE(MAX(depth), 3) as max_d FROM sm_top_level WHERE cid=%s", (cid,), one=True)
+        max_top_depth = int(max_top["max_d"]) if max_top and max_top.get("max_d") is not None else 3
+        data["level_depth_no"] = max_top_depth + int(lvl.get("depth") or 0)
 
     dup_where = "AND id<>%s" if existing else ""
     dup_params = (cid, data["sup_id"], data["level_id"]) + ((existing["id"],) if existing else ())

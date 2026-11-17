@@ -11,6 +11,7 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-040 | done | supervisor-level | - | P1 | 2026-11-17 | Supervisor Area Hierarchy Tier Filter & searchable dropdown on create/edit and unified level_depth_no calculation (V-021, D-035)
 - T-039 | done | rep | T-038 | P1 | 2026-11-17 | Employee create rep_id hidden and rep_username unique on (cid, rep_username) added across form, list, hooks, ddl, and DB (V-020, D-034)
 - T-038 | done | rep | T-037 | P1 | 2026-11-17 | Employee dob and doj non-mandatory across create, edit, and Excel import (V-019, D-033)
 - T-037 | done | rep | T-036 | P1 | 2026-11-17 | Employee form non-editable rep_id (readonly on create & edit with styling and auto-generation) and field reorder placing Distributor and Photo before Note

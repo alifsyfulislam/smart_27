@@ -448,11 +448,44 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
     if slug == "supervisor-level":
         field_opts["sup_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
                                  for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='sup' AND status='ACTIVE' ORDER BY name", (config.CID,))]
-        top_lvls = [(r["level_id"], f"{r['level_id']} | {r['level_name']} (National)")
-                    for r in q("SELECT level_id, level_name FROM sm_top_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
-        fld_lvls = [(r["level_id"], f"{r['level_id']} | {r['level_name']} (Field)")
-                    for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
-        field_opts["level_id"] = top_lvls + fld_lvls
+        max_top = q("SELECT COALESCE(MAX(depth), 3) as max_d FROM sm_top_level WHERE cid=%s", (config.CID,), one=True)
+        max_top_depth = int(max_top["max_d"]) if max_top and max_top.get("max_d") is not None else 3
+
+        top_tier_names = {0: "National", 1: "Area", 2: "Zone", 3: "Territory"}
+        fld_tier_names = {0: "Territory", 1: "Town", 2: "Route", 3: "Beat"}
+
+        top_rows = q("SELECT level_id, level_name, depth FROM sm_top_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))
+        fld_rows = q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))
+
+        opts = []
+        seen_ids = set()
+        for r in top_rows:
+            d = int(r.get("depth") or 0)
+            tname = top_tier_names.get(d, f"Top-{d}")
+            opts.append((
+                r["level_id"],
+                f"[{tname}] {r['level_id']} | {r['level_name']}",
+                f"tier_top_{d}",
+                d,
+                f"Depth {d} ({tname})"
+            ))
+            seen_ids.add(r["level_id"])
+
+        for r in fld_rows:
+            d = int(r.get("depth") or 0)
+            if r["level_id"] in seen_ids and d == 0:
+                continue
+            calc_depth = max_top_depth + d
+            tname = fld_tier_names.get(d, f"Field-{d}")
+            opts.append((
+                r["level_id"],
+                f"[{tname}] {r['level_id']} | {r['level_name']}",
+                "tier_top_3" if d == 0 else f"tier_fld_{d}",
+                calc_depth,
+                f"Depth {calc_depth} ({tname})"
+            ))
+
+        field_opts["level_id"] = opts
 
     elif slug == "rep-area":
         field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
