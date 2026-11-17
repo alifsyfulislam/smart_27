@@ -15,6 +15,8 @@
 --   * outlet master      : sm_client (Outlet module, exact columns from
 --                          requirements, DESC index markers normalized like the
 --                          other tables for MariaDB 10.4 compatibility)
+--   * rack master        : sm_rack (Rack module under Item Info, T-029)
+--   * stock balance      : sm_depot_stock_balance (Distributor Info, T-030)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS `smart_27`.`sm_item_hierarchy` (
@@ -248,8 +250,8 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_client` (
   `longitude` varchar(20) DEFAULT '0',
   `depot_id` varchar(50) DEFAULT NULL,
   `depot_name` varchar(200) DEFAULT NULL,
-  `store_id` varchar(50) DEFAULT NULL,
-  `store_name` varchar(200) DEFAULT NULL,
+  `store_id` varchar(75) DEFAULT NULL,
+  `store_name` varchar(100) DEFAULT NULL,
   `customer_type` varchar(100) DEFAULT NULL COMMENT 'auto: CATEGORY_ID|CATEGORY_NAME',
   `contact_no1` varchar(50) DEFAULT NULL,
   `contact_no2` varchar(50) DEFAULT NULL,
@@ -651,3 +653,54 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_client_visit_plan` (
   PRIMARY KEY (`id`),
   KEY `cid` (`cid`, `area_id`, `status`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;
+
+-- ==================================================================
+-- Rack Master & Distributor Stock Balance (T-029, T-030)
+-- ==================================================================
+
+-- ------------------------------------------------------------------
+-- Rack Master (sm_rack): Item Info sub-module
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `smart_27`.`sm_rack` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'SMART',
+  `rack_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `rack_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT 'ACTIVE',
+  `issue_date` date DEFAULT NULL,
+  `expiary_date` date DEFAULT NULL,
+  `image_path` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `field1` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `field2` int DEFAULT '0',
+  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `cid_status_issue_date_expiary_date` (`cid`, `status`, `issue_date`, `expiary_date`),
+  UNIQUE KEY `cid_rack_id` (`cid`, `rack_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------------------------------------------------
+-- Distributor Stock (sm_depot_stock_balance): Distributor Info sub-module
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `smart_27`.`sm_depot_stock_balance` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT 'SMART',
+  `depot_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `store_id` varchar(75) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `store_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT '-',
+  `item_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `batch_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `expiary_date` date DEFAULT NULL,
+  `quantity` int NOT NULL DEFAULT '0',
+  `block_qty` int NOT NULL DEFAULT '0',
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `UNQ_DEPOT_STORE_ITEM_BATCH` (`cid`, `depot_id`, `store_id`, `item_id`, `batch_id`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+

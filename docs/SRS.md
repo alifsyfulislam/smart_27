@@ -54,8 +54,8 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR4.2 Depth cap: cannot create below flavor (max depth 3).
 - FR4.3 Rename propagates to descendants; soft-delete/restore cascade the subtree.
 - FR4.4 Item create → default batch (BR3; hook `item_after_create`, ON DUPLICATE-safe). On view, hierarchy displays formatted text without select inputs; Item ID is readonly and immutable on edit.
-- FR4.5 Depot create → default stores (BR5; hook `depot_after_create`).
-- FR4.6 Uniqueness: item by cid+item_id; batch by cid+item_id+batch_id; store by cid+depot_id+store_id; category by cid+type_name+cat_type_id; name dup within same hierarchy parent. On edit, batch Item selector is disabled and immutable.
+- FR4.5 Depot create → default stores (BR5; hook `depot_after_create`). Distributor ID (`depot_id`) is strictly non-editable on edit (`readonly_on_edit=True` and `depot_prepare`). Inactivating (`status='INACTIVE'`), soft-deleting (`status='PENDING'`), or restoring (`status='ACTIVE'`) a Distributor automatically cascades that status change to all its child stores in `sm_depot_store`.
+- FR4.6 Uniqueness: item by cid+item_id; batch by cid+item_id+batch_id; store by cid+depot_id+store_id; category by cid+type_name+cat_type_id; rack by cid+rack_id; stock balance by cid+depot_id+store_id+item_id+batch_id; name dup within same hierarchy parent. On edit, batch Item selector and distributor store Distributor selector are disabled and immutable.
 - FR4.7 Category values for type names map from `sm_category_type` groups (DISTRIBUTOR_CATEGORY, STORE_TYPE, ITEM_CATEGORY, ITEM_UNIT, ITEM_PACK, OUTLET_CATEGORY, OUTLET_SUB_CATEGORY — see `SEED_CATEGORY_TYPES`).
 
 - FR4.8 Outlet (`sm_client`): uniqueness cid+client_id; category/sub-category resolution; auto-generated customer_type (`category_id|category_name`); depot and store validation against `sm_depot` and `sm_depot_store`.
@@ -66,6 +66,8 @@ Templates: Jinja2 (app/templates) · Static: app/static (FontAwesome local)
 - FR4.13 PSR Area Assignment & Cascading Beat Population (`sm_rep_area`): Reps (`sm_rep` with `user_type='rep'`) assigned exclusively to Route (`sm_level` depth 2). Form takes PSR and Route; saving triggers automated resolution of all active Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`.
 - FR4.14 PSR Visit Plan (`sm_visit_plan`): Concurrently populated upon Route/Beat assignment in `sm_rep_area`. Maps Beat to `order_col_day` (Saturday..Friday); automatically derives `delivery_day` as the next calendar day.
 - FR4.15 Outlet Exceptional Visit Plan (`sm_client_visit_plan`): Enables custom outlet scheduling by mapping an outlet (`client_id`) within an area (`area_id`) with visit frequency, weekly cycle flags (`w1`..`w5`), and weekday matrix flags (`sat`..`fri`).
+- FR4.16 Rack Master (`sm_rack`): Managed under Item Info (`/rack`). Unique on `(cid, rack_id)`. `rack_id` is immutable on edit (`readonly_on_edit=True` and `rack_prepare`). Supports image upload parity with `sm_item` (PNG/JPG/GIF/WEBP up to 5 MB saved under `/static/uploads/sm_rack_{slug}_image_{timestamp}.{ext}`). Preserves historical schema column expiry date.
+- FR4.17 Distributor Stock (`sm_depot_stock_balance`): Managed under Distributor Info (`/depot-stock-balance`). Unique on `(cid, depot_id, store_id, item_id, batch_id)` (`UNQ_DEPOT_STORE_ITEM_BATCH`). Features dropdown selection for active Distributor, Store, Item, and dynamic Batch (`/api/item/batches?item_id=...`). Editing, deleting, and Excel importing are strictly prohibited (`no_edit: True`, `no_delete: True`, `no_import: True`; edit, delete, and import endpoints redirect with danger flash, and action buttons and templates are suppressed across UI). Has no status column. Auto-provisions zero-quantity stock records (`quantity=0`, `block_qty=0`, `batch_id='1'`, BR3 default expiry date) via 3 hooks: on Item creation/import (across all stores), on Distributor creation (across default stores × all items), and on Distributor Store creation (across that store × all items). Preserves historical schema column expiry date.
 
 ### FR5 Audit
 - FR5.1 `sm_audit_log` rows: table_name, record_key (business id), action, old_values/new_values JSON snapshots, changed_by, user_ip, note.
@@ -85,7 +87,9 @@ Tables (scripts/ddl.sql, exact names/columns from requirements):
 |---|---|
 | `sm_item_hierarchy` | + `status` (soft delete); `image_path` now stores a generated `/static/uploads/...` link written by the upload handler (files on disk under `app/static/uploads/`) |
 | `sm_item`, `sm_item_batch` | provided; `sm_item_batch` + `status` |
+| `sm_rack` | Item rack master with `image_path` upload parity, immutable `rack_id`, `issue_date`, expiry date, and `status` |
 | `sm_depot`, `sm_depot_store` | provided; `sm_depot_store` + `status` |
+| `sm_depot_stock_balance` | Distributor store item batch inventory balances; non-editable/non-deletable/non-importable master record with `quantity`, `block_qty`, expiry date, unique on `(cid, depot_id, store_id, item_id, batch_id)`, no `status` column |
 | `sm_category_type` | + `status` |
 | `sm_client` | provided client/outlet master + `status` |
 | `sm_top_level` | National structure hierarchy (National > Area > Zone > Territory) with lineage `level0..level3`, `is_leaf`, `depth`, `image_path` |

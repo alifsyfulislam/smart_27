@@ -31,8 +31,10 @@ DB coordinates can be overridden with env vars `SSMS_DB_HOST / SSMS_DB_PORT / SS
 | Brand (hierarchy) | `/brand` | auto codes via `LEVEL_PREFIX`, path columns, subtree soft delete, rename propagation; tree list opens depth-0 by default with per-level accordion; type-to-search parent picker, image upload+preview (`/static/uploads`, link in `image_path`), add one/many child levels from the edit page (`POST /brand/add-children/{id}`); `is_leaf` kept = "no ACTIVE child" on create/update/delete/restore |
 | Item | `/item` | hierarchy tagging, prices; auto default batch (BR3) |
 | Item Batch | `/item-batch` | per-item batches, datalist item picker |
-| Distributor | `/distributor` | auto default stores Commercial + Damage (BR5) |
-| Distributor Store | `/distributor-store` | store types from category master |
+| Rack | `/rack` | rack master with image upload, immutable ID on edit |
+| Distributor | `/distributor` | auto default stores Commercial + Damage (BR5), status cascade to child stores |
+| Distributor Store | `/distributor-store` | store types from category master, distributor filter & immutable distributor |
+| Distributor Stock | `/depot-stock-balance` | inventory balances with depot/store/item/batch selection, auto-provisioned, non-editable/deletable/importable |
 | Outlet | `/outlet` | client_id uniqueness, auto customer_type, distributor & store linking |
 | National Structure | `/top-level` | client_id uniqueness, auto customer_type, distributor & store linking |
 | Field Structure | `/level` | client_id uniqueness, auto customer_type, distributor & store linking |

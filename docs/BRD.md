@@ -23,8 +23,8 @@ It enforces role-based access control and maintains a central audit trail of eve
 
 **In scope (this release):**
 
-1. **Item Info** — Brand (item hierarchy), Item, Item Batch.
-2. **Distributor Info** — Distributor, Distributor Store.
+1. **Item Info** — Brand (item hierarchy), Item, Item Batch, Rack.
+2. **Distributor Info** — Distributor, Distributor Store, Distributor Stock.
 3. **Outlet Info** — Outlet (client master with distributor, store, and category linkage).
 4. **Fieldforce Info** — National Structure (`sm_top_level`), Field Structure (`sm_level`), Employee Master (`sm_rep`), Supervisor Area Assignment (`sm_supervisor_level`), PSR Area Assignment (`sm_rep_area`), PSR Visit Plan (`sm_visit_plan`), Outlet Exceptional Visit Plan (`sm_client_visit_plan`).
 5. **Settings** — Category Type (data definitions for columns like `depot_category`, `store_type`, `pack_size`, `unit_type`, `item_category`).
@@ -57,6 +57,10 @@ It enforces role-based access control and maintains a central audit trail of eve
 | BR18 | **PSR Area Assignment & Cascading Beat Population** (`sm_rep_area`): Field representatives (`sm_rep` where `user_type='rep'`) can only be assigned to a Route (`sm_level` depth 2). The assignment form accepts PSR and Route selection; upon save, the engine automatically resolves all active child Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`. |
 | BR19 | **PSR Visit Plan** (`sm_visit_plan`): Simultaneous with Route/Beat assignment (`sm_rep_area`), the system auto-populates visit plan rows in `sm_visit_plan`, mapping each Beat to an order collection day (`order_col_day` in Saturday..Friday). The corresponding delivery day (`delivery_day`) is automatically derived as the immediate next calendar day. |
 | BR20 | **Outlet Exceptional Visit Plan** (`sm_client_visit_plan`): Enables custom, non-standard outlet scheduling by mapping an outlet (`client_id`) within an area (`area_id`) with visit frequency, weekly cycle flags (`w1`..`w5`), and weekday matrix flags (`sat`..`fri`). |
+| BR21 | **Rack Master** (`sm_rack`): Managed under Item Info (`/rack`). Supports manual creation, view, edit, soft delete, restore, and Excel import. Mirrored image upload parity with `sm_item` (PNG/JPG/GIF/WEBP up to 5 MB saved under `app/static/uploads/sm_rack_{slug}_image_{timestamp}.{ext}`). Unique on `(cid, rack_id)`. The `rack_id` is immutable on edit. Preserves historical schema column expiry date. |
+| BR22 | **Distributor Stock** (`sm_depot_stock_balance`): Managed under Distributor Info (`/depot-stock-balance`). Records inventory balances per distributor, store, item, and batch. Create form renders dropdown selectors for active Distributor, Store, Item, and Batch. Unique on `(cid, depot_id, store_id, item_id, batch_id)`. Editing, deleting, and Excel importing are strictly prohibited (`no_edit: True`, `no_delete: True`, `no_import: True`; action endpoints redirect with error flash and corresponding buttons are suppressed). Does not carry a `status` column. Features automatic stock row provisioning with quantity 0 and blocked quantity 0 across three triggers: (1) creating/importing an item auto-provisions across all stores, (2) creating a distributor auto-provisions across its default stores &times; all items, (3) creating a store auto-provisions across that store &times; all items. Preserves historical schema column expiry date. |
+| BR23 | **Distributor Store Filter & Readonly Distributor** (`sm_depot_store`): The `/distributor-store` list page provides a Distributor dropdown filter. On `/distributor-store/edit/{id}`, the Distributor selector is disabled/non-editable (`readonly_on_edit=True` with hidden input fallback and server-side immutability in `depot_store_prepare`), preventing reassignment to another distributor. |
+| BR24 | **Distributor Status Cascade & Readonly Distributor ID** (`sm_depot`): Inactivating (`status='INACTIVE'`) or soft-deleting (`status='PENDING'`) a Distributor automatically cascades that status change to all its child stores in `sm_depot_store`. Restoring (`status='ACTIVE'`) a Distributor cascades `ACTIVE` status back to its child stores. On `/distributor/edit/{id}`, Distributor ID (`depot_id`) is strictly non-editable (`readonly_on_edit=True` with server-side immutability in `depot_prepare`). |
 
 ## 4. Users
 

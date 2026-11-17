@@ -1,65 +1,9 @@
-1. Task 1:
+# MY_WATCHER — raw task inbox
+Write new tasks/requirements here in any format (paste DDL, specs, bugs — anything).
+At session start the AI drains this file into `brain/TASKS.md` (structured: id, status,
+deps, priority) and replaces the content with a new tombstone line. Raw history lives in
+`brain/archive/`. Nothing here needs formatting — plain text is fine.
 
-CREATE TABLE `sm_rack` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cid` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `rack_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `rack_name` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `status` varchar(20) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `issue_date` date DEFAULT NULL,
-  `expiary_date` date DEFAULT NULL,
-  `image_path` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `field1` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `field2` int DEFAULT NULL,
-  `note` varchar(200) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `created_on` datetime DEFAULT NULL,
-  `created_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `updated_on` datetime DEFAULT NULL,
-  `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`id` DESC),
-  KEY `cid_status_issue_date_expiary_date` (`cid` DESC,`status` DESC,`issue_date` DESC,`expiary_date` DESC)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-Build whole module under item info below item batch do the same like sm_item 
-module
-
-
-2.
-
-CREATE TABLE `sm_depot_stock_balance` (
-  `id` int NOT NULL AUTO_INCREMENT,
-  `cid` varchar(10) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `depot_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `store_id` varchar(75) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `store_name` varchar(100) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `item_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `batch_id` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `expiary_date` date DEFAULT NULL,
-  `quantity` int NOT NULL DEFAULT '0',
-  `block_qty` int NOT NULL DEFAULT '0',
-  `created_on` datetime DEFAULT NULL,
-  `created_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  `updated_on` datetime DEFAULT NULL,
-  `updated_by` varchar(50) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
-  PRIMARY KEY (`id` DESC),
-  KEY `CID_DEPOT_STORE_ITEM` (`cid` DESC,`depot_id` DESC,`store_id` DESC,`item_id` DESC)
-) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
-Build whole module under distributor info below distributor store do the same like sm_depot but no edit module there
-in create module there depot option item_option batch_option status active
-
-
-
-3. http://10.168.115.161:8027/distributor-store there will depot filter
-
-4. http://10.168.115.161:8027/distributor-store/edit/2 distributor option will not be editable 
-
-followin http://10.168.115.161:8027/item-batch/edit/1 item
-
-
-5. Distributor inactive all it store auto inactive
-
-6. http://10.168.115.161:8027/distributor/edit/2 here depot_id not be ditable follow item/edit item_id
-
-
-update all view if required accordingly
+---
+Drained 2026-11-17 -> T-029..T-034 (see brain/TASKS.md). Raw original:
+brain/archive/MY_WATCHER_2026-11-17.md

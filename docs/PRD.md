@@ -22,13 +22,13 @@ secondary-sales master data with login-based access control and full auditabilit
 - Recent 8 audit entries; quick actions (new level/item/batch/distributor, template downloads).
 
 ### 2.3 Sidebar navigation
-Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch) · **Fieldforce Info** (National Structure, Field Structure, Employee Master, Supervisor Area, PSR Area, PSR Visit Plan, Outlet Visit Plan) · **Distributor Info** (Distributor, Distributor Store) · **Outlet Info** (Outlet) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
+Groups: **Top** (Dashboard) · **Item Info** (Brand, Item, Item Batch, Rack) · **Fieldforce Info** (National Structure, Field Structure, Employee Master, Supervisor Area, PSR Area, PSR Visit Plan, Outlet Visit Plan) · **Distributor Info** (Distributor, Distributor Store, Distributor Stock) · **Outlet Info** (Outlet) · **Settings** (Category Type) · **Administration** (Users, Roles, Permissions) · **Records** (Audit Log).
 Accordion behavior — opening a group collapses the others (persisted in localStorage); a toggle
 collapses the sidebar to icon rail on desktop, drawer + overlay on mobile; smooth CSS transitions;
 Font Awesome icons; Facebook-style colors (#1877f2 primary, #f0f2f5 background, #050505/#65676b text).
 
 ### 2.4 Master modules (generic engine driven by `app/modules.py`)
-Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor Store**, **Outlet**, **National Structure**, **Supervisor Area**, **PSR Area**, **PSR Visit Plan**, **Outlet Visit Plan**, **Category Type**
+Per module: **Brand**, **Item**, **Item Batch**, **Rack**, **Distributor**, **Distributor Store**, **Distributor Stock**, **Outlet**, **National Structure**, **Supervisor Area**, **PSR Area**, **PSR Visit Plan**, **Outlet Visit Plan**, **Category Type**
 
 | Feature | Behavior |
 |---|---|
@@ -62,6 +62,12 @@ Per module: **Brand**, **Item**, **Item Batch**, **Distributor**, **Distributor 
 - **Field Structure Parent & Territory Selection**: In `/level/create` and `/level/edit`, Parent Level options are sourced dynamically from active Zones in National Structure (`sm_top_level` depth 2, `status='ACTIVE'`); Level Name suggestions dynamically filter and load active National Structure Territories (`sm_top_level` depth 3) under that chosen Zone.
 - **Distributor Town Selection**: `town_name` renders as a searchable dropdown dynamically populated from `sm_level` (`depth=1` and `status='ACTIVE'`). The backend `depot_prepare` hook automatically synchronizes `town_id` and `town_name`.
 
+### 2.4.4 Rack & Distributor Info Enhancements
+- **Rack Master (`sm_rack`)**: Positioned under Item Info (`/rack`). Supports manual creation, view, edit, soft delete, restore, and Excel import. Mirrored image upload parity with `sm_item` (PNG/JPG/GIF/WEBP up to 5 MB stored in `app/static/uploads/sm_rack_{slug}_image_{timestamp}.{ext}`). Unique on `(cid, rack_id)`. The `rack_id` is immutable on edit (`readonly_on_edit=True` in module spec and enforced in `rack_prepare`). Historical column expiry date preserved.
+- **Distributor Stock (`sm_depot_stock_balance`)**: Positioned under Distributor Info (`/depot-stock-balance`). Features dropdown selection of active Distributor, Store (filtered/cascaded by distributor), Item, and Batch (dynamically populated via `/api/item/batches?item_id=...`). Unique on `(cid, depot_id, store_id, item_id, batch_id)`. Strictly non-editable (`no_edit: True`), non-deletable (`no_delete: True`), and non-importable (`no_import: True`); edit, delete, and import endpoints redirect with danger flash, and corresponding action buttons and templates are suppressed across UI. Has no status column. Auto-provisions zero-quantity stock records (`quantity=0`, `block_qty=0`, `batch_id='1'`, BR3 default expiry date) via 3 hooks: on Item creation/import (across all stores), on Distributor creation (across default stores × all items), and on Distributor Store creation (across that store × all items). Historical column expiry date preserved.
+- **Distributor Store Filter & Immutability (`sm_depot_store`)**: List view includes a Distributor (`depot_id`) dropdown filter. On `/distributor-store/edit/{id}`, the Distributor option is strictly non-editable (`readonly_on_edit=True` with disabled select, hidden input, and backend enforcement in `depot_store_prepare`).
+- **Distributor Status Cascade & Immutability (`sm_depot`)**: Inactivating (`status='INACTIVE'`) or soft-deleting (`status='PENDING'`) a Distributor automatically propagates that status change to all its child stores in `sm_depot_store`. Restoring (`status='ACTIVE'`) a Distributor restores all child stores to `ACTIVE`. On `/distributor/edit/{id}`, Distributor ID (`depot_id`) is strictly non-editable (`readonly_on_edit=True` and backend immutability in `depot_prepare`).
+
 ### 2.4.3 Fieldforce Modules & User Journeys (Fieldforce Info)
 - **National Structure (`sm_top_level`)**: 4-tier tree: National (depth 0, prefix `H`), Area (depth 1, prefix `A`), Zone (depth 2, prefix `Z`), Territory (depth 3, prefix `T`). Territory is max depth (leaf; cannot have children). Auto-incremental codes (`H0001`, `A0001`, `Z0001`, `T0001`), parent lineage `level0..level3`, tree visualization, accordion collapse, image attachment, and dynamic `is_leaf` recomputation.
 - **Field Structure (`sm_level`)**: 4-tier market coverage tree: Territory (depth 0, prefix `T`, parent Zone sourced dynamically from `sm_top_level` depth 2 active list; Territory name/code filtered from `sm_top_level` depth 3 active list under selected Zone; inserts `level_id`, `level_name`, `parent_level_id`, `parent_level_name`), Town (depth 1, prefix `TW`, distributor tagging exposed), Route (depth 2, prefix `R`, auto-inherits Town distributor), Beat (depth 3, prefix `B`, auto-inherits Town distributor). Beat is max depth (leaf; cannot have children). Auto-incremental codes for child depths (`TW0001`, `R0000006`, `B0000033`), parent lineage `level0..level3`, town distributor cascading to routes/beats, and dynamic `is_leaf`.
@@ -88,14 +94,20 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 | `hierarchy.after_update` | Rename propagation to `parent_level_name` and `level{n}_name` of descendants; node + parent leaf flags recomputed from ACTIVE children |
 | `hierarchy.soft_delete/restore` | Subtree cascading with parent-active check on restore; parent leaf flag recomputed on both (deleted last child → parent leaf again) |
 | `crud image upload` | Any form field of type `image` (brand `image_path` today): multipart read, extension/size validation, `{table}_{slug}_image_{timestamp}` naming, file written only after the row insert/update succeeds |
-| `item.after_create` | Default batch per BR3 (hook: `app/hooks.py item_after_create`) |
-| `depot.after_create` | Default stores per BR5 (hook: `app/hooks.py depot_after_create`) |
+| `item.after_create` | Default batch per BR3 (hook: `app/hooks.py item_after_create`); auto-provisions Distributor Stock rows (qty=0, block_qty=0) across all stores |
+| `depot.after_create` | Default stores per BR5 (hook: `app/hooks.py depot_after_create`); auto-provisions Distributor Stock rows (qty=0, block_qty=0) across default stores × all items |
 | `item_batch.prepare` | Item existence, auto name, uniqueness per item |
-| `depot_store.prepare` | Depot existence, uniqueness per depot |
+| `rack.prepare` | Validates rack_id format/uniqueness; enforces immutability of `rack_id` on edit |
+| `depot.prepare` | Uniqueness + name resolution; synchronizes `town_id` and `town_name` with `sm_level` (depth 1 Town); enforces immutability of `depot_id` on edit |
+| `depot.after_update` | Cascades status updates (ACTIVE/INACTIVE/PENDING) from Distributor to all child stores in `sm_depot_store` |
+| `depot.soft_delete/restore` | Soft delete sets Distributor to PENDING and cascades PENDING to child stores; restore sets Distributor to ACTIVE and cascades ACTIVE to child stores |
+| `depot_store.prepare` | Depot existence, uniqueness per depot; enforces immutability of `depot_id` on edit |
+| `depot_store.after_create` | Auto-provisions Distributor Stock rows (qty=0, block_qty=0) across created store × all items |
+| `depot_stock_balance.prepare` | Validates distributor, store, item, batch existence; resolves store_name and expiry date; sanitizes quantities (no status validation) |
 | `outlet.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `supervisor_level.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
 | `rep_area.prepare` | Client ID uniqueness, category & sub-category resolution, auto-generated customer_type (`category_id|category_name`), distributor & store validation |
-| `item.prepare` / `depot.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids; depot syncs `town_id` and `town_name` with `sm_level` (depth 1 Town) |
+| `item.prepare` / `category_type.prepare` | Uniqueness + name resolution from hierarchy ids |
 | `top_level.prepare` | Auto level code per prefix (`H`, `A`, `Z`, `T`), max depth 3 (Territory), name uniqueness under parent, path fill `level0..level3`, initial `is_leaf=1` |
 | `top_level.after_create/update/delete` | Leaf flag recomputation and subtree rename propagation |
 | `level.prepare` | Auto level code per prefix (`TW`, `R`, `B`), depth 0 Territory parent Zone sourced dynamically from `sm_top_level` depth 2 active list and Territory name/code filtered by Zone from depth 3 active list (injects `level_id`, `level_name`, `parent_level_id`, `parent_level_name`), distributor tagging on Town (depth 1), auto-inheritance of distributor on Route/Beat, max depth 3 (Beat), path fill, initial `is_leaf=1` |

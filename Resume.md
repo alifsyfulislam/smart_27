@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit 4ca8090 · Date: 2026-11-17 -->
+<!-- Synced with repo state at commit 150a2b4 · Date: 2026-11-17 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
@@ -35,7 +35,7 @@
 2. **Central Application-Written Audit (`sm_audit_log`)**  
    Every state modification is recorded via `app/audit.py:log_change`. No database triggers are permitted. Audit failures must be non-blocking.
 3. **Strict Granular Access Control (ACL)**  
-   Every route must enforce `require_perm(user, "module.action")`. Permissions follow `{module}.{action}` syntax (74 canonical seeded permissions). Super administrators (`is_super=1`) bypass checks.
+   Every route must enforce `require_perm(user, "module.action")`. Permissions follow `{module}.{action}` syntax (81 canonical seeded permissions). Super administrators (`is_super=1`) bypass checks.
 4. **Frozen Schema Names & Intentional Anomalies**  
    Column and table names in `scripts/ddl.sql` are strictly frozen to preserve legacy compatibility, including the historical spelling `expiary_date` in `sm_item_batch`.
 5. **No External CDNs**  
@@ -63,15 +63,20 @@
 - **Item Image Upload Parity (D-018):** Replicates Brand image upload pattern for `sm_item.image_path`. Supports up to 5 MB (`.png,.jpg,.jpeg,.gif,.webp`), stores file under `/static/uploads/sm_item_{slug}_image_{timestamp}.{ext}` after DB commit, logs CREATE/UPDATE in `sm_audit_log`, and guards against MariaDB default `'-'` broken previews.
 - **Item & Batch Immutable IDs on Edit (D-020):** `item_id` in `sm_item` and `sm_item_batch` is `readonly_on_edit=True` (`readonly` input for Item, `disabled` select for Batch), protected against tampering in `item_prepare` and `item_batch_prepare`.
 - **Item View Hierarchy Printout (D-020):** `/item/view/{id}` renders read-only formatted text for Company, Brand, Type, and Flavor ID and Name without `<select>` elements.
+- **Rack Master Module (`sm_rack`, BR21, D-024):** Auto-coded per `app/hooks.py _next_rack_code`: `RCK{seq:04d}` (`RCK0001`). `rack_id` is immutable on edit (`readonly_on_edit=True`, protected in `rack_prepare`). Full image upload parity matching Brand/Item (`image_path` up to 5 MB, stored under `/static/uploads/sm_rack_{slug}_image_{timestamp}.{ext}`, thumbnail preview, clean handling of default `'-'`). Standard soft-delete (`status='PENDING'`) and restore (`status='ACTIVE'`).
 
 ### 3.2 Soft-Delete Semantics (Unified to `PENDING`)
 - **Master Modules:** Soft delete sets `status='PENDING'`. Restore sets `status='ACTIVE'`.
 - **ACL Users & Roles:** Soft delete sets `status='PENDING'`. Restore sets `status='ACTIVE'` (unified per Decision D-011).
 - **Item Domain Status vs Batches:** Item master status (`ACTIVE`, `INACTIVE`, `PENDING`, `REJECTED`) is a business domain status. Changing an item to non-active cascades the status to its batch rows (`app/hooks.py item_soft_delete`).
+- **Distributor Status Cascade (BR24, D-028):** Inactivating (`status='INACTIVE'`) or soft-deleting (`status='PENDING'`) a Distributor (`sm_depot`) automatically cascades synchronously to update all child stores in `sm_depot_store` to matching status (`depot_after_update`, `depot_soft_delete`). Restoring (`depot_restore`) restores all child stores to `ACTIVE`.
 
-### 3.3 Default Auto-Provisions
+### 3.3 Default Auto-Provisions & Distributor Hardening
 - **Default Item Batch (BR3):** Creating an item automatically creates default batch `batch_id='1'` with expiry `2100-12-31` (`app/hooks.py item_after_create`).
 - **Default Distributor Stores (BR5):** Creating a distributor (depot) automatically creates two default stores: `{depot_id}140` (Commercial) and `{depot_id}170` (Damage) (`app/hooks.py depot_after_create`).
+- **Distributor Stock Invariants (`sm_depot_stock_balance`, BR22, D-025, D-030):** Master under Distributor Info recording batch quantities across distributor and store (renamed from Distributor Stock Balance). Sourced via dynamic dropdowns (`depot_id`, `store_id`, `item_id`, `batch_id`) with dynamic batch hydration endpoint (`/api/item/batches?item_id=...`). Strictly non-editable (`no_edit=True`), non-deletable (`no_delete=True`), and non-importable (`no_import=True`): action buttons and templates suppressed across UI; GET/POST routes for edit, delete, restore, and upload rejected with 303 redirect. Has no `status` column; unique on `(cid, depot_id, store_id, item_id, batch_id)`. Auto-provisions zero-quantity stock records (`quantity=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`) via 3 hooks: on Item create/Excel import (across all stores), on Distributor create (across default stores × all items), and on Distributor Store create (across that store × all items). Includes one-time data backfill for existing active records.
+- **Distributor Store Hardening (`sm_depot_store`, BR23, D-026, D-027):** Dedicated Distributor (`depot_id`) dropdown filter on `/distributor-store` list view. Non-editable Distributor selector on `/distributor-store/edit/{id}` with `readonly_on_edit=True` (disabled select + hidden input fallback + `depot_store_prepare` backend guard).
+- **Distributor Master Hardening (`sm_depot`, BR24, D-029):** Non-editable Distributor ID (`depot_id`) on `/distributor/edit/{id}` with `readonly_on_edit=True` and `depot_prepare` backend guard.
 
 ### 3.4 Dynamic Form Dropdowns & Hierarchy Standards
 - **Option Display Standard:** All dynamic/foreign-key dropdown options format selectable options uniformly as `ID | Name` (e.g., `BG001 | Kurkure`).
@@ -98,15 +103,17 @@
 
 ## 4. Master Module Directory & Technical Specification
 
-SSMS currently registers **14 master data modules**, plus ACL and Audit engines:
+SSMS currently registers **16 master data modules**, plus ACL and Audit engines:
 
 | Module Slug | Title / Group | Database Table | Primary / Unique Keys | Permissions | Hooks (`app/hooks.py`) |
 |---|---|---|---|---|---|
 | `brand` | Brand / *Item Info* | `sm_item_hierarchy` | `id`, (`cid`, `level_id`) | `brand.{view,create,edit,delete,import}` | `hierarchy_prepare`, `_recompute_is_leaf` |
 | `item` | Item / *Item Info* | `sm_item` | `id`, (`cid`, `item_id`) | `item.{view,create,edit,delete,import}` | `item_prepare`, `item_after_create`, `item_soft_delete` |
 | `item-batch` | Item Batch / *Item Info* | `sm_item_batch` | `id`, (`cid`, `item_id`, `batch_id`) | `item_batch.{view,create,edit,delete,import}` | `item_batch_prepare` |
-| `distributor` | Distributor / *Distributor Info* | `sm_depot` | `id`, (`cid`, `depot_id`) | `distributor.{view,create,edit,delete,import}` | `depot_prepare`, `depot_after_create` |
-| `distributor-store` | Distributor Store / *Distributor Info* | `sm_depot_store` | `id`, (`cid`, `depot_id`, `store_id`) | `depot_store.{view,create,edit,delete,import}` | `depot_store_prepare` |
+| `rack` | Rack / *Item Info* | `sm_rack` | `id`, (`cid`, `rack_id`) | `rack.{view,create,edit,delete,import}` | `rack_prepare` |
+| `distributor` | Distributor / *Distributor Info* | `sm_depot` | `id`, (`cid`, `depot_id`) | `distributor.{view,create,edit,delete,import}` | `depot_prepare`, `depot_after_create`, `depot_after_update`, `depot_soft_delete`, `depot_restore` |
+| `distributor-store` | Distributor Store / *Distributor Info* | `sm_depot_store` | `id`, (`cid`, `depot_id`, `store_id`) | `distributor_store.{view,create,edit,delete,import}` | `depot_store_prepare` |
+| `depot-stock-balance` | Distributor Stock / *Distributor Info* | `sm_depot_stock_balance` | `id`, (`cid`, `depot_id`, `store_id`, `item_id`, `batch_id`) | `depot_stock_balance.{view,create}` | `depot_stock_balance_prepare` |
 | `outlet` | Outlet / *Outlet Info* | `sm_client` | `id`, (`cid`, `client_id`) | `outlet.{view,create,edit,delete,import}` | `outlet_prepare` |
 | `category-type` | Module Category / *Settings* | `sm_category_type` | `id`, (`cid`, `type_name`, `cat_type_id`) | `category_type.{view,create,edit,delete,import}` | `category_type_prepare` |
 | `top-level` | National Structure / *Fieldforce Info* | `sm_top_level` | `id`, (`cid`, `level_id`) | `top_level.{view,create,edit,delete,import}` | `top_level_prepare`, `_recompute_top_level_is_leaf` |
@@ -136,8 +143,8 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
    └── brain/STATUS.md              # Current system state & verified entity counts
 
 [Layer 2: History & Auditable Logs]
-   ├── brain/DECISIONS.md           # Permanent append-only architectural log (D-001 to D-023)
-   └── brain/VERIFICATION_LOG.md    # Append-only verified test logs (V-001 to V-014)
+   ├── brain/DECISIONS.md           # Permanent append-only architectural log (D-001 to D-030)
+   └── brain/VERIFICATION_LOG.md    # Append-only verified test logs (V-001 to V-016)
 
 [Layer 3: Task Flow & Inbox]
    ├── MY_WATCHER.txt               # Raw task inbox for user inputs
@@ -181,7 +188,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ## 7. Current Task Register & Status
 
-### Active Milestones Verified (V-001 to V-014)
+### Active Milestones Verified (V-001 to V-016)
 - **V-001 (2026-11-05 · fb0e803):** Core v1.0.0 end-to-end verified (Login, dashboard, 6 master modules, ACL admin, audit log).
 - **V-002 (2026-11-09 · 8b10af5):** Brand UX verified (Tree list, accordion per level, parent picker, image upload, multi-child addition, `is_leaf` invariant).
 - **V-003 (2026-11-13 · 00f28df):** Excel data download & hierarchy export verified across all 7 master modules (HIERARCHY_TREE, HIERARCHY_PATHS, ITEMS with synced levels, openpyxl styling).
@@ -196,11 +203,32 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **V-012 (2026-11-16 · HEAD):** Field Structure Parent Level from National Structure Zone Depth 2 (T-026): `/level/create` and `/level/edit` (depth 0) source Parent Level options from active National Structure Zones (`sm_top_level` depth 2).
 - **V-013 (2026-11-16 · HEAD):** Parent Level Whitespace Fix & Dynamic Zone-to-Territory Suggestion Filter (T-027): Parent level dropdowns verified zero leading newlines; Field Structure dynamically filters Territory suggestions by selected Parent Zone; backend rejects cross-zone mismatches.
 - **V-014 (2026-11-16 · HEAD):** Field Structure Route & Beat Code Length Synchronization (T-028): Auto-generation for Route (`R`) and Beat (`B`) produces 8-character codes (`R0000001`..`R0000037`, `B0000001`..`B0000037`) with 7-digit zero-padding; existing records migrated and lineage columns synced.
+- **V-015 (2026-11-17 · HEAD):** My Watcher Master Modules & Distributor Hardening Suite (T-029..T-034):
+  - Task 1 (T-029): `sm_rack` master module under Item Info with image upload parity and immutable `rack_id` on edit.
+  - Task 2 (T-030): `sm_depot_stock_balance` master module under Distributor Info with dynamic batch endpoint (`/api/item/batches`) and strictly no edit action (`no_edit: True`).
+  - Task 3 (T-031): Distributor (`depot_id`) filter on `/distributor-store` list page.
+  - Task 4 (T-032): Non-editable Distributor (`depot_id`) on `/distributor-store/edit/{id}`.
+  - Task 5 (T-033): Distributor status cascade on inactivate/soft-delete (`INACTIVE`/`PENDING`) and restore (`ACTIVE`) to child stores.
+  - Task 6 (T-034): Non-editable Distributor ID (`depot_id`) on `/distributor/edit/{id}`.
+  - Verified live via HTTP against port 8027 with full `sm_audit_log` trail.
+- **V-016 (2026-11-17 · HEAD):** Distributor Stock Refinement & Auto-Provisioning Suite (T-035):
+  - Module title displays "Distributor Stock"; delete, import, and status column removed.
+  - Action restrictions: direct GET/POST to `/depot-stock-balance/template`, `/edit/{id}`, `/delete/{id}`, `/restore/{id}`, and `/upload` strictly redirect (303) with danger flash; action buttons and template links eliminated from UI.
+  - Schema & permissions: Dropped `status` column from `sm_depot_stock_balance`, unique key `UNQ_DEPOT_STORE_ITEM_BATCH (cid, depot_id, store_id, item_id, batch_id)`; permissions catalogue reduced from 83 to 81.
+  - Auto-provisioning triggers verified live: Trigger A (item create / Excel import across all stores), Trigger B (distributor create across default stores 140/170 × all items), Trigger C (distributor store create across that store × all items) inserting `qty=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`.
+  - One-time active data backfill executed and verified.
 
 ### Task Register Snapshot (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
 |---|---|---|---|---|
+| **T-035** | **P1** | `depot-stock-balance` | `done` | Distributor Stock refinement: renamed from Distributor Stock Balance, removed import/delete/status (permissions 83 -> 81), added 3 zero-qty auto-provisioning triggers (item, depot, depot_store) and data backfill (V-016, D-030). |
+| **T-034** | **P1** | `distributor` | `done` | Distributor ID (`depot_id`) non-editable on `/distributor/edit/{id}` with `readonly_on_edit=True` and server-side immutability in `depot_prepare` (V-015, D-029). |
+| **T-033** | **P1** | `distributor` | `done` | Distributor status cascade: automatically cascades INACTIVE, PENDING (soft-delete), and ACTIVE (restore) to all child stores in `sm_depot_store` (V-015, D-028). |
+| **T-032** | **P1** | `distributor-store` | `done` | Distributor selector non-editable on `/distributor-store/edit/{id}` with `readonly_on_edit=True` and backend immutability in `depot_store_prepare` (V-015, D-027). |
+| **T-031** | **P1** | `distributor-store` | `done` | Distributor dropdown filter (`depot_id`) added to `/distributor-store` list page alongside status and store_type (V-015, D-026). |
+| **T-030** | **P1** | `depot-stock-balance` | `done` | Distributor Stock Balance module (`sm_depot_stock_balance`) with `no_edit: True`, dropdown selectors for distributor, store, item, and batch, with auto expiry resolution (V-015, D-025). |
+| **T-029** | **P1** | `rack` | `done` | Rack Master module (`sm_rack`) under Item Info with image upload parity, immutable `rack_id` on edit, full CRUD, and Excel export/import (V-015, D-024). |
 | **T-028** | **P1** | `level` | `done` | Field Structure Route and Beat code length synchronization (R0000037, B0000037 8-character zero-padded format) with `sm_level` data migration (V-014, D-023). |
 | **T-027** | **P1** | `level` | `done` | Parent Level option whitespace fix in `/top-level/create` and `/level/create`; dynamic Zone-to-Territory suggestion filter in Field Structure (V-013, D-022). |
 | **T-026** | **P1** | `level` | `done` | Field Structure Parent Level options from `sm_top_level` depth 2 (active Zones) for `/level/create` and `/level/edit` with depth 3 Territory name sync (V-012, D-021). |
@@ -221,7 +249,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-023)
+## 8. Architectural Decision Summary (D-001 to D-029)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -246,14 +274,21 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-021:** Field Structure Parent Level Sourced from National Structure Depth 2: In Field Structure (`/level/create` and `/level/edit`), Parent Level options are sourced dynamically from active Zones in National Structure (`sm_top_level` where `depth = 2` and `status = 'ACTIVE'`). On `/level/create` and `/level/edit` (for depth 0 Territory records), Parent Level renders an active searchable select populated via `_level_parent_opts()`.
 - **D-022:** Parent Level Whitespace Fix & Dynamic Zone-to-Territory Suggestion Filter: Formatted `<option>` tags on a single line in `form.html` and added trimming in `app.js` to eliminate multiline indentation spaces from dropdown labels; Root option suppresses prefix `0 | `. In Field Structure (`/level/create` and `/level/edit`), `level_name` suggestions (Territory from `sm_top_level` depth 3) are filtered dynamically by the selected Parent Zone (`sm_top_level` depth 2). Backend validation in `level_prepare` rejects cross-zone mismatches.
 - **D-023:** Field Structure Route & Beat Code Length Synchronization: Route (prefix `R`, depth 2) and Beat (prefix `B`, depth 3) auto-generated codes synchronized to the 8-character enterprise format (`R0000037`, `B0000037`) using 7-digit zero-padding (`:07d`) in `_next_field_level_code(cid, prefix)` in `app/hooks.py`. Existing records in `sm_level` and path foreign key columns normalized to 8-character format.
+- **D-024:** Rack Master Module (`sm_rack`) under Item Info: Auto-coded `RCK{seq:04d}` (`RCK0001`), `rack_id` immutable on edit (`readonly_on_edit=True`), full image upload pipeline parity with Brand/Item (`image_path`), and standard soft-delete (`status='PENDING'`).
+- **D-025:** Distributor Stock Balance Master Module (`sm_depot_stock_balance`): Snapshot module under Distributor Info recording item-batch stock balances per distributor and store. Dynamic `/api/item/batches?item_id=...` endpoint hydrates batches for selected item. Configured with strictly no edit module or edit action (`no_edit=True`), hiding edit buttons and rejecting GET/POST edit access with 303 redirect.
+- **D-026:** Distributor Store List Page Distributor Filter: Added `depot_id` dropdown filter on `/distributor-store` list view, populated from active distributors and synchronized with search, pagination, and Excel export.
+- **D-027:** Distributor Store Edit Immobility for Distributor Selection: Configured `depot_id` with `readonly_on_edit=True` in `sm_depot_store`. `form.html` renders disabled select with hidden fallback input; `depot_store_prepare` guards backend against tampering.
+- **D-028:** Distributor Status Inactivation and Soft-Delete Cascade: Updating a Distributor (`sm_depot`) to `INACTIVE` or soft-deleting to `PENDING` cascades synchronously to update all child stores in `sm_depot_store` to matching status (`depot_after_update`, `depot_soft_delete`). Restoring (`depot_restore`) restores child stores to `ACTIVE`.
+- **D-029:** Distributor Master Edit Immobility for Distributor ID: Configured `depot_id` with `readonly_on_edit=True` in `sm_depot` module spec and backend guard in `depot_prepare` to prevent primary business key mutation on edit.
+- **D-030:** Distributor Stock Module Refinement, Action Restrictions & Zero-Quantity Auto-Provisioning: Renamed module from "Distributor Stock Balance" to "Distributor Stock" (`depot-stock-balance` / `sm_depot_stock_balance`). Configured `no_delete=True, no_import=True` alongside `no_edit=True`; gated delete and upload routes with 303 Redirect; suppressed action buttons and templates across UI; purged delete and import from permissions catalogue (83 → 81). Dropped `status` column from schema, live DB, and module spec; replaced key with `UNQ_DEPOT_STORE_ITEM_BATCH (cid, depot_id, store_id, item_id, batch_id)`. Wired 3 zero-quantity stock auto-provisioning triggers (`qty=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`) in `app/hooks.py`: (1) `item_after_create` (item creation / Excel import) across all stores, (2) `depot_after_create` (distributor creation) across default stores 140/170 × all items, and (3) `depot_store_after_create` (distributor store creation) across created store × all items. Executed one-time data backfill across all existing stores and items.
 
 ---
 
 ## 9. System Health & Audit Checkpoint
 
 - **Context Checker Status:** **PASS (15/15 checks clean)** via `scripts/check_context.py`.
-- **Active Master Modules:** 14 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
-- **Verification Milestones:** 14 verification milestones verified live (V-001 through V-014).
+- **Active Master Modules:** 16 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
+- **Verification Milestones:** 16 verification milestones verified live (V-001 through V-016).
 - **Known Technical Debt / Pending Actions:**
   1. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore`.
   2. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).

@@ -145,6 +145,38 @@ MODULES = {
         "excel_cols": ["item_id", "batch_id", "name", "expiary_date", "note"],
         "unique_msg": "This batch already exists for the item.",
     },
+    "rack": {
+        "title": "Rack",
+        "icon": "fa-boxes-stacked",
+        "perm": "rack",
+        "table": "sm_rack",
+        "group": "Item Info",
+        "order": "id DESC",
+        "list_cols": [
+            ("rack_id", "Rack ID"), ("rack_name", "Rack Name"),
+            ("issue_date", "Issue Date"), ("expiary_date", "Expiary Date"),
+            ("status", "Status"),
+        ],
+        "search_cols": ["rack_id", "rack_name", "field1", "note"],
+        "filters": [("status", "Status", "status")],
+        "form_fields": [
+            f("rack_id", "Rack ID", "text", required=True, in_list=True, readonly_on_edit=True,
+              help="Unique rack identifier. Immutable on edit."),
+            f("rack_name", "Rack Name", "text", required=True, in_list=True),
+            f("issue_date", "Issue Date", "date", in_list=True),
+            f("expiary_date", "Expiary Date", "date", in_list=True),
+            f("image_path", "Image", "image",
+              help="Optional PNG/JPG/GIF/WEBP (max 5 MB). Saved under /static/uploads as "
+                   "{table}_{slug}_image_{timestamp}.{ext}; the generated link is stored in image_path."),
+            f("field1", "Field 1", "text"),
+            f("field2", "Field 2", "int", default=0),
+            f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE", in_list=True),
+            f("note", "Note", "textarea"),
+        ],
+        "create_hook": "rack",
+        "excel_cols": ["rack_id", "rack_name", "issue_date", "expiary_date", "image_path", "field1", "field2", "note"],
+        "unique_msg": "A rack with this Rack ID already exists.",
+    },
     # ================= DISTRIBUTOR INFO =================
     "distributor": {
         "title": "Distributor",
@@ -162,8 +194,8 @@ MODULES = {
         "filters": [("status", "Status", "status"),
                     ("depot_category", "Depot Category", "cat", "DISTRIBUTOR_CATEGORY")],
         "form_fields": [
-            f("depot_id", "Distributor ID (Depot)", "text", required=True, in_list=True,
-              help="Comes from integration or manual. On create, default stores {id}140 (Commercial) and {id}170 (Damage) are generated automatically."),
+            f("depot_id", "Distributor ID (Depot)", "text", required=True, in_list=True, readonly_on_edit=True,
+              help="Comes from integration or manual. Immutable on edit. On create, default stores {id}140 (Commercial) and {id}170 (Damage) are generated automatically."),
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("short_name", "Short Name", "text"),
@@ -209,9 +241,10 @@ MODULES = {
         ],
         "search_cols": ["depot_id", "store_id", "store_name", "store_type", "note"],
         "filters": [("status", "Status", "status"),
+                    ("depot_id", "Distributor", "depot"),
                     ("store_type", "Store Type", "cat", "STORE_TYPE")],
         "form_fields": [
-            f("depot_id", "Distributor", "depot_select", required=True, in_list=True),
+            f("depot_id", "Distributor", "depot_select", required=True, in_list=True, readonly_on_edit=True),
             f("store_id", "Store ID", "text", required=True, in_list=True),
             f("store_name", "Store Name", "text", required=True, in_list=True),
             f("store_type", "Store Type", "select", cat="STORE_TYPE", in_list=True),
@@ -221,6 +254,44 @@ MODULES = {
         "create_hook": "depot_store",
         "excel_cols": ["depot_id", "store_id", "store_name", "store_type", "note"],
         "unique_msg": "This store already exists for the distributor.",
+    },
+    "depot-stock-balance": {
+        "title": "Distributor Stock",
+        "icon": "fa-cubes-stacked",
+        "perm": "depot_stock_balance",
+        "table": "sm_depot_stock_balance",
+        "group": "Distributor Info",
+        "order": "id DESC",
+        "no_edit": True,
+        "no_delete": True,
+        "no_import": True,
+        "list_cols": [
+            ("depot_id", "Distributor ID"), ("store_id", "Store ID"),
+            ("store_name", "Store Name"), ("item_id", "Item ID"),
+            ("batch_id", "Batch ID"), ("expiary_date", "Expiary Date"),
+            ("quantity", "Quantity"), ("block_qty", "Blocked Qty"),
+        ],
+        "search_cols": ["depot_id", "store_id", "store_name", "item_id", "batch_id"],
+        "filters": [
+            ("depot_id", "Distributor", "depot"),
+        ],
+        "form_fields": [
+            f("depot_id", "Distributor", "depot_select", required=True, in_list=True,
+              help="Select distributor (sm_depot)."),
+            f("store_id", "Store", "store_select", required=True, in_list=True,
+              help="Select store belonging to the distributor."),
+            f("item_id", "Item", "item_select", required=True, in_list=True,
+              help="Active items only."),
+            f("batch_id", "Batch ID", "batch_select", required=True, in_list=True,
+              help="Select active batch for the item."),
+            f("expiary_date", "Expiary Date", "date", in_list=True,
+              help="Auto-populated from batch or custom."),
+            f("quantity", "Quantity", "int", default=0, in_list=True),
+            f("block_qty", "Blocked Qty", "int", default=0, in_list=True),
+        ],
+        "create_hook": "depot_stock_balance",
+        "excel_cols": ["depot_id", "store_id", "item_id", "batch_id", "expiary_date", "quantity", "block_qty"],
+        "unique_msg": "Stock balance entry could not be created.",
     },
     # ================= OUTLET INFO =================
     "outlet": {
@@ -522,18 +593,19 @@ MODULES = {
 }
 
 MODULE_ORDER = [
-    "brand", "item", "item-batch",
+    "brand", "item", "item-batch", "rack",
     "top-level", "level", "rep", "supervisor-level", "rep-area", "visit-plan", "client-visit-plan",
-    "distributor", "distributor-store",
+    "distributor", "distributor-store", "depot-stock-balance",
     "outlet", "category-type",
 ]
 
 PERM2SLUG = {
-    "brand": "brand", "item": "item", "item_batch": "item-batch",
+    "brand": "brand", "item": "item", "item_batch": "item-batch", "rack": "rack",
     "top_level": "top-level", "level": "level", "rep": "rep",
     "supervisor_level": "supervisor-level", "rep_area": "rep-area",
     "visit_plan": "visit-plan", "client_visit_plan": "client-visit-plan",
     "distributor": "distributor", "depot_store": "distributor-store",
+    "depot_stock_balance": "depot-stock-balance",
     "outlet": "outlet", "category_type": "category-type",
 }
 

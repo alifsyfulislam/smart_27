@@ -87,6 +87,13 @@ SEED_PERMISSIONS = [
     ("client_visit_plan.edit", "Edit outlet visit plans", "client_visit_plan"),
     ("client_visit_plan.delete", "Soft delete outlet visit plans", "client_visit_plan"),
     ("client_visit_plan.import", "Excel upload outlet visit plans", "client_visit_plan"),
+    ("rack.view", "View racks", "rack"),
+    ("rack.create", "Create racks", "rack"),
+    ("rack.edit", "Edit racks", "rack"),
+    ("rack.delete", "Soft delete racks", "rack"),
+    ("rack.import", "Excel upload racks", "rack"),
+    ("depot_stock_balance.view", "View distributor stock", "depot_stock_balance"),
+    ("depot_stock_balance.create", "Create distributor stock", "depot_stock_balance"),
     ("acl.view", "View access control", "acl"),
     ("acl.manage", "Manage users, roles and permissions", "acl"),
     ("audit.view", "View central audit log", "audit"),
@@ -156,7 +163,8 @@ ROLE_PERM_MATRIX = {
     "MANAGER": [p[0] for p in SEED_PERMISSIONS if p[2] in
                 ("dashboard", "brand", "item", "item_batch", "distributor",
                  "depot_store", "outlet", "category_type", "audit",
-                 "top_level", "level", "rep", "supervisor_level", "rep_area", "visit_plan", "client_visit_plan") and p[0].split(".")[-1] != "import"],
+                 "top_level", "level", "rep", "supervisor_level", "rep_area", "visit_plan", "client_visit_plan",
+                 "rack", "depot_stock_balance") and p[0].split(".")[-1] != "import"],
     "VIEWER": [p[0] for p in SEED_PERMISSIONS if p[0].endswith(".view")],
 }
 

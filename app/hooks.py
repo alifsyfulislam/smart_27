@@ -229,12 +229,21 @@ def item_prepare(cid, data, existing=None, user=None):
 def item_after_create(cid, row, user=None):
     """Every item automatically gets a default batch: batch_id '1',
     expiary_date 2100-12-31 (per requirements). The batch mirrors the
-    item's own status."""
+    item's own status.
+    Auto-provisions sm_depot_stock_balance rows across all stores with qty 0."""
+    user = user or "SYSTEM"
     x("""INSERT INTO sm_item_batch
          (cid, item_id, name, batch_id, expiary_date, status, note, created_on, created_by)
          VALUES (%s,%s,%s,'1','2100-12-31',%s,'Default batch (auto)',NOW(),%s)
          ON DUPLICATE KEY UPDATE name=VALUES(name)""",
-      (cid, row["item_id"], row["name"], (row.get("status") or "ACTIVE"), user or "SYSTEM"))
+      (cid, row["item_id"], row["name"], (row.get("status") or "ACTIVE"), user))
+    # Auto-provision stock rows across all stores
+    stores = q("SELECT depot_id, store_id, store_name FROM sm_depot_store WHERE cid=%s", (cid,))
+    for st in stores:
+        x("""INSERT IGNORE INTO sm_depot_stock_balance
+             (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
+             VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
+          (cid, st["depot_id"], st["store_id"], st.get("store_name", "-"), row["item_id"], user))
 
 
 def _cascade_item_status(cid, item_id, status, user=None):
@@ -300,8 +309,28 @@ def item_batch_prepare(cid, data, existing=None, user=None):
     return None
 
 
+# ----------------------------------------------------------------- rack
+def rack_prepare(cid, data, existing=None, user=None):
+    if existing is not None:
+        data["rack_id"] = existing["rack_id"]
+    rack_id = (data.get("rack_id") or "").strip()
+    rack_name = (data.get("rack_name") or "").strip()
+    if not rack_id or not rack_name:
+        return "Rack ID and Rack Name are required."
+    dup_sql = "SELECT id FROM sm_rack WHERE cid=%s AND rack_id=%s"
+    dup_params = [cid, rack_id]
+    if existing is not None:
+        dup_sql += " AND id<>%s"
+        dup_params.append(existing["id"])
+    if q(dup_sql, dup_params, one=True):
+        return "A rack with this Rack ID already exists."
+    return None
+
+
 # ----------------------------------------------------------------- depot
 def depot_prepare(cid, data, existing=None, user=None):
+    if existing is not None:
+        data["depot_id"] = existing["depot_id"]
     depot_id = (data.get("depot_id") or "").strip()
     name = (data.get("name") or "").strip()
     if not depot_id or not name:
@@ -333,9 +362,47 @@ def depot_prepare(cid, data, existing=None, user=None):
     return None
 
 
+def _cascade_depot_status(cid, depot_id, status, user=None):
+    """A distributor's status is always reflected on its stores: whatever status
+    the distributor carries (INACTIVE/PENDING/REJECTED/...) is pushed to every store row."""
+    if not depot_id or not status:
+        return
+    x("""UPDATE sm_depot_store SET status=%s, updated_on=NOW(), updated_by=%s
+         WHERE cid=%s AND depot_id=%s AND status<>%s""",
+      (status, user or "SYSTEM", cid, depot_id, status))
+
+
+def depot_after_update(cid, old, new, user=None):
+    if (old.get("status") or "") != (new.get("status") or ""):
+        _cascade_depot_status(cid, new.get("depot_id"), new.get("status"), user)
+
+
+def depot_soft_delete(cid, rid, user=None):
+    row = q("SELECT * FROM sm_depot WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    _, n = x("UPDATE sm_depot SET status='PENDING', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status<>'PENDING'", (user, cid, rid))
+    if n:
+        _cascade_depot_status(cid, row["depot_id"], "PENDING", user)
+    return n, None
+
+
+def depot_restore(cid, rid, user=None):
+    row = q("SELECT * FROM sm_depot WHERE cid=%s AND id=%s", (cid, rid), one=True)
+    if not row:
+        return None, "Record not found."
+    _, n = x("UPDATE sm_depot SET status='ACTIVE', updated_on=NOW(), updated_by=%s "
+             "WHERE cid=%s AND id=%s AND status<>'ACTIVE'", (user, cid, rid))
+    if n:
+        _cascade_depot_status(cid, row["depot_id"], "ACTIVE", user)
+    return n, None
+
+
 def depot_after_create(cid, row, user=None):
     """Every distributor automatically gets two default stores:
-       {depot_id}140 -> Commercial, {depot_id}170 -> Damage (per requirements)."""
+       {depot_id}140 -> Commercial, {depot_id}170 -> Damage (per requirements).
+       Auto-provisions sm_depot_stock_balance rows across default stores * all items with qty 0."""
     user = user or "SYSTEM"
     pairs = [(f"{row['depot_id']}140", "Commercial", "COMMERCIAL"),
              (f"{row['depot_id']}170", "Damage", "DAMAGE")]
@@ -345,10 +412,20 @@ def depot_after_create(cid, row, user=None):
              VALUES (%s,%s,%s,%s,%s,'ACTIVE','Default store (auto)',NOW(),%s)
              ON DUPLICATE KEY UPDATE store_name=VALUES(store_name)""",
           (cid, row["depot_id"], store_id, store_name[:100], store_type, user))
+    # Auto-provision stock rows across default stores * all items
+    items = q("SELECT item_id FROM sm_item WHERE cid=%s", (cid,))
+    for store_id, store_name, _ in pairs:
+        for it in items:
+            x("""INSERT IGNORE INTO sm_depot_stock_balance
+                 (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
+                 VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
+              (cid, row["depot_id"], store_id, store_name, it["item_id"], user))
 
 
 # ----------------------------------------------------------------- store
 def depot_store_prepare(cid, data, existing=None, user=None):
+    if existing is not None:
+        data["depot_id"] = existing["depot_id"]
     depot_id = (data.get("depot_id") or "").strip()
     store_id = (data.get("store_id") or "").strip()
     store_name = (data.get("store_name") or "").strip()
@@ -363,6 +440,61 @@ def depot_store_prepare(cid, data, existing=None, user=None):
         dup_params.append(existing["id"])
     if q(dup_sql, dup_params, one=True):
         return "This store already exists for the distributor."
+    return None
+
+
+def depot_store_after_create(cid, row, user=None):
+    """When a new distributor store is created, auto-provisions sm_depot_stock_balance
+    rows for that store * all items with quantity 0, block_qty 0."""
+    user = user or "SYSTEM"
+    items = q("SELECT item_id FROM sm_item WHERE cid=%s", (cid,))
+    for it in items:
+        x("""INSERT IGNORE INTO sm_depot_stock_balance
+             (cid, depot_id, store_id, store_name, item_id, batch_id, expiary_date, quantity, block_qty, created_on, created_by)
+             VALUES (%s,%s,%s,%s,%s,'1','2100-12-31',0,0,NOW(),%s)""",
+          (cid, row["depot_id"], row["store_id"], row.get("store_name", "-"), it["item_id"], user))
+
+
+# ----------------------------------------------------------------- stock balance
+def depot_stock_balance_prepare(cid, data, existing=None, user=None):
+    depot_id = (data.get("depot_id") or "").strip()
+    store_id = (data.get("store_id") or "").strip()
+    item_id = (data.get("item_id") or "").strip()
+    batch_id = (data.get("batch_id") or "").strip()
+    if not depot_id or not store_id or not item_id or not batch_id:
+        return "Distributor, Store, Item and Batch ID are required."
+
+    depot = q("SELECT id FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
+    if not depot:
+        return f"Distributor '{depot_id}' not found."
+
+    store = q("SELECT id, store_name FROM sm_depot_store WHERE cid=%s AND depot_id=%s AND store_id=%s",
+              (cid, depot_id, store_id), one=True)
+    if not store:
+        return f"Store '{store_id}' not found for distributor '{depot_id}'."
+    if not (data.get("store_name") or "").strip() or data.get("store_name") == "-":
+        data["store_name"] = store["store_name"] or "-"
+
+    item = q("SELECT id FROM sm_item WHERE cid=%s AND item_id=%s", (cid, item_id), one=True)
+    if not item:
+        return f"Item '{item_id}' not found."
+
+    batch = q("SELECT id, expiary_date FROM sm_item_batch WHERE cid=%s AND item_id=%s AND batch_id=%s",
+              (cid, item_id, batch_id), one=True)
+    if not batch:
+        return f"Batch '{batch_id}' not found for item '{item_id}'."
+    if not (data.get("expiary_date") or "").strip():
+        data["expiary_date"] = str(batch["expiary_date"]) if batch["expiary_date"] else "2100-12-31"
+
+    try:
+        data["quantity"] = max(0, int(data.get("quantity") or 0))
+    except (TypeError, ValueError):
+        data["quantity"] = 0
+    try:
+        data["block_qty"] = max(0, int(data.get("block_qty") or 0))
+    except (TypeError, ValueError):
+        data["block_qty"] = 0
+
     return None
 
 
@@ -1143,11 +1275,19 @@ HOOKS = {
         "restore": item_restore,
     },
     "item_batch": {"prepare": item_batch_prepare},
+    "rack": {"prepare": rack_prepare},
     "depot": {
         "prepare": depot_prepare,
         "after_create": depot_after_create,
+        "after_update": depot_after_update,
+        "soft_delete": depot_soft_delete,
+        "restore": depot_restore,
     },
-    "depot_store": {"prepare": depot_store_prepare},
+    "depot_store": {
+        "prepare": depot_store_prepare,
+        "after_create": depot_store_after_create,
+    },
+    "depot_stock_balance": {"prepare": depot_stock_balance_prepare},
     "outlet": {"prepare": outlet_prepare},
     "category_type": {"prepare": category_type_prepare},
     "top_level": {

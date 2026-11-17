@@ -29,8 +29,9 @@ from ..modules import (PERM2SLUG, STATUS_OPTIONS, MODULES, get, touch,
 router = APIRouter()
 
 _GROUP_BY_MODULE = {
-    "brand": "Item Info", "item": "Item Info", "item-batch": "Item Info",
+    "brand": "Item Info", "item": "Item Info", "item-batch": "Item Info", "rack": "Item Info",
     "distributor": "Distributor Info", "distributor-store": "Distributor Info",
+    "depot-stock-balance": "Distributor Info",
     "category-type": "Settings",
 }
 
@@ -80,6 +81,8 @@ async def _collect_image_uploads(m, form, data, existing=None):
             return None, None, f"{spec['label']}: file is larger than {MAX_IMAGE_MB} MB."
         slug_src = ((data.get("level_name") or "").strip()
                     or ((existing or {}).get("level_name") or "").strip()
+                    or (data.get("rack_name") or "").strip()
+                    or ((existing or {}).get("rack_name") or "").strip()
                     or (data.get("name") or "").strip()
                     or ((existing or {}).get("name") or "").strip())
         ts = datetime.now().strftime("%Y%m%d%H%M%S%f")[:-3]  # ms precision -> unique
@@ -113,13 +116,30 @@ def _access(request, slug, action):
     m = get(slug)
     if not m:
         return None, user, RedirectResponse("/", status_code=303)
+    if m.get("no_edit") and action == "edit":
+        set_flash(request, "danger", f"Editing is not allowed for {m['title']}.")
+        return None, user, RedirectResponse(f"/{slug}", status_code=303)
+    if m.get("no_delete") and action == "delete":
+        set_flash(request, "danger", f"Deleting is not allowed for {m['title']}.")
+        return None, user, RedirectResponse(f"/{slug}", status_code=303)
+    if m.get("no_import") and action == "import":
+        set_flash(request, "danger", f"Importing is not allowed for {m['title']}.")
+        return None, user, RedirectResponse(f"/{slug}", status_code=303)
     if not require_perm(user, f"{m['perm']}.{action}"):
         set_flash(request, "danger", "You do not have permission for this action.")
         target = "/" if action == "view" else f"/{slug}"
         return None, user, RedirectResponse(target, status_code=303)
     context = ctx(request, user)
-    context["perms"] = {a: require_perm(user, f"{m['perm']}.{a}")
-                        for a in ("view", "create", "edit", "delete", "import")}
+    context["perms"] = {
+        a: (
+            False if (
+                (a == "edit" and m.get("no_edit")) or
+                (a == "delete" and m.get("no_delete")) or
+                (a == "import" and m.get("no_import"))
+            ) else require_perm(user, f"{m['perm']}.{a}")
+        )
+        for a in ("view", "create", "edit", "delete", "import")
+    }
     return m, user, context
 
 
@@ -226,6 +246,14 @@ def _brand_opts_from_items():
                           ORDER BY brand_name""", (config.CID,))]
 
 
+def _depot_options():
+    """Distributor filter options — ACTIVE distributors."""
+    return [(r["depot_id"], f"{r['depot_id']} | {r['name']}" if r["name"] else r["depot_id"])
+            for r in q("""SELECT depot_id, name FROM sm_depot
+                          WHERE cid=%s AND status='ACTIVE'
+                          ORDER BY depot_id""", (config.CID,))]
+
+
 def _filter_options(m):
     out = []
     for f in m["filters"]:
@@ -236,6 +264,8 @@ def _filter_options(m):
             opts = _brand_opts_from_hierarchy()
         elif kind == "item_brand":
             opts = _brand_opts_from_items()
+        elif kind == "depot":
+            opts = _depot_options()
         else:
             opts = STATUS_OPTIONS
         out.append({"name": name, "label": label, "options": opts})
@@ -245,11 +275,11 @@ def _filter_options(m):
 def _select_opts_for(slug):
     """Dropdown option rows needed by create/edit forms of a module."""
     item_opts, depot_opts = [], []
-    if slug == "item-batch":
+    if slug in ("item-batch", "depot-stock-balance"):
         item_opts = q("""SELECT item_id, name, brand_name FROM sm_item
                          WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 300""",
                       (config.CID,))
-    if slug in ("distributor-store", "outlet", "level", "rep"):
+    if slug in ("distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
         depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
                           ORDER BY name LIMIT 300""", (config.CID,))
     return item_opts, depot_opts
@@ -258,6 +288,7 @@ def _select_opts_for(slug):
 def _record_key(m, row):
     key_map = {
         "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
+        "rack": "rack_id", "depot-stock-balance": "id",
         "top-level": "level_id", "level": "level_id", "rep": "rep_id",
         "supervisor-level": "id", "rep-area": "id", "visit-plan": "id",
         "client-visit-plan": "id",
@@ -270,6 +301,7 @@ def _record_key(m, row):
 def key_col_of(m):
     return {
         "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
+        "rack": "rack_id", "depot_stock_balance": "id",
         "top_level": "level_id", "level": "level_id", "rep": "rep_id",
         "supervisor_level": "id", "rep_area": "id", "visit_plan": "id",
         "client_visit_plan": "id",
@@ -380,7 +412,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         tree = _build_tree(rows)
     item_opts = None
     depot_opts = None
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
         item_opts, depot_opts = _select_opts_for(slug)
     item_opts = item_opts or []
     depot_opts = depot_opts or []
@@ -485,7 +517,7 @@ async def module_create_form(request: Request, slug: str):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
         item_opts, depot_opts = _select_opts_for(slug)
     if slug == "category-type":
         context["type_names"] = [r["type_name"] for r in
@@ -545,7 +577,7 @@ async def module_create(request: Request, slug: str):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -600,7 +632,7 @@ async def module_edit_form(request: Request, slug: str, rid: int):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
@@ -644,7 +676,7 @@ async def module_edit(request: Request, slug: str, rid: int):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -1189,4 +1221,16 @@ async def depot_stores(request: Request, depot_id: str = ""):
     rows = q("""SELECT store_id, store_name FROM sm_depot_store
                 WHERE cid=%s AND status='ACTIVE' AND depot_id=%s
                 ORDER BY store_id""", (config.CID, (depot_id or "").strip()))
+    return {"items": rows}
+
+
+@router.get("/api/item/batches")
+async def item_batches(request: Request, item_id: str = ""):
+    """Active batches of one item — feeds the dependent Stock Balance batch dropdown."""
+    user = current_user(request)
+    if not user:
+        return {"items": []}
+    rows = q("""SELECT batch_id, name, expiary_date FROM sm_item_batch
+                WHERE cid=%s AND status='ACTIVE' AND item_id=%s
+                ORDER BY batch_id""", (config.CID, (item_id or "").strip()))
     return {"items": rows}

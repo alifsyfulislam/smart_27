@@ -12,7 +12,7 @@
     {% if error %}<div class="error-box"><i class="fa-solid fa-triangle-exclamation"></i> {{ error }}</div>{% endif %}
 
     {% set has_image = m.form_fields | selectattr('type', 'equalto', 'image') | list %}
-    <form method="post" {% if has_image %}enctype="multipart/form-data"{% endif %} action="{{ '/%s/create' % slug if a == 'Create' else '/%s/edit/%s' % (slug, row['id']) }}">
+    <form method="post" {% if has_image %}enctype="multipart/form-data"{% endif %} action="{{ '/%s/create' % slug if a == 'Create' else ('/%s/edit/%s' % (slug, row['id']) if a == 'Edit' else '#') }}">
       <div class="form-grid">
         {% for s in m.form_fields %}
           {% if s.type == 'hier_root_select' %}
@@ -94,12 +94,16 @@
             {% if a == 'View' %}<div>{{ data.get('depot_id') }}{% if data.get('depot_name') and data.get('depot_name') != '-' %} | {{ data.get('depot_name') }}{% endif %}</div>
             {% else %}
             <select name="depot_id" id="f-depot_id" data-searchable data-search-placeholder="Type to search distributor…"
+                    {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select distributor --</option>
               {% for o in depot_opts %}
               <option value="{{ o['depot_id'] }}" {{ 'selected' if data.get('depot_id') == o['depot_id'] }}>{{ o['depot_id'] }} | {{ o['name'] }}</option>
               {% endfor %}
             </select>
+            {% if a == 'Edit' and s.readonly_on_edit %}
+            <input type="hidden" name="depot_id" value="{{ data.get('depot_id') }}">
+            {% endif %}
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -110,11 +114,34 @@
             {% else %}
             <select name="store_id" id="f-store_id" data-store-depends="depot_id" data-searchable
                     data-search-placeholder="Type to search store…"
+                    {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                     {{ 'required' if s.required and a == 'Create' }}>
               {% if data.get('store_id') %}
               <option value="{{ data.get('store_id') }}" selected>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} | {{ data.get('store_name') }}{% endif %}</option>
               {% endif %}
             </select>
+            {% if a == 'Edit' and s.readonly_on_edit %}
+            <input type="hidden" name="store_id" value="{{ data.get('store_id') }}">
+            {% endif %}
+            {% endif %}
+            {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+          </div>
+          {% elif s.type == 'batch_select' %}
+          <div class="field">
+            <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+            {% if a == 'View' %}<div>{{ data.get('batch_id') }}</div>
+            {% else %}
+            <select name="batch_id" id="f-batch_id" data-batch-depends="item_id" data-searchable
+                    data-search-placeholder="Type to search batch…"
+                    {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
+                    {{ 'required' if s.required and a == 'Create' }}>
+              {% if data.get('batch_id') %}
+              <option value="{{ data.get('batch_id') }}" selected>{{ data.get('batch_id') }}</option>
+              {% endif %}
+            </select>
+            {% if a == 'Edit' and s.readonly_on_edit %}
+            <input type="hidden" name="batch_id" value="{{ data.get('batch_id') }}">
+            {% endif %}
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
@@ -452,6 +479,43 @@
       if (depotField) {
         depotField.addEventListener("change", function () { load(depotField.value, false); });
         load(depotField.value, true);
+      }
+    })();
+
+    // stock balance form: batch dropdown loads the active batches of the chosen item
+    (function () {
+      var batch = document.getElementById("f-batch_id");
+      if (!batch) return;
+      var itemField = document.querySelector("select[name='" + (batch.getAttribute("data-batch-depends") || "item_id") + "']");
+      function load(item, keepCurrent) {
+        fetch("/api/item/batches?item_id=" + encodeURIComponent(item || ""))
+          .then(r => r.json()).then(function (res) {
+            var keep = keepCurrent ? batch.value : "";
+            var rows = res.items || [];
+            batch.innerHTML = "";
+            var ph = document.createElement("option");
+            ph.value = "";
+            ph.textContent = item ? "-- Batch of " + item + " --" : "-- Select an item first --";
+            batch.appendChild(ph);
+            var kept = false;
+            rows.forEach(function (b) {
+              var o = document.createElement("option");
+              o.value = b.batch_id;
+              o.textContent = b.batch_id + (b.expiary_date ? " (Exp: " + b.expiary_date + ")" : "");
+              if (keep && b.batch_id === keep) { o.selected = true; kept = true; }
+              batch.appendChild(o);
+            });
+            if (keep && !kept) {
+              var o = document.createElement("option");
+              o.value = keep; o.textContent = keep; o.selected = true;
+              batch.appendChild(o);
+            }
+            batch.dispatchEvent(new Event("ssms-refresh"));
+          });
+      }
+      if (itemField) {
+        itemField.addEventListener("change", function () { load(itemField.value, false); });
+        load(itemField.value, true);
       }
     })();
 
