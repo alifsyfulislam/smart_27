@@ -1,4 +1,4 @@
-# INDEX — synced at commit 2df1844 · 2026-11-16
+# INDEX — synced at commit 4ca8090 · 2026-11-16
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by

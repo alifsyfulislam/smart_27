@@ -108,7 +108,7 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_item_batch` (
   `cid` varchar(20) DEFAULT 'SMART',
   `item_id` varchar(50) DEFAULT NULL,
   `name` varchar(200) DEFAULT '-',
-  `batch_id` varchar(20) DEFAULT NULL,
+  `batch_id` varchar(50) DEFAULT NULL,
   `expiary_date` date DEFAULT NULL,
   `status` varchar(20) DEFAULT 'ACTIVE',
   `field1` varchar(200) DEFAULT '-',
