@@ -15,7 +15,9 @@
     <form method="post" {% if has_image %}enctype="multipart/form-data"{% endif %} action="{{ '/%s/create' % slug if a == 'Create' else ('/%s/edit/%s' % (slug, row['id']) if a == 'Edit' else '#') }}">
       <div class="form-grid">
         {% for s in m.form_fields %}
-          {% if s.type == 'hier_root_select' %}
+          {% if a == 'Create' and s.hide_on_create %}
+            <input type="hidden" name="{{ s.name }}" id="f-{{ s.name }}" value="">
+          {% elif s.type == 'hier_root_select' %}
           <div class="field">
             <label>Parent Level</label>
             {% if a == 'View' or (a == 'Edit' and (slug != 'level' or (row and (row.get('depth') or 0) != 0))) %}
@@ -782,7 +784,7 @@
 
       var repIdInput = document.getElementById("f-rep_id");
       var updateRepIdHint = null;
-      if (repIdInput) {
+      if (repIdInput && repIdInput.type !== "hidden") {
         repIdInput.readOnly = true;
         {% if a == 'Create' %}
         updateRepIdHint = function () {

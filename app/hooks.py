@@ -1064,24 +1064,25 @@ def rep_prepare(cid, data, existing=None, user=None):
 
     if existing is not None:
         data["rep_id"] = existing["rep_id"]
-        data["rep_username"] = existing.get("rep_username") or existing["rep_id"]
+        rep_un = (data.get("rep_username") or "").strip() or existing.get("rep_username") or existing["rep_id"]
+        if q("SELECT id FROM sm_rep WHERE cid=%s AND rep_username=%s AND id != %s", (cid, rep_un, existing["id"]), one=True):
+            return f"Username '{rep_un}' already exists."
+        data["rep_username"] = rep_un
     else:
         raw_rep_id = data.get("rep_id")
         if raw_rep_id is not None and str(raw_rep_id).strip() and not str(raw_rep_id).strip().startswith("("):
             rep_id = str(raw_rep_id).strip()
-            dup = q("SELECT id FROM sm_rep WHERE cid=%s AND rep_id=%s", (cid, rep_id), one=True)
-            if dup:
+            if q("SELECT id FROM sm_rep WHERE cid=%s AND rep_id=%s", (cid, rep_id), one=True):
                 return f"Employee ID '{rep_id}' already exists."
             data["rep_id"] = rep_id
-            data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
         elif raw_rep_id is None and "rep_id" in data and data.get("_is_integration"):
             data["rep_id"] = None
-            data["rep_username"] = (data.get("rep_username") or "").strip() or None
         else:
-            prefix = desig_id.upper()
-            rep_id = _next_rep_code(cid, prefix)
-            data["rep_id"] = rep_id
-            data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
+            data["rep_id"] = _next_rep_code(cid, desig_id.upper())
+        rep_un = (data.get("rep_username") or "").strip() or (None if data.get("_is_integration") else data["rep_id"])
+        if rep_un and q("SELECT id FROM sm_rep WHERE cid=%s AND rep_username=%s", (cid, rep_un), one=True):
+            return f"Username '{rep_un}' already exists."
+        data["rep_username"] = rep_un
 
     raw_pw = (data.get("password") or "").strip()
     if existing is not None:

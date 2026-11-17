@@ -532,6 +532,7 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_rep` (
   `updated_by` varchar(50) DEFAULT NULL,
   PRIMARY KEY (`id`),
   UNIQUE KEY `CID_REP_ID` (`cid`, `rep_id`),
+  UNIQUE KEY `UNQ_REP_USERNAME` (`cid`, `rep_username`),
   KEY `CID_REP_ID_MOBILE` (`cid`, `rep_id`, `mobile_no`),
   KEY `CID_REP_ID_PASSWORD_STATUS_SYNC_CODE_NOTE` (`cid`, `rep_id`, `password`, `status`, `sync_code`, `note`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;

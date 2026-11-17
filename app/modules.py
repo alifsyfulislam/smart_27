@@ -18,7 +18,7 @@ STATUS_OPTIONS = [
 def f(name, label, type_="text", required=False, in_list=False, in_form=True,
       in_search=False, in_excel=True, options=None, cat=None, default=None,
       width=None, help=None, readonly_on_edit=False, readonly=False,
-      hidden_in_list_width=None, searchable=False, placeholder=None):
+      hidden_in_list_width=None, searchable=False, placeholder=None, hide_on_create=False):
     """Build a field spec dict."""
     return {
         "name": name, "label": label, "type": type_, "required": required,
@@ -26,7 +26,7 @@ def f(name, label, type_="text", required=False, in_list=False, in_form=True,
         "in_excel": in_excel, "options": options, "cat": cat,
         "default": default, "width": width, "help": help,
         "readonly_on_edit": readonly_on_edit, "readonly": readonly,
-        "searchable": searchable, "placeholder": placeholder,
+        "searchable": searchable, "placeholder": placeholder, "hide_on_create": hide_on_create,
     }
 
 
@@ -411,7 +411,7 @@ MODULES = {
             ("depot_name", "Distributor"), ("is_leaf", "Leaf"), ("status", "Status"),
         ],
         "search_cols": ["level_id", "level_name", "parent_level_id", "parent_level_name", "depot_id", "depot_name"],
-        "filters": [("status", "Status", "status")],
+        "filters": [("status", "Status", "status"),("depot_id", "Distributor", "depot"),],
         "form_fields": [
             f("parent_level_id", "Parent Level", "hier_root_select", in_form=True,
               help="Root (level 0) is Territory (T). Levels: Territory(T) > Town(TW) > Route(R) > Beat(B). Beat (depth 3) is a leaf."),
@@ -431,23 +431,26 @@ MODULES = {
         "group": "Fieldforce Info",
         "order": "id DESC",
         "list_cols": [
-            ("rep_id", "Employee ID"), ("name", "Name"),
+            ("rep_id", "Employee ID"), ("rep_username", "Username"), ("name", "Name"),
             ("user_type", "User Type"), ("designation_name", "Designation"),
             ("mobile_no", "Mobile"), ("depot_name", "Distributor"), ("status", "Status"),
         ],
         "search_cols": ["rep_id", "rep_username", "name", "name_bn", "user_type", "designation_id", "designation_name", "mobile_no", "email", "depot_id", "depot_name"],
         "filters": [
             ("status", "Status", "status"),
-            ("user_type", "User Type", "cat", "EMP_USER_TYPE"),
+            # ("user_type", "User Type", "cat", "EMP_USER_TYPE"),
             ("designation_id", "Designation", "cat", "EMP_DESIGNATION"),
+            ("depot_id", "Distributor", "depot"),
         ],
         "form_fields": [
             f("user_type", "User Type", "select", cat="EMP_USER_TYPE", required=True, in_list=True,
               help="Sourced dynamically from Settings > Module Category (type EMP_USER_TYPE). Controls allowed designations."),
             f("designation_id", "Designation", "select", cat="EMP_DESIGNATION", required=True, in_list=True, searchable=True,
               help="Cascaded from User Type: 'rep' -> PSR only, 'dm' -> DM only, 'sup' -> all except PSR & DM."),
-            f("rep_id", "Employee ID", "text", readonly=True, in_list=True, placeholder="(Auto-generated on save)",
+            f("rep_id", "Employee ID", "text", readonly=True, in_list=True, hide_on_create=True, placeholder="(Auto-generated on save)",
               help="Auto-generated on save from Designation (e.g. PSR0001, DM0001, HOS0001). Immutable."),
+            f("rep_username", "Username", "text", required=True, in_list=True,
+              help="Unique username (cid, rep_username) for system login and identification."),
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("mobile_no", "Mobile No", "text", in_list=True),
@@ -469,8 +472,8 @@ MODULES = {
             f("note", "Note", "textarea"),
         ],
         "create_hook": "rep",
-        "excel_cols": ["user_type", "designation_id", "name", "name_bn", "mobile_no", "alt_mobile_no", "email", "dob", "doj", "nid", "tin", "address", "address_bn", "depot_id", "image_path", "note"],
-        "unique_msg": "An employee with this ID already exists.",
+        "excel_cols": ["rep_username", "user_type", "designation_id", "name", "name_bn", "mobile_no", "alt_mobile_no", "email", "dob", "doj", "nid", "tin", "address", "address_bn", "depot_id", "image_path", "note"],
+        "unique_msg": "An employee with this Employee ID or Username already exists.",
     },
     "supervisor-level": {
         "title": "Supervisor Area",
