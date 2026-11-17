@@ -1,4 +1,4 @@
-# INDEX — synced at commit 150a2b4 · 2026-11-17
+# INDEX — synced at commit 143550e · 2026-11-17
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -18,7 +18,7 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | Permission catalogue | 81 seeded | `scripts/setup_database.py:17 (SEED_PERMISSIONS)` |
 | Category-type values | 29 seeded (incl. OUTLET_CATEGORY/OUTLET_SUB_CATEGORY, EMP_DESIGNATION) | `scripts/setup_database.py (SEED_CATEGORY_TYPES)` |
 | Module registry | 16 master modules | `app/modules.py:32 (MODULES)` |
-| Hook registry | one entry per module | `app/hooks.py:1262 (HOOKS)` |
+| Hook registry | one entry per module | `app/hooks.py:1307 (HOOKS)` |
 | Frozen schema names | incl. typo `expiary_date` | `scripts/ddl.sql` (header = change-log) |
 | Run command + admin creds + DB coords | — | `AGENTS.md` (How to verify / nn5) |
 | UI palette values | — | `docs/PRD.md` §2.3 |
@@ -39,14 +39,14 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | category-type | sm_category_type | `app/modules.py:347 ("category-type")` | `app/hooks.py:502 (category_type_prepare)` | category_type | /category-type | — | PRD §2.4 |
 | top-level | sm_top_level | `app/modules.py:373 ("top-level")` | `app/hooks.py:599 (top_level_prepare)` + HOOKS `top_level` | top_level | /top-level | — | PRD §2.4, SRS §2 FR4.9 |
 | level | sm_level | `app/modules.py:398 ("level")` | `app/hooks.py:725 (level_prepare)` + HOOKS `level` | level | /level | top-level, distributor | PRD §2.4, SRS §2 FR4.10 |
-| rep | sm_rep | `app/modules.py:424 ("rep")` | `app/hooks.py:1011 (rep_prepare)` + HOOKS `rep` | rep | /rep | category-type, distributor | PRD §2.4, SRS §2 FR4.11 |
-| supervisor-level | sm_supervisor_level | `app/modules.py:466 ("supervisor-level")` | `app/hooks.py:1059 (supervisor_level_prepare)` + HOOKS `supervisor_level` | supervisor_level | /supervisor-level | rep, top-level, level | PRD §2.4, SRS §2 FR4.12 |
-| rep-area | sm_rep_area | `app/modules.py:492 ("rep-area")` | `app/hooks.py:1099 (rep_area_prepare)` + HOOKS `rep_area` | rep_area | /rep-area | rep, level | PRD §2.4, SRS §2 FR4.13 |
-| visit-plan | sm_visit_plan | `app/modules.py:518 ("visit-plan")` | `app/hooks.py:1174 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
-| client-visit-plan | sm_client_visit_plan | `app/modules.py:554 ("client-visit-plan")` | `app/hooks.py:1229 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
+| rep | sm_rep | `app/modules.py:425 ("rep")` | `app/hooks.py:1013 (rep_prepare)` + HOOKS `rep` | rep | /rep | category-type, distributor | PRD §2.4, SRS §2 FR4.11 |
+| supervisor-level | sm_supervisor_level | `app/modules.py:474 ("supervisor-level")` | `app/hooks.py:1104 (supervisor_level_prepare)` + HOOKS `supervisor_level` | supervisor_level | /supervisor-level | rep, top-level, level | PRD §2.4, SRS §2 FR4.12 |
+| rep-area | sm_rep_area | `app/modules.py:500 ("rep-area")` | `app/hooks.py:1144 (rep_area_prepare)` + HOOKS `rep_area` | rep_area | /rep-area | rep, level | PRD §2.4, SRS §2 FR4.13 |
+| visit-plan | sm_visit_plan | `app/modules.py:526 ("visit-plan")` | `app/hooks.py:1219 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
+| client-visit-plan | sm_client_visit_plan | `app/modules.py:562 ("client-visit-plan")` | `app/hooks.py:1274 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
 
 ACL screens: `app/routers/acl_admin.py` (users/roles/permissions — include BEFORE crud router).
-Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/menu: `app/modules.py:595 (MODULE_ORDER)`.
+Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/menu: `app/modules.py:603 (MODULE_ORDER)`.
 
 ## §3 Doc map (what to read for what; skip unless §4 sends you)
 | Question | File | Last-sync |

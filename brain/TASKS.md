@@ -11,4 +11,4 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
-(none)
+- T-036 | done | rep | - | P1 | 2026-11-17 | Refine Employee Master: rename to Employee(rep/sup/dm), EMP_USER_TYPE category type (29->32), rep_id auto-generation & nullable for integration, user_type -> designation cascading dropdown, dob/doj required, md5 password hashing, image_path upload, form rearrangement & doc sync

@@ -1,4 +1,6 @@
 """Business-rule hooks for SSMS modules (invoked by the generic CRUD router)."""
+import hashlib
+
 from . import config
 from .database import q, x, scalar
 
@@ -1013,22 +1015,43 @@ def rep_prepare(cid, data, existing=None, user=None):
     if not name:
         return "Employee name is required."
 
-    desig_id = (data.get("designation_id") or "").strip()
+    user_type = (data.get("user_type") or "").strip().lower()
+    if not user_type:
+        return "User Type is required."
+    if user_type not in ("rep", "sup", "dm"):
+        return f"User type '{user_type}' is invalid. Allowed types: rep, sup, dm."
+    data["user_type"] = user_type
+
+    desig_id = (data.get("designation_id") or "").strip().upper()
     if not desig_id:
         return "Designation is required."
 
     desig = q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
-                 WHERE cid=%s AND type_name='DESIGNATION' AND cat_type_id=%s AND status='ACTIVE'""",
+                 WHERE cid=%s AND type_name='EMP_DESIGNATION' AND cat_type_id=%s AND status='ACTIVE'""",
               (cid, desig_id), one=True)
+    if not desig:
+        desig = q("""SELECT cat_type_id, cat_type_name FROM sm_category_type
+                     WHERE cid=%s AND type_name='DESIGNATION' AND cat_type_id=%s AND status='ACTIVE'""",
+                  (cid, desig_id), one=True)
     if not desig:
         return f"Designation '{desig_id}' not found in active category definitions."
     data["designation_id"] = desig["cat_type_id"]
     data["designation_name"] = desig["cat_type_name"] or desig["cat_type_id"]
 
-    user_type = (data.get("user_type") or "rep").strip().lower()
-    if user_type not in ("rep", "sup"):
-        user_type = "rep"
-    data["user_type"] = user_type
+    # Cascading compatibility rules between User Type and Designation
+    if user_type == "rep" and desig_id != "PSR":
+        return "Pre Sales Executive / PSR (user_type='rep') must have Designation 'PSR'."
+    if user_type == "dm" and desig_id != "DM":
+        return "Delivery Man / DM (user_type='dm') must have Designation 'DM'."
+    if user_type == "sup" and desig_id in ("PSR", "DM"):
+        return f"Supervisor / Manager (user_type='sup') cannot have Designation '{desig_id}'. Allowed designations are all except PSR and DM."
+
+    dob = (data.get("dob") or "").strip()
+    if not dob or dob == "-":
+        return "Date of Birth (dob) is required."
+    doj = (data.get("doj") or "").strip()
+    if not doj or doj == "-":
+        return "Date of Joining (doj) is required."
 
     depot_id = (data.get("depot_id") or "").strip()
     if depot_id and depot_id != "-":
@@ -1043,13 +1066,35 @@ def rep_prepare(cid, data, existing=None, user=None):
         data["rep_id"] = existing["rep_id"]
         data["rep_username"] = existing.get("rep_username") or existing["rep_id"]
     else:
-        prefix = desig_id.upper()
-        rep_id = _next_rep_code(cid, prefix)
-        data["rep_id"] = rep_id
-        data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
+        raw_rep_id = data.get("rep_id")
+        if raw_rep_id is not None and str(raw_rep_id).strip():
+            rep_id = str(raw_rep_id).strip()
+            dup = q("SELECT id FROM sm_rep WHERE cid=%s AND rep_id=%s", (cid, rep_id), one=True)
+            if dup:
+                return f"Employee ID '{rep_id}' already exists."
+            data["rep_id"] = rep_id
+            data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
+        elif raw_rep_id is None and "rep_id" in data and data.get("_is_integration"):
+            data["rep_id"] = None
+            data["rep_username"] = (data.get("rep_username") or "").strip() or None
+        else:
+            prefix = desig_id.upper()
+            rep_id = _next_rep_code(cid, prefix)
+            data["rep_id"] = rep_id
+            data["rep_username"] = (data.get("rep_username") or "").strip() or rep_id
 
-    if not (data.get("password") or "").strip():
-        data["password"] = "123456"
+    raw_pw = (data.get("password") or "").strip()
+    if existing is not None:
+        if raw_pw:
+            data["password"] = hashlib.md5(raw_pw.encode("utf-8")).hexdigest()
+        else:
+            data["password"] = existing.get("password")
+    else:
+        if raw_pw:
+            data["password"] = hashlib.md5(raw_pw.encode("utf-8")).hexdigest()
+        else:
+            data["password"] = hashlib.md5(b"123456").hexdigest()
+
     if not (data.get("status") or "").strip():
         data["status"] = "ACTIVE"
     return None

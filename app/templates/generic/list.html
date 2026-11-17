@@ -150,6 +150,8 @@
           <td><span class="badge {{ 'active' if r[cname] == 'ACTIVE' else 'inactive' }}">{{ r[cname] }}</span></td>
           {% elif cname in ('mrp','price','dist_price','invoice_price','weight') %}
           <td class="mono">{{ r[cname] }}</td>
+          {% elif cname == 'image_path' %}
+          <td>{% if r[cname] and r[cname] != '-' %}<img src="{{ r[cname] }}" style="height:28px;width:28px;object-fit:cover;border-radius:4px" alt="">{% else %}—{% endif %}</td>
           {% else %}
           <td>{{ r[cname] }}</td>
           {% endif %}

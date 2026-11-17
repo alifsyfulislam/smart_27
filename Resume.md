@@ -93,7 +93,7 @@
   - *Dynamic Zone-to-Territory Filter (D-022):* Territory input/select is dynamically filtered by selected Parent Zone (`parent_level_id = zone_id`). `level_prepare` rejects cross-zone mismatches on both create and edit.
   - *Distributor Tagging & Cascade (D-019):* Distributor tagging (`depot_id`) is scoped strictly to Town (`depth = 1`). Route (`depth = 2`) and Beat (`depth = 3`) inherit distributor from Town. Editing a Town distributor automatically cascades to all descendant Routes and Beats (`level_after_update`).
   - *Route & Beat Code Length (D-023):* Auto-generated codes for Route (prefix `R`, depth 2) and Beat (prefix `B`, depth 3) use 7-digit zero-padding (`:07d`, length 8: `R0000001`..`R0000037`, `B0000001`..`B0000037`), aligning with enterprise sample lengths. Town (`TW0001`) and Territory (`T0001`) retain standard 4-digit padding.
-- **Employee Master (`sm_rep`, BR16):** Dual user types: `rep` (PSR) and `sup` (Supervisor). Unique `(cid, rep_id)`. Immutable auto-incremental ID prefixed by designation: `HOS0001`, `SOM0001`, `ASM0001`, `ASE0001`, `CE0001`, `PSR0001`, `DM0001` (dynamically sourced from `sm_category_type` where `type_name='DESIGNATION'`).
+- **Employee Master (`sm_rep`, BR16, D-031):** Renamed to "Employee(rep/sup/dm)". Sourced dynamically from `sm_category_type` where `type_name='EMP_USER_TYPE'` (`rep` -> Pre Sales Executive / PSR, `sup` -> Supervisor / Manager, `dm` -> Delivery Man / DM). Dynamic cascading dropdown: selecting `user_type` filters `designation_id` (`rep` -> `PSR` only; `dm` -> `DM` only; `sup` -> all designations except `PSR` and `DM`). `rep_id` is auto-generated following designation prefix (`PSR0001`, `DM0001`, `HOS0001`, `SOM0001`, etc.) and immutable on edit, while external integration via `emp_integration` can supply `NULL` (supported by MariaDB nullable unique key). Mandatory `dob` and `doj`. Passwords automatically hashed with MD5 on create/edit (preserved on blank edit). Photo upload parity (`image_path` up to 5 MB stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`). Form fields rearranged into logical groups.
 - **Supervisor Area Assignment (`sm_supervisor_level`, BR17):** Assigns supervisors (`user_type='sup'`) to any hierarchy node across National (`sm_top_level`) or Field (`sm_level`) structures (`sup_id`, `level_id`, `level_depth_no`).
 - **PSR Area Assignment & Cascading Beat Population (`sm_rep_area`, BR18):** PSR reps (`user_type='rep'`) assignable only to Route (`sm_level` depth 2). Saving resolves all active Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`.
 - **PSR Visit Plan (`sm_visit_plan`, BR19):** Auto-populated concurrently with `sm_rep_area` assignment. Maps Beat to `order_col_day` (Saturday..Friday); automatically derives `delivery_day` as the subsequent calendar day.
@@ -118,7 +118,7 @@ SSMS currently registers **16 master data modules**, plus ACL and Audit engines:
 | `category-type` | Module Category / *Settings* | `sm_category_type` | `id`, (`cid`, `type_name`, `cat_type_id`) | `category_type.{view,create,edit,delete,import}` | `category_type_prepare` |
 | `top-level` | National Structure / *Fieldforce Info* | `sm_top_level` | `id`, (`cid`, `level_id`) | `top_level.{view,create,edit,delete,import}` | `top_level_prepare`, `_recompute_top_level_is_leaf` |
 | `level` | Field Structure / *Fieldforce Info* | `sm_level` | `id`, (`cid`, `level_id`) | `level.{view,create,edit,delete,import}` | `level_prepare`, `level_after_update`, `_recompute_level_is_leaf`, `level_restore` |
-| `rep` | Employee Master / *Fieldforce Info* | `sm_rep` | `id`, (`cid`, `rep_id`) | `rep.{view,create,edit,delete,import}` | `rep_prepare` |
+| `rep` | Employee(rep/sup/dm) / *Fieldforce Info* | `sm_rep` | `id`, (`cid`, `rep_id`) | `rep.{view,create,edit,delete,import}` | `rep_prepare` |
 | `supervisor-level` | Supervisor Area / *Fieldforce Info* | `sm_supervisor_level` | `id` | `supervisor_level.{view,create,edit,delete,import}` | `supervisor_level_prepare` |
 | `rep-area` | PSR Area / *Fieldforce Info* | `sm_rep_area` | `id` | `rep_area.{view,create,edit,delete,import}` | `rep_area_prepare`, `rep_area_after_create` |
 | `visit-plan` | PSR Visit Plan / *Fieldforce Info* | `sm_visit_plan` | `id` | `visit_plan.{view,create,edit,delete,import}` | `visit_plan_prepare` |
@@ -217,11 +217,21 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
   - Schema & permissions: Dropped `status` column from `sm_depot_stock_balance`, unique key `UNQ_DEPOT_STORE_ITEM_BATCH (cid, depot_id, store_id, item_id, batch_id)`; permissions catalogue reduced from 83 to 81.
   - Auto-provisioning triggers verified live: Trigger A (item create / Excel import across all stores), Trigger B (distributor create across default stores 140/170 × all items), Trigger C (distributor store create across that store × all items) inserting `qty=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`.
   - One-time active data backfill executed and verified.
+- **V-017 (2026-11-17 · HEAD):** Employee(rep/sup/dm) Refinement Suite (T-036):
+  - Module title updated to "Employee(rep/sup/dm)" in `MODULES["rep"]`.
+  - Added `EMP_USER_TYPE` (`rep`, `sup`, `dm`) to `sm_category_type` (category-type count 29 → 32).
+  - Client-side cascading script filters designations dynamically based on `user_type` (`rep` -> `PSR`, `dm` -> `DM`, `sup` -> all except `PSR`/`DM`) and dispatches `ssms-refresh` to sync searchable dropdown UI.
+  - Auto-generated `rep_id` on UI creation following designation prefix (`PSR0001`, `DM0001`, `SOM0001`), immutable on edit, nullable for external integrations (`emp_integration`).
+  - Strict validation for required `dob` and `doj`.
+  - Automated MD5 password hashing with empty-password preservation on edit.
+  - Full photo upload parity (`image_path` up to 5 MB stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`) with thumbnail rendering on view, edit, and list views.
+  - Form fields rearranged into logical groups; verified live via HTTP against port 8027 with full `sm_audit_log` trail.
 
 ### Task Register Snapshot (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
 |---|---|---|---|---|
+| **T-036** | **P1** | `rep` | `done` | Employee(rep/sup/dm) refinement: title rename, EMP_USER_TYPE category type, cascading user_type to designation, auto rep_id with designation prefix, nullable rep_id for integration, required dob/doj, MD5 password hashing, photo upload, form rearrangement (V-017, D-031). |
 | **T-035** | **P1** | `depot-stock-balance` | `done` | Distributor Stock refinement: renamed from Distributor Stock Balance, removed import/delete/status (permissions 83 -> 81), added 3 zero-qty auto-provisioning triggers (item, depot, depot_store) and data backfill (V-016, D-030). |
 | **T-034** | **P1** | `distributor` | `done` | Distributor ID (`depot_id`) non-editable on `/distributor/edit/{id}` with `readonly_on_edit=True` and server-side immutability in `depot_prepare` (V-015, D-029). |
 | **T-033** | **P1** | `distributor` | `done` | Distributor status cascade: automatically cascades INACTIVE, PENDING (soft-delete), and ACTIVE (restore) to all child stores in `sm_depot_store` (V-015, D-028). |
@@ -249,7 +259,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-029)
+## 8. Architectural Decision Summary (D-001 to D-031)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -281,6 +291,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-028:** Distributor Status Inactivation and Soft-Delete Cascade: Updating a Distributor (`sm_depot`) to `INACTIVE` or soft-deleting to `PENDING` cascades synchronously to update all child stores in `sm_depot_store` to matching status (`depot_after_update`, `depot_soft_delete`). Restoring (`depot_restore`) restores child stores to `ACTIVE`.
 - **D-029:** Distributor Master Edit Immobility for Distributor ID: Configured `depot_id` with `readonly_on_edit=True` in `sm_depot` module spec and backend guard in `depot_prepare` to prevent primary business key mutation on edit.
 - **D-030:** Distributor Stock Module Refinement, Action Restrictions & Zero-Quantity Auto-Provisioning: Renamed module from "Distributor Stock Balance" to "Distributor Stock" (`depot-stock-balance` / `sm_depot_stock_balance`). Configured `no_delete=True, no_import=True` alongside `no_edit=True`; gated delete and upload routes with 303 Redirect; suppressed action buttons and templates across UI; purged delete and import from permissions catalogue (83 → 81). Dropped `status` column from schema, live DB, and module spec; replaced key with `UNQ_DEPOT_STORE_ITEM_BATCH (cid, depot_id, store_id, item_id, batch_id)`. Wired 3 zero-quantity stock auto-provisioning triggers (`qty=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`) in `app/hooks.py`: (1) `item_after_create` (item creation / Excel import) across all stores, (2) `depot_after_create` (distributor creation) across default stores 140/170 × all items, and (3) `depot_store_after_create` (distributor store creation) across created store × all items. Executed one-time data backfill across all existing stores and items.
+- **D-031:** Employee(rep/sup/dm) Dynamic Cascading, Designation-Based ID Generation, MD5 Password Encryption & Avatar Upload: Refined `sm_rep` master module (`MODULES["rep"]`) with title "Employee(rep/sup/dm)". Added `EMP_USER_TYPE` (`rep`, `sup`, `dm`) to `sm_category_type` (category-type count 29 → 32). Implemented client-side cascading script in `form.html` and backend cross-validation in `rep_prepare` (`user_type` cascades to `designation_id`: `rep` → PSR, `dm` → DM, `sup` → non-PSR/non-DM). Auto-generated `rep_id` on UI creation formatted as `{designation_prefix}{seq:04d}` (`PSR0001`, `DM0001`, `SOM0001`), immutable on edit, and nullable for external integration (`emp_integration`). Enforced mandatory `dob` and `doj`. Automated MD5 password hashing with empty-password preservation on edit. Added full image upload parity for `image_path` (up to 5 MB, stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`, thumbnail rendering on view, edit, and list views). Rearranged form fields into logical groups.
 
 ---
 
@@ -288,7 +299,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 - **Context Checker Status:** **PASS (15/15 checks clean)** via `scripts/check_context.py`.
 - **Active Master Modules:** 16 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
-- **Verification Milestones:** 16 verification milestones verified live (V-001 through V-016).
+- **Verification Milestones:** 17 verification milestones verified live (V-001 through V-017).
 - **Known Technical Debt / Pending Actions:**
   1. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore`.
   2. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).

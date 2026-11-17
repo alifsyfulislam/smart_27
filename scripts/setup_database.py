@@ -145,6 +145,10 @@ SEED_CATEGORY_TYPES = [
     ("EMP_DESIGNATION", "CE", "Customer Executive"),
     ("EMP_DESIGNATION", "PSR", "Pre Sales Executive"),
     ("EMP_DESIGNATION", "DM", "Delivery Man"),
+
+    ("EMP_USER_TYPE", "rep", "Pre Sales Executive / PSR"),
+    ("EMP_USER_TYPE", "sup", "Supervisor / Manager"),
+    ("EMP_USER_TYPE", "dm", "Delivery Man / DM"),
 ]
 
 SEED_HIERARCHY = [

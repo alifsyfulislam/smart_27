@@ -173,7 +173,7 @@
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
             {% else %}
-            <select name="{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
+            <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                     {% if s.searchable %}data-searchable data-search-placeholder="Type to search {{ s.label }}…"{% endif %}>
               {% for o in (field_opts.get(s.name) or s.options or []) %}
               <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
@@ -241,10 +241,12 @@
           <div class="field">
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}
-              <div>{{ data.get(s.name) }}</div>
+              <div>{{ '••••••••' if s.type == 'password' and data.get(s.name) else (data.get(s.name) or '') }}</div>
             {% else %}
-              <input type="{{ 'number' if s.type in ('int','float') else 'date' if s.type == 'date' else 'text' }}"
-                     name="{{ s.name }}" value="{{ '' if data.get(s.name) is none else data.get(s.name) }}"
+              <input type="{{ 'number' if s.type in ('int','float') else 'date' if s.type == 'date' else 'password' if s.type == 'password' else 'text' }}"
+                     name="{{ s.name }}" id="f-{{ s.name }}"
+                     value="{{ '' if s.type == 'password' or data.get(s.name) is none else data.get(s.name) }}"
+                     {% if s.type == 'password' %}{% if a == 'Edit' %}placeholder="Leave empty to keep current password"{% else %}placeholder="Enter password (default: 123456)"{% endif %}{% endif %}
                      {% if s.type == 'float' %}step="any"{% endif %}
                      {{ 'readonly' if a == 'Edit' and s.readonly_on_edit }}
                      {{ 'required' if s.required and a == 'Create' }}>
@@ -710,6 +712,75 @@
         parentSel.addEventListener("change", updateFieldStructureView);
         updateFieldStructureView();
       }
+    })();
+    {% endif %}
+
+    {% if slug == 'rep' %}
+    (function () {
+      var userTypeSel = document.getElementById("f-user_type") || document.querySelector("select[name='user_type']");
+      var desigSel = document.getElementById("f-designation_id") || document.querySelector("select[name='designation_id']");
+      if (!userTypeSel || !desigSel) return;
+
+      var allDesigOpts = [];
+      Array.prototype.slice.call(desigSel.options).forEach(function (opt) {
+        allDesigOpts.push({
+          value: opt.value,
+          text: opt.textContent,
+          selected: opt.selected
+        });
+      });
+
+      function filterDesignations(isInit) {
+        var uType = (userTypeSel.value || "").trim().toLowerCase();
+        var currentDesig = desigSel.value;
+        desigSel.innerHTML = "";
+
+        // Cascading rules:
+        // - rep -> only PSR
+        // - dm -> only DM
+        // - sup -> all except PSR and DM
+        var allowedOpts = allDesigOpts.filter(function (opt) {
+          if (!opt.value) return true;
+          var val = opt.value.toUpperCase();
+          if (uType === "rep") {
+            return val === "PSR";
+          } else if (uType === "dm") {
+            return val === "DM";
+          } else if (uType === "sup") {
+            return val !== "PSR" && val !== "DM";
+          }
+          return true;
+        });
+
+        var hasMatch = false;
+        allowedOpts.forEach(function (opt) {
+          var el = document.createElement("option");
+          el.value = opt.value;
+          el.textContent = opt.text;
+          if (opt.value && opt.value === currentDesig) {
+            el.selected = true;
+            hasMatch = true;
+          }
+          desigSel.appendChild(el);
+        });
+
+        if (!hasMatch && allowedOpts.length > 0) {
+          var firstValid = allowedOpts.find(function (o) { return o.value; });
+          if (firstValid) {
+            desigSel.value = firstValid.value;
+          } else {
+            desigSel.value = allowedOpts[0].value;
+          }
+        }
+
+        desigSel.dispatchEvent(new Event("ssms-refresh"));
+      }
+
+      userTypeSel.addEventListener("change", function () {
+        filterDesignations(false);
+      });
+
+      filterDesignations(true);
     })();
     {% endif %}
   </script>
