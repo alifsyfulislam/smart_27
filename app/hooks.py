@@ -1046,12 +1046,12 @@ def rep_prepare(cid, data, existing=None, user=None):
     if user_type == "sup" and desig_id in ("PSR", "DM"):
         return f"Supervisor / Manager (user_type='sup') cannot have Designation '{desig_id}'. Allowed designations are all except PSR and DM."
 
-    dob = (data.get("dob") or "").strip()
-    if not dob or dob == "-":
-        return "Date of Birth (dob) is required."
-    doj = (data.get("doj") or "").strip()
-    if not doj or doj == "-":
-        return "Date of Joining (doj) is required."
+    dob = str(data.get("dob") or "").strip()
+    dob = dob.split()[0].strip() if " " in dob else dob
+    data["dob"] = dob if dob and dob != "-" else None
+    doj = str(data.get("doj") or "").strip()
+    doj = doj.split()[0].strip() if " " in doj else doj
+    data["doj"] = doj if doj and doj != "-" else None
 
     depot_id = (data.get("depot_id") or "").strip()
     if depot_id and depot_id != "-":

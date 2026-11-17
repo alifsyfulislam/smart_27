@@ -11,5 +11,6 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-038 | done | rep | T-037 | P1 | 2026-11-17 | Employee dob and doj non-mandatory across create, edit, and Excel import (V-019, D-033)
 - T-037 | done | rep | T-036 | P1 | 2026-11-17 | Employee form non-editable rep_id (readonly on create & edit with styling and auto-generation) and field reorder placing Distributor and Photo before Note
 - T-036 | done | rep | - | P1 | 2026-11-17 | Refine Employee Master: rename to Employee(rep/sup/dm), EMP_USER_TYPE category type (29->32), rep_id auto-generation & nullable for integration, user_type -> designation cascading dropdown, dob/doj required, md5 password hashing, image_path upload, form rearrangement & doc sync

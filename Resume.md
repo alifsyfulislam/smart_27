@@ -93,7 +93,7 @@
   - *Dynamic Zone-to-Territory Filter (D-022):* Territory input/select is dynamically filtered by selected Parent Zone (`parent_level_id = zone_id`). `level_prepare` rejects cross-zone mismatches on both create and edit.
   - *Distributor Tagging & Cascade (D-019):* Distributor tagging (`depot_id`) is scoped strictly to Town (`depth = 1`). Route (`depth = 2`) and Beat (`depth = 3`) inherit distributor from Town. Editing a Town distributor automatically cascades to all descendant Routes and Beats (`level_after_update`).
   - *Route & Beat Code Length (D-023):* Auto-generated codes for Route (prefix `R`, depth 2) and Beat (prefix `B`, depth 3) use 7-digit zero-padding (`:07d`, length 8: `R0000001`..`R0000037`, `B0000001`..`B0000037`), aligning with enterprise sample lengths. Town (`TW0001`) and Territory (`T0001`) retain standard 4-digit padding.
-- **Employee Master (`sm_rep`, BR16, D-031, D-032):** Renamed to "Employee(rep/sup/dm)". Sourced dynamically from `sm_category_type` where `type_name='EMP_USER_TYPE'` (`rep` -> Pre Sales Executive / PSR, `sup` -> Supervisor / Manager, `dm` -> Delivery Man / DM). Dynamic cascading dropdown: selecting `user_type` filters `designation_id` (`rep` -> `PSR` only; `dm` -> `DM` only; `sup` -> all designations except `PSR` and `DM`). The `rep_id` is rendered non-editable (`readonly=True`, placeholder indicating auto-generation, non-editable styling) on create and edit forms; auto-generated on save following designation prefix (`PSR0001`, `DM0001`, `HOS0001`, `SOM0001`, etc.) and immutable on edit, while external integration via `emp_integration` can supply `NULL` (supported by MariaDB nullable unique key). Mandatory `dob` and `doj`. Passwords automatically hashed with MD5 on create/edit (preserved on blank edit). Photo upload parity (`image_path` up to 5 MB stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`). Form fields arranged logically with Distributor (`depot_id`) and Photo / Image (`image_path`) positioned directly before Note (`note`).
+- **Employee Master (`sm_rep`, BR16, D-031, D-032, D-033):** Renamed to "Employee(rep/sup/dm)". Sourced dynamically from `sm_category_type` where `type_name='EMP_USER_TYPE'` (`rep` -> Pre Sales Executive / PSR, `sup` -> Supervisor / Manager, `dm` -> Delivery Man / DM). Dynamic cascading dropdown: selecting `user_type` filters `designation_id` (`rep` -> `PSR` only; `dm` -> `DM` only; `sup` -> all designations except `PSR` and `DM`). The `rep_id` is rendered non-editable (`readonly=True`, placeholder indicating auto-generation, non-editable styling) on create and edit forms; auto-generated on save following designation prefix (`PSR0001`, `DM0001`, `HOS0001`, `SOM0001`, etc.) and immutable on edit, while external integration via `emp_integration` can supply `NULL` (supported by MariaDB nullable unique key). Optional `dob` and `doj` across create, edit, and Excel import (stored as `NULL` when omitted, D-033). Passwords automatically hashed with MD5 on create/edit (preserved on blank edit). Photo upload parity (`image_path` up to 5 MB stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`). Form fields arranged logically with Distributor (`depot_id`) and Photo / Image (`image_path`) positioned directly before Note (`note`).
 - **Supervisor Area Assignment (`sm_supervisor_level`, BR17):** Assigns supervisors (`user_type='sup'`) to any hierarchy node across National (`sm_top_level`) or Field (`sm_level`) structures (`sup_id`, `level_id`, `level_depth_no`).
 - **PSR Area Assignment & Cascading Beat Population (`sm_rep_area`, BR18):** PSR reps (`user_type='rep'`) assignable only to Route (`sm_level` depth 2). Saving resolves all active Beats under that Route and bulk-inserts individual Beat records into `sm_rep_area`.
 - **PSR Visit Plan (`sm_visit_plan`, BR19):** Auto-populated concurrently with `sm_rep_area` assignment. Maps Beat to `order_col_day` (Saturday..Friday); automatically derives `delivery_day` as the subsequent calendar day.
@@ -143,8 +143,8 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
    └── brain/STATUS.md              # Current system state & verified entity counts
 
 [Layer 2: History & Auditable Logs]
-   ├── brain/DECISIONS.md           # Permanent append-only architectural log (D-001 to D-030)
-   └── brain/VERIFICATION_LOG.md    # Append-only verified test logs (V-001 to V-016)
+   ├── brain/DECISIONS.md           # Permanent append-only architectural log (D-001 to D-033)
+   └── brain/VERIFICATION_LOG.md    # Append-only verified test logs (V-001 to V-019)
 
 [Layer 3: Task Flow & Inbox]
    ├── MY_WATCHER.txt               # Raw task inbox for user inputs
@@ -188,7 +188,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ## 7. Current Task Register & Status
 
-### Active Milestones Verified (V-001 to V-016)
+### Active Milestones Verified (V-001 to V-019)
 - **V-001 (2026-11-05 · fb0e803):** Core v1.0.0 end-to-end verified (Login, dashboard, 6 master modules, ACL admin, audit log).
 - **V-002 (2026-11-09 · 8b10af5):** Brand UX verified (Tree list, accordion per level, parent picker, image upload, multi-child addition, `is_leaf` invariant).
 - **V-003 (2026-11-13 · 00f28df):** Excel data download & hierarchy export verified across all 7 master modules (HIERARCHY_TREE, HIERARCHY_PATHS, ITEMS with synced levels, openpyxl styling).
@@ -233,11 +233,17 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
   - Prepare hook `rep_prepare` handles empty or placeholder `rep_id` values on create by auto-generating `{prefix}{seq:04d}`.
   - Form layout rearranged: Distributor (`depot_id`) and Photo / Image (`image_path`) placed as the last two fields before Note (`note`).
   - Verified live via HTTP against port 8027 (form renders readonly `rep_id`, correct field order, and successful employee create generating `PSR0002` with `sm_audit_log` trail).
+- **V-019 (2026-11-17 · HEAD):** Employee Optional Date Fields (dob / doj) Verification across Create, Edit & Import (T-038):
+  - Prepare hook `rep_prepare` sanitizes empty/whitespace/'-' date values to `None` (SQL NULL) and extracts date component from Excel timestamps.
+  - Verified live via HTTP against port 8027: POST `/rep/create` creates employee with `dob=None, doj=None` when omitted, and saves dates when provided.
+  - Verified live: POST `/rep/edit/{id}` clears dates to `dob=None, doj=None`.
+  - Verified live: POST `/rep/upload` imports rows with empty dates and populated dates seamlessly with `sm_audit_log` audit entries.
 
 ### Task Register Snapshot (`brain/TASKS.md`)
 
 | Task ID | Priority | Module | Status | Scope / Description |
 |---|---|---|---|---|
+| **T-038** | **P1** | `rep` | `done` | Employee dob and doj non-mandatory across create, edit, and Excel import (V-019, D-033). |
 | **T-037** | **P1** | `rep` | `done` | Employee create form refinement: `rep_id` non-editable on form with placeholder/styling; Distributor and Photo/Image positioned directly before Note (V-018, D-032). |
 | **T-036** | **P1** | `rep` | `done` | Employee(rep/sup/dm) refinement: title rename, EMP_USER_TYPE category type, cascading user_type to designation, auto rep_id with designation prefix, nullable rep_id for integration, required dob/doj, MD5 password hashing, photo upload, form rearrangement (V-017, D-031). |
 | **T-035** | **P1** | `depot-stock-balance` | `done` | Distributor Stock refinement: renamed from Distributor Stock Balance, removed import/delete/status (permissions 83 -> 81), added 3 zero-qty auto-provisioning triggers (item, depot, depot_store) and data backfill (V-016, D-030). |
@@ -267,7 +273,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 ---
 
-## 8. Architectural Decision Summary (D-001 to D-032)
+## 8. Architectural Decision Summary (D-001 to D-033)
 
 - **D-001:** Generic CRUD engine (`app/modules.py` + `app/routers/crud.py`). Avoid per-module route forks.
 - **D-002:** Strict schema fidelity (`scripts/ddl.sql`) with MariaDB 10.4 normalized indexes; retain `expiary_date` spelling.
@@ -301,6 +307,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 - **D-030:** Distributor Stock Module Refinement, Action Restrictions & Zero-Quantity Auto-Provisioning: Renamed module from "Distributor Stock Balance" to "Distributor Stock" (`depot-stock-balance` / `sm_depot_stock_balance`). Configured `no_delete=True, no_import=True` alongside `no_edit=True`; gated delete and upload routes with 303 Redirect; suppressed action buttons and templates across UI; purged delete and import from permissions catalogue (83 → 81). Dropped `status` column from schema, live DB, and module spec; replaced key with `UNQ_DEPOT_STORE_ITEM_BATCH (cid, depot_id, store_id, item_id, batch_id)`. Wired 3 zero-quantity stock auto-provisioning triggers (`qty=0`, `block_qty=0`, `batch_id='1'`, expiry `2100-12-31`) in `app/hooks.py`: (1) `item_after_create` (item creation / Excel import) across all stores, (2) `depot_after_create` (distributor creation) across default stores 140/170 × all items, and (3) `depot_store_after_create` (distributor store creation) across created store × all items. Executed one-time data backfill across all existing stores and items.
 - **D-031:** Employee(rep/sup/dm) Dynamic Cascading, Designation-Based ID Generation, MD5 Password Encryption & Avatar Upload: Refined `sm_rep` master module (`MODULES["rep"]`) with title "Employee(rep/sup/dm)". Added `EMP_USER_TYPE` (`rep`, `sup`, `dm`) to `sm_category_type` (category-type count 29 → 32). Implemented client-side cascading script in `form.html` and backend cross-validation in `rep_prepare` (`user_type` cascades to `designation_id`: `rep` → PSR, `dm` → DM, `sup` → non-PSR/non-DM). Auto-generated `rep_id` on UI creation formatted as `{designation_prefix}{seq:04d}` (`PSR0001`, `DM0001`, `SOM0001`), immutable on edit, and nullable for external integration (`emp_integration`). Enforced mandatory `dob` and `doj`. Automated MD5 password hashing with empty-password preservation on edit. Added full image upload parity for `image_path` (up to 5 MB, stored under `/static/uploads/sm_rep_{slug}_image_{timestamp}.{ext}`, thumbnail rendering on view, edit, and list views). Rearranged form fields into logical groups.
 - **D-032:** Employee Form Readonly `rep_id` and Layout Adjustment: Added `readonly=False` and `placeholder=None` capability to generic field helper `f(...)` in `app/modules.py`. Marked `rep_id` as `readonly=True, in_list=True, placeholder="(Auto-generated on save)"`. Updated `app/templates/generic/form.html` to output `readonly` and `tabindex="-1"` attributes, with dynamic JS placeholder reflection on designation change (`(Auto-generated: {prefix}xxxx on save)`). Added universal `.field input:read-only` styling in `app/static/css/style.css`. In `app/hooks.py` (`rep_prepare`), treated empty or placeholder string `rep_id` inputs as trigger to generate auto-code. Rearranged form fields in `MODULES["rep"]` so Distributor (`depot_id`) and Photo / Image (`image_path`) are positioned as the last two fields before Note (`note`).
+- **D-033:** Employee Date Fields (dob / doj) Made Non-Mandatory Across Create, Edit & Import: Relaxed mandatory constraint on Date of Birth (`dob`) and Date of Joining (`doj`) in `MODULES["rep"]`. In `app/hooks.py` (`rep_prepare`), removed strict required check; sanitized empty, whitespace, or `"-"` inputs to SQL `NULL` (`None`) while extracting date part from Excel timestamps (`YYYY-MM-DD`). In `sm_rep`, columns `dob` and `doj` remain nullable `date DEFAULT NULL`, enabling optional employee dates across manual form creation, edit updates (clearing dates), and bulk Excel imports.
 
 ---
 
@@ -308,7 +315,7 @@ To avoid context fragmentation, token bloat, and hallucinations, memory is split
 
 - **Context Checker Status:** **PASS (15/15 checks clean)** via `scripts/check_context.py`.
 - **Active Master Modules:** 16 master modules registered and verified across BRD/PRD/SRS/README/PROMPTS/INDEX.
-- **Verification Milestones:** 18 verification milestones verified live (V-001 through V-018).
+- **Verification Milestones:** 19 verification milestones verified live (V-001 through V-019).
 - **Known Technical Debt / Pending Actions:**
   1. Untrack legacy session/cookie files (`cookies`, `cookies2`, `server.log`) via `.gitignore`.
   2. Clean cosmetic flash message strings in `app/routers/acl_admin.py:155,242` ("set to INACTIVE" text residue).
