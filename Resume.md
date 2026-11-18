@@ -1,5 +1,5 @@
 # SSMS Single Source of Truth (SSOT) — Resume.md
-<!-- Synced with repo state at commit 9429b9f · Date: 2026-11-18 -->
+<!-- Synced with repo state at commit f812cce · Date: 2026-11-18 -->
 
 > **Purpose:** This document is the authoritative **Single Source of Truth (SSOT)** and primary **Session Resumption & Alignment Guide** for the Secondary Sales Management System (SSMS). Any developer or AI agent resuming work on this repository must align with the architecture, non-negotiables, conventions, and status codified here.
 
