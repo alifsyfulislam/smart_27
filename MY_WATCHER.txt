@@ -5,5 +5,5 @@ deps, priority) and replaces the content with a new tombstone line. Raw history 
 `brain/archive/`. Nothing here needs formatting — plain text is fine.
 
 ---
-Drained 2026-11-17 -> T-029..T-034 (see brain/TASKS.md). Raw original:
-brain/archive/MY_WATCHER_2026-11-17.md
+Drained 2026-11-18 -> T-046..T-048 (see brain/TASKS.md). Raw original:
+brain/archive/MY_WATCHER_2026-11-18.md

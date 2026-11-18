@@ -157,6 +157,11 @@ SEED_CATEGORY_TYPES = [
     ("WEEK_DAYS", "Wednesday", "Wednesday"),
     ("WEEK_DAYS", "Thursday", "Thursday"),
     ("WEEK_DAYS", "Friday", "Friday"),
+
+    ("FREQUENCY_TYPE", "WEEKLY", "Weekly"),
+    ("FREQUENCY_TYPE", "BI_WEEKLY", "Bi-Weekly"),
+    ("FREQUENCY_TYPE", "MONTHLY", "Monthly"),
+    ("FREQUENCY_TYPE", "FORTNIGHTLY", "Fortnightly"),
 ]
 
 SEED_HIERARCHY = [

@@ -1,4 +1,4 @@
-# INDEX — synced at commit 8bfce51 · 2026-11-18
+# INDEX — synced at commit 7678cf3 · 2026-11-18
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -16,9 +16,9 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | `is_leaf` invariant | `1` iff no ACTIVE child | `app/hooks.py:113 (_recompute_is_leaf)` |
 | Item status cascade | non-active item status pushed to its batch rows | `app/hooks.py:272 (item_soft_delete)` |
 | Permission catalogue | 81 seeded | `scripts/setup_database.py:17 (SEED_PERMISSIONS)` |
-| Category-type values | 39 seeded (incl. OUTLET_CATEGORY/OUTLET_SUB_CATEGORY, EMP_DESIGNATION, EMP_USER_TYPE, WEEK_DAYS) | `scripts/setup_database.py (SEED_CATEGORY_TYPES)` |
+| Category-type values | 43 seeded (incl. OUTLET_CATEGORY/OUTLET_SUB_CATEGORY, EMP_DESIGNATION, EMP_USER_TYPE, WEEK_DAYS, FREQUENCY_TYPE) | `scripts/setup_database.py (SEED_CATEGORY_TYPES)` |
 | Module registry | 17 master modules | `app/modules.py:34 (MODULES)` |
-| Hook registry | one entry per module | `app/hooks.py:1497 (HOOKS)` |
+| Hook registry | one entry per module | `app/hooks.py:1538 (HOOKS)` |
 | Frozen schema names | incl. typo `expiary_date` | `scripts/ddl.sql` (header = change-log) |
 | Run command + admin creds + DB coords | — | `AGENTS.md` (How to verify / nn5) |
 | UI palette values | — | `docs/PRD.md` §2.3 |
@@ -36,18 +36,18 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | distributor-store | sm_depot_store | `app/modules.py:234 ("distributor-store")` | `app/hooks.py:456 (depot_store_prepare)` | depot_store | /distributor-store | distributor | PRD §2.4.4, SRS §2 FR4.6 |
 | depot-stock-balance | sm_depot_stock_balance | `app/modules.py:261 ("depot-stock-balance")` | `app/hooks.py:491 (depot_stock_balance_prepare)` + HOOKS `depot_stock_balance` | depot_stock_balance | /depot-stock-balance | distributor, distributor-store, item, item-batch | PRD §2.4.4, SRS §2 FR4.17 |
 | depot-rack-stock-balance | sm_depot_rack_stock_balance | `app/modules.py:302 ("depot-rack-stock-balance")` | `app/hooks.py:534 (depot_rack_stock_balance_prepare)` + HOOKS `depot_rack_stock_balance` | depot_rack_stock_balance | /depot-rack-stock-balance | distributor, outlet, rack | PRD §2.4.4, SRS §2 FR4.18 |
-| outlet | sm_client | `app/modules.py:348 ("outlet")` | `app/hooks.py:568 (outlet_prepare)` | outlet | /outlet | category-type, distributor, distributor-store | PRD §2.4, SRS §2 FR4.8 |
-| category-type | sm_category_type | `app/modules.py:398 ("category-type")` | `app/hooks.py:539 (category_type_prepare)` | category_type | /category-type | — | PRD §2.4 |
-| top-level | sm_top_level | `app/modules.py:424 ("top-level")` | `app/hooks.py:636 (top_level_prepare)` + HOOKS `top_level` | top_level | /top-level | — | PRD §2.4, SRS §2 FR4.9 |
-| level | sm_level | `app/modules.py:449 ("level")` | `app/hooks.py:762 (level_prepare)` + HOOKS `level` | level | /level | top-level, distributor | PRD §2.4, SRS §2 FR4.10 |
-| rep | sm_rep | `app/modules.py:475 ("rep")` | `app/hooks.py:1052 (rep_prepare)` + HOOKS `rep` | rep | /rep | category-type, distributor | PRD §2.4, SRS §2 FR4.11 |
-| supervisor-level | sm_supervisor_level | `app/modules.py:527 ("supervisor-level")` | `app/hooks.py:1148 (supervisor_level_prepare)` + HOOKS `supervisor_level` | supervisor_level | /supervisor-level | rep, top-level, level | PRD §2.4, SRS §2 FR4.12 |
-| rep-area | sm_rep_area | `app/modules.py:555 ("rep-area")` | `app/hooks.py:1194 (rep_area_prepare)` + HOOKS `rep_area` | rep_area | /rep-area | rep, level | PRD §2.4, SRS §2 FR4.13 |
-| visit-plan | sm_visit_plan | `app/modules.py:579 ("visit-plan")` | `app/hooks.py:1314 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
-| client-visit-plan | sm_client_visit_plan | `app/modules.py:619 ("client-visit-plan")` | `app/hooks.py:1464 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
+| outlet | sm_client | `app/modules.py:348 ("outlet")` | `app/hooks.py:586 (outlet_prepare)` | outlet | /outlet | category-type, distributor, distributor-store | PRD §2.4, SRS §2 FR4.8 |
+| category-type | sm_category_type | `app/modules.py:407 ("category-type")` | `app/hooks.py:539 (category_type_prepare)` | category_type | /category-type | — | PRD §2.4 |
+| top-level | sm_top_level | `app/modules.py:433 ("top-level")` | `app/hooks.py:675 (top_level_prepare)` + HOOKS `top_level` | top_level | /top-level | — | PRD §2.4, SRS §2 FR4.9 |
+| level | sm_level | `app/modules.py:458 ("level")` | `app/hooks.py:801 (level_prepare)` + HOOKS `level` | level | /level | top-level, distributor | PRD §2.4, SRS §2 FR4.10 |
+| rep | sm_rep | `app/modules.py:484 ("rep")` | `app/hooks.py:1091 (rep_prepare)` + HOOKS `rep` | rep | /rep | category-type, distributor | PRD §2.4, SRS §2 FR4.11 |
+| supervisor-level | sm_supervisor_level | `app/modules.py:536 ("supervisor-level")` | `app/hooks.py:1187 (supervisor_level_prepare)` + HOOKS `supervisor_level` | supervisor_level | /supervisor-level | rep, top-level, level | PRD §2.4, SRS §2 FR4.12 |
+| rep-area | sm_rep_area | `app/modules.py:564 ("rep-area")` | `app/hooks.py:1233 (rep_area_prepare)` + HOOKS `rep_area` | rep_area | /rep-area | rep, level | PRD §2.4, SRS §2 FR4.13 |
+| visit-plan | sm_visit_plan | `app/modules.py:588 ("visit-plan")` | `app/hooks.py:1353 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
+| client-visit-plan | sm_client_visit_plan | `app/modules.py:628 ("client-visit-plan")` | `app/hooks.py:1503 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
 
 ACL screens: `app/routers/acl_admin.py` (users/roles/permissions — include BEFORE crud router).
-Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/menu: `app/modules.py:660 (MODULE_ORDER)`.
+Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/menu: `app/modules.py:671 (MODULE_ORDER)`.
 
 ## §3 Doc map (what to read for what; skip unless §4 sends you)
 | Question | File | Last-sync |

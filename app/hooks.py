@@ -565,16 +565,44 @@ def _cat_type_name(cid, type_name, cat_type_id):
     return (node["cat_type_name"] if node else "-") or "-"
 
 
+def _next_outlet_code(cid: str) -> str:
+    """Auto-generate numeric Outlet ID starting at 1000001."""
+    rows = q("""SELECT client_id FROM sm_client
+                WHERE cid=%s AND client_id REGEXP '^[0-9]+$'
+                ORDER BY CAST(client_id AS UNSIGNED) DESC LIMIT 1""", (cid,))
+    if rows and rows[0]["client_id"]:
+        try:
+            curr = int(rows[0]["client_id"])
+            nxt = max(curr + 1, 1000001)
+        except (ValueError, TypeError):
+            nxt = 1000001
+    else:
+        nxt = 1000001
+    while scalar("SELECT 1 FROM sm_client WHERE cid=%s AND client_id=%s", (cid, str(nxt))):
+        nxt += 1
+    return str(nxt)
+
+
 def outlet_prepare(cid, data, existing=None, user=None):
     """Create/edit an sm_client (Outlet) row.
 
-    Auto-fill rules: category/sub-category names resolve from sm_category_type,
-    customer_type is generated as 'CATEGORY_ID|CATEGORY_NAME', depot/store names
-    resolve from sm_depot / sm_depot_store, and (cid, client_id) is unique."""
-    client_id = (data.get("client_id") or "").strip()
+    Auto-fill rules: auto-incremental client_id starting at 1000001,
+    area_name resolves from sm_level (depth 3 Beat), category/sub-category
+    names resolve from sm_category_type, customer_type is generated as
+    'CATEGORY_ID|CATEGORY_NAME', depot/store names resolve from sm_depot /
+    sm_depot_store if provided or preserved, and (cid, client_id) is unique."""
+    if existing is not None:
+        client_id = (existing.get("client_id") or data.get("client_id") or "").strip()
+    else:
+        client_id = (data.get("client_id") or "").strip()
+        if not client_id:
+            client_id = _next_outlet_code(cid)
+    data["client_id"] = client_id
+
     name = (data.get("name") or "").strip()
-    if not client_id or not name:
-        return "Outlet ID and Outlet Name are required."
+    if not name:
+        return "Outlet Name is required."
+
     dup_sql = "SELECT id FROM sm_client WHERE cid=%s AND client_id=%s"
     dup_params = [cid, client_id]
     if existing is not None:
@@ -583,38 +611,49 @@ def outlet_prepare(cid, data, existing=None, user=None):
     if q(dup_sql, dup_params, one=True):
         return "An outlet with this Outlet ID already exists."
 
+    area_id = (data.get("area_id") or "").strip()
+    if not area_id or area_id == "-":
+        return "Beat / Area is required."
+    data["area_id"] = area_id
+    beat = q("SELECT level_name FROM sm_level WHERE cid=%s AND level_id=%s AND depth=3",
+             (cid, area_id), one=True)
+    if beat:
+        data["area_name"] = beat["level_name"] or "-"
+    else:
+        lvl = q("SELECT level_name FROM sm_level WHERE cid=%s AND level_id=%s", (cid, area_id), one=True)
+        data["area_name"] = (lvl["level_name"] if lvl else "-") or "-"
+
     cat_id = (data.get("category_id") or "").strip()
     data["category_id"] = cat_id or "-"
     data["category_name"] = _cat_type_name(cid, OUTLET_CAT_TYPE, cat_id) if cat_id else "-"
     sub_id = (data.get("sub_category_id") or "").strip()
     data["sub_category_id"] = sub_id or "-"
     data["sub_category_name"] = _cat_type_name(cid, OUTLET_SUBCAT_TYPE, sub_id) if sub_id else "-"
-    # customer_type is auto-generated, never typed by the user
     data["customer_type"] = f"{data['category_id']}|{data['category_name']}" if cat_id else "-"
 
-    depot_id = (data.get("depot_id") or "").strip()
+    depot_id = (data.get("depot_id") or (existing.get("depot_id") if existing else "") or "").strip()
     data["depot_id"] = depot_id or "-"
     if depot_id and depot_id != "-":
         depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s",
                   (cid, depot_id), one=True)
-        if not depot:
-            return f"Distributor '{depot_id}' not found."
-        data["depot_name"] = (depot["name"] or "-") or "-"
+        data["depot_name"] = (depot["name"] if depot else "-") or "-"
     else:
         data["depot_name"] = "-"
 
-    store_id = (data.get("store_id") or "").strip()
+    store_id = (data.get("store_id") or (existing.get("store_id") if existing else "") or "").strip()
     data["store_id"] = store_id or "-"
     if store_id and store_id != "-":
-        if not (depot_id and depot_id != "-"):
-            return "Select a distributor before choosing a store."
-        store = q("SELECT store_name FROM sm_depot_store WHERE cid=%s AND depot_id=%s AND store_id=%s",
-                  (cid, depot_id, store_id), one=True)
-        if not store:
-            return f"Store '{store_id}' not found under distributor '{depot_id}'."
-        data["store_name"] = (store["store_name"] or "-") or "-"
+        store = q("SELECT store_name FROM sm_depot_store WHERE cid=%s AND store_id=%s",
+                  (cid, store_id), one=True)
+        data["store_name"] = (store["store_name"] if store else "-") or "-"
     else:
         data["store_name"] = "-"
+
+    old_id = (data.get("client_old_id") or (existing.get("client_old_id") if existing else "") or "").strip()
+    data["client_old_id"] = old_id or "-"
+
+    if existing and not data.get("image_path") and existing.get("image_path"):
+        data["image_path"] = existing["image_path"]
 
     if not (data.get("status") or "").strip():
         data["status"] = "ACTIVE"
@@ -1465,14 +1504,16 @@ def client_visit_plan_prepare(cid, data, existing=None, user=None):
     client_id = (data.get("client_id") or "").strip()
     if not client_id:
         return "Outlet ID (client_id) is required."
-    clt = q("SELECT client_id, name FROM sm_client WHERE cid=%s AND client_id=%s AND status='ACTIVE'",
+    clt = q("SELECT client_id, name, area_id FROM sm_client WHERE cid=%s AND client_id=%s AND status='ACTIVE'",
             (cid, client_id), one=True)
     if not clt:
         return f"Outlet '{client_id}' not found or inactive."
     data["client_id"] = clt["client_id"]
 
     area_id = (data.get("area_id") or "").strip()
-    data["area_id"] = area_id or "-"
+    if not area_id or area_id == "-":
+        area_id = (clt.get("area_id") or "").strip() or "-"
+    data["area_id"] = area_id
 
     freq = (data.get("frequency") or "WEEKLY").strip().upper()
     data["frequency"] = freq

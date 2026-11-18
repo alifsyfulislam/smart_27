@@ -266,6 +266,22 @@ def _item_options():
                           ORDER BY item_id""", (config.CID,))]
 
 
+def _depot_store_options():
+    """Distributor store filter options — ACTIVE distributor stores."""
+    return [(r["store_id"], f"{r['store_id']} | {r['store_name']}" if r["store_name"] else r["store_id"])
+            for r in q("""SELECT store_id, store_name FROM sm_depot_store
+                          WHERE cid=%s AND status='ACTIVE'
+                          ORDER BY store_id""", (config.CID,))]
+
+
+def _rack_options():
+    """Rack filter options — ACTIVE racks."""
+    return [(r["rack_id"], f"{r['rack_id']} | {r['rack_name']}" if r["rack_name"] else r["rack_id"])
+            for r in q("""SELECT rack_id, rack_name FROM sm_rack
+                          WHERE cid=%s AND status='ACTIVE'
+                          ORDER BY rack_id""", (config.CID,))]
+
+
 def _filter_options(m):
     out = []
     for f in m["filters"]:
@@ -280,6 +296,10 @@ def _filter_options(m):
             opts = _depot_options()
         elif kind == "item":
             opts = _item_options()
+        elif kind == "depot_store":
+            opts = _depot_store_options()
+        elif kind == "rack":
+            opts = _rack_options()
         else:
             opts = STATUS_OPTIONS
         out.append({"name": name, "label": label, "options": opts})
@@ -535,12 +555,41 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
             for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='dm' OR designation_id='DM') AND status='ACTIVE' ORDER BY name", (config.CID,))
         ]
 
+    elif slug == "outlet":
+        route_opts = q("""SELECT level_id, level_name FROM sm_level
+                          WHERE cid=%s AND depth=2 AND status='ACTIVE'
+                          ORDER BY level_id""", (config.CID,))
+        beat_opts = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                         FROM sm_level
+                         WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                         ORDER BY level_id""", (config.CID,))
+        context["route_opts"] = route_opts
+        context["beat_opts"] = beat_opts
+        context["route_map"] = {r["level_id"]: r["level_name"] for r in route_opts}
+        context["beat_route_map"] = {b["level_id"]: b["parent_level_id"] for b in beat_opts}
+        field_opts["area_id"] = [(b["level_id"], f"{b['level_id']} | {b['level_name']}") for b in beat_opts]
+
     elif slug == "client-visit-plan":
-        field_opts["client_id"] = [(r["client_id"], f"{r['client_id']} | {r['name']}")
-                                    for r in q("SELECT client_id, name FROM sm_client WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 500", (config.CID,))]
+        route_opts = q("""SELECT level_id, level_name FROM sm_level
+                          WHERE cid=%s AND depth=2 AND status='ACTIVE'
+                          ORDER BY level_id""", (config.CID,))
+        beat_opts = q("""SELECT level_id, level_name, parent_level_id, parent_level_name
+                         FROM sm_level
+                         WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                         ORDER BY level_id""", (config.CID,))
+        outlet_opts = q("""SELECT client_id, name, area_id, area_name
+                           FROM sm_client
+                           WHERE cid=%s AND status='ACTIVE'
+                           ORDER BY name""", (config.CID,))
+        context["route_opts"] = route_opts
+        context["beat_opts"] = beat_opts
+        context["outlet_opts"] = outlet_opts
+        context["route_map"] = {r["level_id"]: r["level_name"] for r in route_opts}
+        context["beat_route_map"] = {b["level_id"]: b["parent_level_id"] for b in beat_opts}
+        context["client_map"] = {c["client_id"]: c["name"] for c in outlet_opts}
+        field_opts["client_id"] = [(c["client_id"], f"{c['client_id']} | {c['name']}") for c in outlet_opts]
         field_opts["area_id"] = [("", "-- Select Beat (Optional) --")] + [
-            (r["level_id"], f"{r['level_id']} | {r['level_name']}")
-            for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=3 AND status='ACTIVE' ORDER BY level_id", (config.CID,))]
+            (b["level_id"], f"{b['level_id']} | {b['level_name']}") for b in beat_opts]
 
     elif slug == "distributor":
         towns = [("", "-- Select Town --")] + [

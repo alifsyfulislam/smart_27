@@ -250,6 +250,61 @@
                 {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
               {% endif %}
             </div>
+            {% elif (slug == 'outlet' or slug == 'client-visit-plan') and s.name == 'area_id' %}
+            <div class="field" id="field-wrap-beat_route_filter">
+              <label>Filter Beat by Route (Optional)</label>
+              {% if a == 'View' %}
+                <div>{{ route_map.get(beat_route_map.get(data.get('area_id'))) or '—' }}</div>
+              {% else %}
+                <select id="f-beat-route-filter" data-searchable data-search-placeholder="Type to search Route…">
+                  <option value="">-- All Routes --</option>
+                  {% for r in (route_opts or []) %}
+                  <option value="{{ r['level_id'] }}">{{ r['level_id'] }} | {{ r['level_name'] }}</option>
+                  {% endfor %}
+                </select>
+                <div class="hint">Filter beats by parent Route.</div>
+              {% endif %}
+            </div>
+            <div class="field" id="field-wrap-area_id">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}
+                <div>{{ data.get('area_id') }} — {{ data.get('area_name') or '' }}</div>
+              {% else %}
+                <select name="area_id" id="f-area_id" {% if s.required %}required{% endif %}
+                        data-searchable data-search-placeholder="Type to search Beat (ID / Name / Route)…">
+                  <option value="">-- Select Beat --</option>
+                  {% for b in (beat_opts or []) %}
+                  <option value="{{ b['level_id'] }}"
+                          data-route="{{ b['parent_level_id'] }}"
+                          {{ 'selected' if (data.get('area_id')|string)|upper == (b['level_id']|string)|upper }}>
+                    {{ b['level_id'] }} | {{ b['level_name'] }}{% if b.get('parent_level_name') %} (Route: {{ b['parent_level_id'] }} - {{ b['parent_level_name'] }}){% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+                {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+              {% endif %}
+            </div>
+            {% elif slug == 'client-visit-plan' and s.name == 'client_id' %}
+            <div class="field" id="field-wrap-client_id">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}
+                <div>{{ data.get('client_id') }} — {{ client_map.get(data.get('client_id')) or '' }}</div>
+              {% else %}
+                <select name="client_id" id="f-client_id" required
+                        data-searchable data-search-placeholder="Type to search Outlet (ID / Name)…">
+                  <option value="">-- Select Outlet --</option>
+                  {% for c in (outlet_opts or []) %}
+                  <option value="{{ c['client_id'] }}"
+                          data-area="{{ c.get('area_id') or '' }}"
+                          {{ 'selected' if (data.get('client_id')|string)|upper == (c['client_id']|string)|upper }}>
+                    {{ c['client_id'] }} | {{ c['name'] }}{% if c.get('area_name') and c.get('area_name') != '-' %} (Beat: {{ c['area_name'] }}){% endif %}
+                  </option>
+                  {% endfor %}
+                </select>
+                <div id="outlet-count-badge" class="hint" style="margin-top: 4px; font-weight: 600; color: #1e40af;"></div>
+                {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+              {% endif %}
+            </div>
             {% else %}
             <div class="field">
               <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
@@ -1026,6 +1081,119 @@
 
       areaSelect.addEventListener("change", updateBadge);
       updateBadge();
+    })();
+    {% endif %}
+    {% if slug in ('outlet', 'client-visit-plan') %}
+    // Filter Beat options by Route
+    (function () {
+      var routeSelect = document.getElementById("f-beat-route-filter");
+      var beatSelect = document.getElementById("f-area_id");
+      if (!beatSelect || !routeSelect) return;
+
+      var masterBeatOpts = Array.from(beatSelect.options);
+
+      function filterBeats(routeId) {
+        var currentVal = beatSelect.value;
+        beatSelect.innerHTML = "";
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = routeId ? "-- Select Beat in Route --" : "-- Select Beat --";
+        beatSelect.appendChild(placeholder);
+
+        masterBeatOpts.forEach(function (o) {
+          if (!o.value) return;
+          if (!routeId || o.dataset.route === routeId) {
+            beatSelect.appendChild(o.cloneNode(true));
+          }
+        });
+
+        if (currentVal && beatSelect.querySelector('option[value="' + currentVal + '"]')) {
+          beatSelect.value = currentVal;
+        } else {
+          beatSelect.value = "";
+        }
+        beatSelect.dispatchEvent(new Event("ssms-refresh"));
+        beatSelect.dispatchEvent(new Event("change"));
+      }
+
+      routeSelect.addEventListener("change", function () {
+        filterBeats(routeSelect.value);
+      });
+
+      var initialBeat = "{{ data.get('area_id') or '' }}";
+      if (initialBeat) {
+        var match = masterBeatOpts.find(function (o) { return o.value === initialBeat; });
+        if (match && match.dataset.route) {
+          routeSelect.value = match.dataset.route;
+          filterBeats(match.dataset.route);
+          beatSelect.value = initialBeat;
+          routeSelect.dispatchEvent(new Event("ssms-refresh"));
+          beatSelect.dispatchEvent(new Event("ssms-refresh"));
+        }
+      }
+    })();
+    {% endif %}
+    {% if slug == 'client-visit-plan' %}
+    // client-visit-plan: dynamic cascading Beat -> Outlet
+    (function () {
+      var beatSelect = document.getElementById("f-area_id");
+      var outletSelect = document.getElementById("f-client_id");
+      var countBadge = document.getElementById("outlet-count-badge");
+      if (!beatSelect || !outletSelect) return;
+
+      var masterOutletOpts = Array.from(outletSelect.options);
+
+      function filterOutlets(beatId) {
+        var currentVal = outletSelect.value;
+        outletSelect.innerHTML = "";
+        var placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = beatId ? "-- Select Outlet in Beat --" : "-- Select Outlet --";
+        outletSelect.appendChild(placeholder);
+
+        var count = 0;
+        masterOutletOpts.forEach(function (o) {
+          if (!o.value) return;
+          if (!beatId || o.dataset.area === beatId) {
+            outletSelect.appendChild(o.cloneNode(true));
+            count++;
+          }
+        });
+
+        if (countBadge) {
+          countBadge.textContent = beatId ? (count + " outlet(s) available in this beat") : "";
+        }
+
+        if (currentVal && outletSelect.querySelector('option[value="' + currentVal + '"]')) {
+          outletSelect.value = currentVal;
+        } else {
+          outletSelect.value = "";
+        }
+        outletSelect.dispatchEvent(new Event("ssms-refresh"));
+      }
+
+      beatSelect.addEventListener("change", function () {
+        filterOutlets(beatSelect.value);
+      });
+
+      var initialOutlet = "{{ data.get('client_id') or '' }}";
+      var initialBeat = "{{ data.get('area_id') or '' }}";
+      if (initialBeat) {
+        filterOutlets(initialBeat);
+        if (initialOutlet) {
+          outletSelect.value = initialOutlet;
+          outletSelect.dispatchEvent(new Event("ssms-refresh"));
+        }
+      } else if (initialOutlet) {
+        var matchOutlet = masterOutletOpts.find(function (o) { return o.value === initialOutlet; });
+        if (matchOutlet && matchOutlet.dataset.area) {
+          beatSelect.value = matchOutlet.dataset.area;
+          beatSelect.dispatchEvent(new Event("ssms-refresh"));
+          filterOutlets(matchOutlet.dataset.area);
+          outletSelect.value = initialOutlet;
+          outletSelect.dispatchEvent(new Event("ssms-refresh"));
+        }
+      }
     })();
     {% endif %}
   </script>
