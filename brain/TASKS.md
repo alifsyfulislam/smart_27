@@ -11,6 +11,8 @@ Statuses: `ready` · `needs-verification` (claimed done — verify against code,
 (none)
 
 ## DONE (append-only; one line each: id-free entries use date | commit | scope | result)
+- T-053 | done | generic/form, crud | - | P1 | 2026-11-18 | View Mode foreign key formatting: resolve and display id — name across distributor, supervisor, representative, delivery man, beat, item, store (V-034, D-048)
+- T-052 | done | distributor | - | P1 | 2026-11-18 | Remove Town input field from distributor create and edit forms while preserving town_name in list, search, and Excel import (V-033, D-047)
 - T-051 | done | outlet, client-visit-plan | - | P1 | 2026-11-18 | Add "All Beat" and "All Distributor" dropdown filters to /outlet and /client-visit-plan list views (V-032, D-046)
 - T-050 | done | outlet, level | - | P1 | 2026-11-18 | Outlet ID form behavior alignment (hide on create, readonly on edit with tabindex -1), Beat distributor validation, auto-record depot and default commercial store, level depot select enable on depths 1-3 (V-031, D-045)
 - T-049 | done | visit-plan, rep-area | - | P1 | 2026-11-18 | Aligned Representative input with Delivery Man (searchable single-select, placeholder, -- Select Representative --, active PSR/rep query) (V-030, D-044)

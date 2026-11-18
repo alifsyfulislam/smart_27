@@ -599,6 +599,7 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         context["beat_opts"] = beat_opts
         context["route_map"] = {r["level_id"]: r["level_name"] for r in route_opts}
         context["beat_route_map"] = {b["level_id"]: b["parent_level_id"] for b in beat_opts}
+        context["beat_map"] = {b["level_id"]: b["level_name"] for b in beat_opts}
         field_opts["area_id"] = [(b["level_id"], f"{b['level_id']} | {b['level_name']}") for b in beat_opts]
 
     elif slug == "client-visit-plan":
@@ -618,26 +619,63 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         context["outlet_opts"] = outlet_opts
         context["route_map"] = {r["level_id"]: r["level_name"] for r in route_opts}
         context["beat_route_map"] = {b["level_id"]: b["parent_level_id"] for b in beat_opts}
+        context["beat_map"] = {b["level_id"]: b["level_name"] for b in beat_opts}
         context["client_map"] = {c["client_id"]: c["name"] for c in outlet_opts}
         field_opts["client_id"] = [(c["client_id"], f"{c['client_id']} | {c['name']}") for c in outlet_opts]
         field_opts["area_id"] = [("", "-- Select Beat (Optional) --")] + [
             (b["level_id"], f"{b['level_id']} | {b['level_name']}") for b in beat_opts]
-
-    elif slug == "distributor":
-        towns = [("", "-- Select Town --")] + [
-            (r["level_name"], f"{r['level_id']} | {r['level_name']}")
-            for r in q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND depth=1 AND status='ACTIVE' ORDER BY level_name", (config.CID,))
-        ]
-        curr_town = (data or {}).get("town_name")
-        if curr_town and curr_town not in ("-", "") and not any(o[0] == curr_town for o in towns):
-            towns.append((curr_town, curr_town))
-        field_opts["town_name"] = towns
 
     elif slug == "level":
         context["top_level_terrs"] = q(
             """SELECT level_id, level_name, parent_level_id FROM sm_top_level
                WHERE cid=%s AND depth=3 AND status='ACTIVE'
                ORDER BY level_name""", (config.CID,))
+
+    # Ensure lookup maps for foreign key view resolution (id — name)
+    depot_map = {d["depot_id"]: d["name"] for d in (depot_opts or [])}
+    did = (data or {}).get("depot_id")
+    if did and did != "-" and did not in depot_map:
+        d_row = q("SELECT depot_id, name FROM sm_depot WHERE cid=%s AND depot_id=%s LIMIT 1", (config.CID, did), one=True)
+        if d_row:
+            depot_map[did] = d_row["name"]
+    context["depot_map"] = depot_map
+
+    item_map = {it["item_id"]: it["name"] for it in (item_opts or [])}
+    iid = (data or {}).get("item_id")
+    if iid and iid != "-" and iid not in item_map:
+        it_row = q("SELECT item_id, name FROM sm_item WHERE cid=%s AND item_id=%s LIMIT 1", (config.CID, iid), one=True)
+        if it_row:
+            item_map[iid] = it_row["name"]
+    context["item_map"] = item_map
+
+    sup_map = {}
+    sid = (data or {}).get("sup_id")
+    if sid and sid != "-":
+        s_row = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s LIMIT 1", (config.CID, sid), one=True)
+        if s_row:
+            sup_map[sid] = s_row["name"]
+    context["sup_map"] = sup_map
+
+    rep_map = {}
+    rid = (data or {}).get("rep_id")
+    dmid = (data or {}).get("delivery_man_id")
+    if rid and rid != "-":
+        r_row = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s LIMIT 1", (config.CID, rid), one=True)
+        if r_row:
+            rep_map[rid] = r_row["name"]
+    if dmid and dmid != "-":
+        dm_row = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s LIMIT 1", (config.CID, dmid), one=True)
+        if dm_row:
+            rep_map[dmid] = dm_row["name"]
+    context["rep_map"] = rep_map
+
+    aid = (data or {}).get("area_id")
+    if aid and aid != "-" and ("beat_map" not in context or aid not in context["beat_map"]):
+        beat_map = context.get("beat_map") or {}
+        b_row = q("SELECT level_id, level_name FROM sm_level WHERE cid=%s AND level_id=%s LIMIT 1", (config.CID, aid), one=True)
+        if b_row:
+            beat_map[aid] = b_row["level_name"]
+        context["beat_map"] = beat_map
 
     context.update({
         "m": m, "slug": PERM2SLUG.get(m["perm"], m["perm"]),
@@ -749,12 +787,23 @@ async def module_view(request: Request, slug: str, rid: int):
     if slug in ("brand", "top-level", "level"):
         children = _hierarchy_children(slug, row["level_id"])
         next_level = _NEXT_LEVEL_BY_SLUG.get(slug, {}).get(int(row["depth"] or 0), "")
+    parent_opts, item_opts, depot_opts = ([], [], [])
+    if slug == "brand":
+        parent_opts = _hierarchy_parent_opts()
+    elif slug == "top-level":
+        parent_opts = _top_level_parent_opts()
+    elif slug == "level":
+        parent_opts = _level_parent_opts()
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+        item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
         request, "generic/form.html",
         _form_context(m, context, "View", row=row,
                       data={k: ("" if v is None else v) for k, v in row.items()},
-                      children=children, next_level=next_level))
+                      children=children, next_level=next_level,
+                      parent_opts=parent_opts,
+                      item_opts=item_opts, depot_opts=depot_opts))
 
 
 @router.get("/{slug}/edit/{rid}")

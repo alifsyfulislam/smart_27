@@ -43,19 +43,19 @@
             <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:12px;padding:10px 14px;background:var(--fb-bg,#f0f2f5);border:1px solid var(--fb-divider,#dadde1);border-radius:6px">
               <div>
                 <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Company</span>
-                <strong>{{ data.get('company_id') or '-' }}{% if data.get('company_name') and data.get('company_name') != '-' %} | {{ data.get('company_name') }}{% endif %}</strong>
+                <strong>{{ data.get('company_id') or '-' }}{% if data.get('company_name') and data.get('company_name') != '-' %} — {{ data.get('company_name') }}{% endif %}</strong>
               </div>
               <div>
                 <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Brand</span>
-                <strong>{{ data.get('brand_id') or '-' }}{% if data.get('brand_name') and data.get('brand_name') != '-' %} | {{ data.get('brand_name') }}{% endif %}</strong>
+                <strong>{{ data.get('brand_id') or '-' }}{% if data.get('brand_name') and data.get('brand_name') != '-' %} — {{ data.get('brand_name') }}{% endif %}</strong>
               </div>
               <div>
                 <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Type</span>
-                <strong>{{ data.get('type_id') or '-' }}{% if data.get('type_name') and data.get('type_name') != '-' %} | {{ data.get('type_name') }}{% endif %}</strong>
+                <strong>{{ data.get('type_id') or '-' }}{% if data.get('type_name') and data.get('type_name') != '-' %} — {{ data.get('type_name') }}{% endif %}</strong>
               </div>
               <div>
                 <span class="muted" style="display:block;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:2px">Flavor</span>
-                <strong>{{ data.get('flavor_id') or '-' }}{% if data.get('flavor_name') and data.get('flavor_name') != '-' %} | {{ data.get('flavor_name') }}{% endif %}</strong>
+                <strong>{{ data.get('flavor_id') or '-' }}{% if data.get('flavor_name') and data.get('flavor_name') != '-' %} — {{ data.get('flavor_name') }}{% endif %}</strong>
               </div>
             </div>
             {% else %}
@@ -76,7 +76,9 @@
           {% elif s.type == 'item_select' %}
           <div class="field {{ 'full' if not s.in_list }}">
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('item_id') }} | {{ data.get('name') }}</div>
+            {% if a == 'View' %}
+            {% set iname = (data.get('name') if data.get('name') and data.get('name') != '-' else (item_map.get(data.get('item_id')) if item_map else '')) %}
+            <div>{{ data.get('item_id') }}{% if iname and iname != '-' %} — {{ iname }}{% endif %}</div>
             {% else %}
             <select name="item_id" data-searchable data-search-placeholder="Type to search item (id / name / brand)…"
                     {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
@@ -95,7 +97,9 @@
           {% elif s.type == 'depot_select' %}
           <div class="field" id="field-wrap-{{ s.name }}" {% if slug == 'level' and ((a == 'Edit' and (row.get('depth') or 0) == 0) or (a == 'View' and (not data.get('depot_id') or data.get('depot_id') == '-')) or (a == 'Create' and (data.get('parent_level_id') or '0') == '0')) %}style="display:none"{% endif %}>
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('depot_id') }}{% if data.get('depot_name') and data.get('depot_name') != '-' %} | {{ data.get('depot_name') }}{% endif %}</div>
+            {% if a == 'View' %}
+            {% set dname = (data.get('depot_name') if data.get('depot_name') and data.get('depot_name') != '-' else (depot_map.get(data.get('depot_id')) if depot_map else '')) %}
+            <div>{{ data.get('depot_id') }}{% if dname and dname != '-' %} — {{ dname }}{% endif %}</div>
             {% else %}
             <select name="depot_id" id="f-depot_id" data-searchable data-search-placeholder="Type to search distributor…"
                     {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
@@ -114,7 +118,7 @@
           {% elif s.type == 'store_select' %}
           <div class="field">
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-            {% if a == 'View' %}<div>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} | {{ data.get('store_name') }}{% endif %}</div>
+            {% if a == 'View' %}<div>{{ data.get('store_id') }}{% if data.get('store_name') and data.get('store_name') != '-' %} — {{ data.get('store_name') }}{% endif %}</div>
             {% else %}
             <select name="store_id" id="f-store_id" data-store-depends="depot_id" data-searchable
                     data-search-placeholder="Type to search store…"
@@ -254,7 +258,9 @@
             <div class="field" id="field-wrap-beat_route_filter">
               <label>Filter Beat by Route (Optional)</label>
               {% if a == 'View' %}
-                <div>{{ route_map.get(beat_route_map.get(data.get('area_id'))) or '—' }}</div>
+                {% set rid = beat_route_map.get(data.get('area_id')) if beat_route_map else '' %}
+                {% set rname = route_map.get(rid) if (route_map and rid) else '' %}
+                <div>{% if rid %}{{ rid }}{% if rname and rname != '-' %} — {{ rname }}{% endif %}{% else %}—{% endif %}</div>
               {% else %}
                 <select id="f-beat-route-filter" data-searchable data-search-placeholder="Type to search Route…">
                   <option value="">-- All Routes --</option>
@@ -268,7 +274,8 @@
             <div class="field" id="field-wrap-area_id">
               <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
               {% if a == 'View' %}
-                <div>{{ data.get('area_id') }} — {{ data.get('area_name') or '' }}</div>
+                {% set bname = (data.get('area_name') if data.get('area_name') and data.get('area_name') != '-' else (beat_map.get(data.get('area_id')) if beat_map else '')) %}
+                <div>{{ data.get('area_id') }}{% if bname and bname != '-' %} — {{ bname }}{% endif %}</div>
               {% else %}
                 <select name="area_id" id="f-area_id" {% if s.required %}required{% endif %}
                         data-searchable data-search-placeholder="Type to search Beat (ID / Name / Route)…">
@@ -308,7 +315,22 @@
             {% else %}
             <div class="field">
               <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
-              {% if a == 'View' %}<div>{{ data.get(s.name) }}</div>
+              {% if a == 'View' %}
+                {% if s.name == 'sup_id' %}
+                  {% set sname = (data.get('sup_name') if data.get('sup_name') and data.get('sup_name') != '-' else (sup_map.get(data.get('sup_id')) if sup_map else '')) %}
+                  <div>{{ data.get('sup_id') }}{% if sname and sname != '-' %} — {{ sname }}{% endif %}</div>
+                {% elif s.name == 'rep_id' %}
+                  {% set rname = (data.get('rep_name') if data.get('rep_name') and data.get('rep_name') != '-' else (rep_map.get(data.get('rep_id')) if rep_map else '')) %}
+                  <div>{{ data.get('rep_id') }}{% if rname and rname != '-' %} — {{ rname }}{% endif %}</div>
+                {% elif s.name == 'delivery_man_id' %}
+                  {% set dmname = (data.get('delivery_man_name') if data.get('delivery_man_name') and data.get('delivery_man_name') != '-' else (rep_map.get(data.get('delivery_man_id')) if rep_map else '')) %}
+                  <div>{{ data.get('delivery_man_id') }}{% if dmname and dmname != '-' %} — {{ dmname }}{% endif %}</div>
+                {% elif s.name == 'depot_id' %}
+                  {% set dname = (data.get('depot_name') if data.get('depot_name') and data.get('depot_name') != '-' else (depot_map.get(data.get('depot_id')) if depot_map else '')) %}
+                  <div>{{ data.get('depot_id') }}{% if dname and dname != '-' %} — {{ dname }}{% endif %}</div>
+                {% else %}
+                  <div>{{ data.get(s.name) }}</div>
+                {% endif %}
               {% else %}
               <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                       {% if s.searchable %}data-searchable data-search-placeholder="{{ s.placeholder or ('Type to search ' ~ s.label ~ '…') }}"{% endif %}>

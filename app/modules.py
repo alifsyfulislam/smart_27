@@ -216,7 +216,7 @@ MODULES = {
             f("wh_address", "Warehouse Address", "textarea"),
             f("wh_address_bn", "Warehouse Address (BN)", "textarea"),
             f("town_id", "Town ID", "text", in_form=False),
-            f("town_name", "Town", "select", in_list=True, searchable=True,
+            f("town_name", "Town", "select", in_form=False, in_list=True, searchable=True,
               help="Town from Field Structure (sm_level depth 1)."),
             f("latitude", "Latitude", "text"),
             f("longitude", "Longitude", "text"),

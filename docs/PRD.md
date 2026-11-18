@@ -49,7 +49,7 @@ Per module: **Brand**, **Item**, **Item Batch**, **Rack**, **Distributor**, **Di
 - **Child Levels card** on the Edit/View page: lists existing child levels (view/edit links, status badges) and, on Edit, offers one name box plus "Add another" to create **one or many** children in a single submit (`POST /{slug}/add-children/{id}`, names deduped, per-name errors reported). Disabled for Flavors (depth 3).
 
 ### 2.4.2 Dynamic Form Dropdowns & Hierarchy Cascade
-- **Option display format**: All dynamically populated form selects (Brand parent picker, Item hierarchy cascade, Item in Item Batch, Distributor in Distributor Store, Store in Outlet, Town in Distributor) format selectable options as `ID | Name` (e.g. `BG001 | Kurkure`, `TW0001 | GULSHAN`), replacing dash delimiters.
+- **Option display format**: All dynamically populated form selects (Brand parent picker, Item hierarchy cascade, Item in Item Batch, Distributor in Distributor Store, Store in Outlet, Beat in Outlet/Visit Plan) format selectable options as `ID | Name` (e.g. `BG001 | Kurkure`, `TW0001 | GULSHAN`), replacing dash delimiters.
 - **Searchable single-select UX (`select[data-searchable]`)**: When focused or typed into, placeholder text (e.g., `-- Company --`, `-- Select item --`, `Type to search Town Name…`) never acts as a pre-applied search query. The options list displays all valid options when empty/focused, allowing instant typeahead filtering.
 - **Hierarchy cascade (Item create & edit)**:
   - **Create**: Company dropdown initially populates from `/api/hierarchy/children?parent=0`. Selecting a level loads its active child levels for the next select (Company → Brand → Type → Flavor).
@@ -60,7 +60,8 @@ Per module: **Brand**, **Item**, **Item Batch**, **Rack**, **Distributor**, **Di
 - **Item Batch Edit Controls**: On `/item-batch/edit/{id}`, the Item selector is disabled (with a hidden input ensuring form payload integrity) and protected on the backend via `item_batch_prepare`.
 - **National Structure Parent & Image Simplification**: `/top-level/create` parent picker restricts options strictly to depth 0 active records plus Root; image input is removed from forms.
 - **Field Structure Parent & Territory Selection**: In `/level/create` and `/level/edit`, Parent Level options are sourced dynamically from active Zones in National Structure (`sm_top_level` depth 2, `status='ACTIVE'`); Level Name suggestions dynamically filter and load active National Structure Territories (`sm_top_level` depth 3) under that chosen Zone.
-- **Distributor Town Selection**: `town_name` renders as a searchable dropdown dynamically populated from `sm_level` (`depth=1` and `status='ACTIVE'`). The backend `depot_prepare` hook automatically synchronizes `town_id` and `town_name`.
+- **Distributor Town Streamlining**: Town and Town ID input fields are excluded from Distributor create and edit forms (`in_form: False`); existing town values are preserved on edit and default to `"-"` on new creation; Town remains available in list view and Excel bulk import.
+- **Foreign Key View Presentation Standard (`id — name`)**: Across all module record view pages (`/{slug}/view/{id}`), foreign key identifiers are formatted in standard `ID — Name` (em-dash separated) format (e.g., Distributor `depot_id — depot_name`, Supervisor `sup_id — sup_name`, Representative `rep_id — rep_name`, Delivery Man `delivery_man_id — delivery_man_name`, Beat `beat_id — beat_name`, Item `item_id — item_name`, Store `store_id — store_name`).
 
 ### 2.4.4 Rack & Distributor Info Enhancements
 - **Rack Master (`sm_rack`)**: Positioned under Item Info (`/rack`). Supports manual creation, view, edit, soft delete, restore, and Excel import. Mirrored image upload parity with `sm_item` (PNG/JPG/GIF/WEBP up to 5 MB stored in `app/static/uploads/sm_rack_{slug}_image_{timestamp}.{ext}`). Unique on `(cid, rack_id)`. The `rack_id` is immutable on edit (`readonly_on_edit=True` in module spec and enforced in `rack_prepare`). Historical column expiry date preserved.
@@ -100,7 +101,7 @@ Filter by table, action, user, free text; expandable old/new JSON values; pagina
 | `depot.after_create` | Default stores per BR5 (hook: `app/hooks.py depot_after_create`); auto-provisions Distributor Stock rows (qty=0, block_qty=0) across default stores × all items |
 | `item_batch.prepare` | Item existence, auto name from sm_item.name, uniqueness per item |
 | `rack.prepare` | Validates rack_id format/uniqueness; enforces immutability of `rack_id` on edit |
-| `depot.prepare` | Uniqueness + name resolution; synchronizes `town_id` and `town_name` (labeled Town) with `sm_level` (depth 1 Town); enforces immutability of `depot_id` on edit |
+| `depot.prepare` | Uniqueness + name resolution; preserves existing `town_id` and `town_name` on edit, defaults to `"-"` on create when omitted from form; enforces immutability of `depot_id` on edit |
 | `depot.after_update` | Cascades status updates (ACTIVE/INACTIVE/PENDING) from Distributor to all child stores in `sm_depot_store` |
 | `depot.soft_delete/restore` | Soft delete sets Distributor to PENDING and cascades PENDING to child stores; restore sets Distributor to ACTIVE and cascades ACTIVE to child stores |
 | `depot_store.prepare` | Depot existence, uniqueness per depot; enforces immutability of `depot_id` on edit |
