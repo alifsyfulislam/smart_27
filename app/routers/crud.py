@@ -274,6 +274,14 @@ def _depot_store_options():
                           ORDER BY store_id""", (config.CID,))]
 
 
+def _beat_options():
+    """Beat filter options — ACTIVE depth=3 beats."""
+    return [(r["level_id"], f"{r['level_id']} | {r['level_name']}" if r["level_name"] else r["level_id"])
+            for r in q("""SELECT level_id, level_name FROM sm_level
+                          WHERE cid=%s AND depth=3 AND status='ACTIVE'
+                          ORDER BY level_id""", (config.CID,))]
+
+
 def _rack_options():
     """Rack filter options — ACTIVE racks."""
     return [(r["rack_id"], f"{r['rack_id']} | {r['rack_name']}" if r["rack_name"] else r["rack_id"])
@@ -294,6 +302,8 @@ def _filter_options(m):
             opts = _brand_opts_from_items()
         elif kind == "depot":
             opts = _depot_options()
+        elif kind == "beat":
+            opts = _beat_options()
         elif kind == "item":
             opts = _item_options()
         elif kind == "depot_store":
@@ -384,6 +394,24 @@ def _filter_sql(m, request, qk=""):
             # case-insensitive: legacy rows may store the display name instead of the code
             where.append(f"UPPER(t.{col}) IN ({ph})")
             params.extend([v.upper() for v in vals])
+        elif kind == "depot":
+            if "depot_id" in table_cols(m):
+                where.append(f"t.depot_id IN ({ph})")
+                params.extend(vals)
+            elif "client_id" in table_cols(m):
+                where.append(f"t.client_id IN (SELECT client_id FROM sm_client "
+                             f"WHERE cid=%s AND depot_id IN ({ph}))")
+                params.append(config.CID)
+                params.extend(vals)
+            elif "area_id" in table_cols(m):
+                where.append(f"t.area_id IN (SELECT level_id FROM sm_level "
+                             f"WHERE cid=%s AND depot_id IN ({ph}))")
+                params.append(config.CID)
+                params.extend(vals)
+            else:
+                col = name if name in table_cols(m) else "status"
+                where.append(f"t.{col} IN ({ph})")
+                params.extend(vals)
         else:
             # column always `name` except status filter on tables whose column name is status
             col = name if name in table_cols(m) else "status"
@@ -524,14 +552,18 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         field_opts["level_id"] = opts
 
     elif slug == "rep-area":
-        field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
-                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='rep' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        field_opts["rep_id"] = [("", "-- Select Representative --")] + [
+            (r["rep_id"], f"{r['rep_id']} | {r['name']}")
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') AND status='ACTIVE' ORDER BY name", (config.CID,))
+        ]
         field_opts["area_id"] = [(r["level_id"], f"{r['level_id']} | {r['level_name']} ({'Route' if r['depth']==2 else 'Beat'})")
                                  for r in q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND depth IN (2, 3) AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
 
     elif slug == "visit-plan":
-        field_opts["rep_id"] = [(r["rep_id"], f"{r['rep_id']} | {r['name']}")
-                                 for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND user_type='rep' AND status='ACTIVE' ORDER BY name", (config.CID,))]
+        field_opts["rep_id"] = [("", "-- Select Representative --")] + [
+            (r["rep_id"], f"{r['rep_id']} | {r['name']}")
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') AND status='ACTIVE' ORDER BY name", (config.CID,))
+        ]
         
         fld_rows = q("""SELECT level_id, level_name, depth, parent_level_id, parent_level_name, depot_id, depot_name 
                         FROM sm_level 

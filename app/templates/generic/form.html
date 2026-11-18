@@ -93,7 +93,7 @@
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
           </div>
           {% elif s.type == 'depot_select' %}
-          <div class="field" id="field-wrap-{{ s.name }}" {% if slug == 'level' and ((a == 'Edit' and (row.get('depth') or 0) != 1) or (a == 'View' and (row.get('depth') or 0) != 1 and (not data.get('depot_id') or data.get('depot_id') == '-')) or (a == 'Create' and (data.get('parent_level_id') or '0') == '0')) %}style="display:none"{% endif %}>
+          <div class="field" id="field-wrap-{{ s.name }}" {% if slug == 'level' and ((a == 'Edit' and (row.get('depth') or 0) == 0) or (a == 'View' and (not data.get('depot_id') or data.get('depot_id') == '-')) or (a == 'Create' and (data.get('parent_level_id') or '0') == '0')) %}style="display:none"{% endif %}>
             <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
             {% if a == 'View' %}<div>{{ data.get('depot_id') }}{% if data.get('depot_name') and data.get('depot_name') != '-' %} | {{ data.get('depot_name') }}{% endif %}</div>
             {% else %}
@@ -387,7 +387,7 @@
                      {% if s.type == 'password' %}{% if a == 'Edit' %}placeholder="Leave empty to keep current password"{% else %}placeholder="Enter password (default: 123456)"{% endif %}{% elif s.placeholder %}placeholder="{{ s.placeholder }}"{% elif s.readonly %}placeholder="(Auto-generated on save)"{% endif %}
                      {% if s.type == 'float' %}step="any"{% endif %}
                      {{ 'readonly' if s.readonly or (a == 'Edit' and s.readonly_on_edit) }}
-                     {{ 'tabindex="-1"' if s.readonly }}
+                     {% if s.readonly or (a == 'Edit' and s.readonly_on_edit) %}tabindex="-1"{% endif %}
                      {{ 'required' if s.required and a == 'Create' and not s.readonly }}>
             {% endif %}
             {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}

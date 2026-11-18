@@ -615,13 +615,38 @@ def outlet_prepare(cid, data, existing=None, user=None):
     if not area_id or area_id == "-":
         return "Beat / Area is required."
     data["area_id"] = area_id
-    beat = q("SELECT level_name FROM sm_level WHERE cid=%s AND level_id=%s AND depth=3",
+
+    beat = q("""SELECT level_id, level_name, depth, depot_id, depot_name 
+                FROM sm_level WHERE cid=%s AND level_id=%s AND status='ACTIVE'""",
              (cid, area_id), one=True)
-    if beat:
-        data["area_name"] = beat["level_name"] or "-"
+    if not beat:
+        return f"Selected Beat '{area_id}' was not found or is inactive."
+    data["area_name"] = beat.get("level_name") or "-"
+
+    depot_id = (beat.get("depot_id") or "").strip()
+    depot_name = (beat.get("depot_name") or "").strip()
+
+    if not depot_id or depot_id == "-":
+        return f"No distributor assigned to Beat '{beat.get('level_name', area_id)}' ({area_id}) yet. Please assign a distributor to this Beat before creating or editing outlets."
+
+    data["depot_id"] = depot_id
+    data["depot_name"] = depot_name
+
+    # Default commercial store for this distributor
+    comm_store = q("""SELECT store_id, store_name FROM sm_depot_store 
+                      WHERE cid=%s AND depot_id=%s AND status='ACTIVE' AND store_type='COMMERCIAL'
+                      ORDER BY id ASC LIMIT 1""", (cid, depot_id), one=True)
+    if not comm_store:
+        comm_store = q("""SELECT store_id, store_name FROM sm_depot_store 
+                          WHERE cid=%s AND depot_id=%s AND status='ACTIVE'
+                          ORDER BY (store_id = %s) DESC, id ASC LIMIT 1""",
+                       (cid, depot_id, f"{depot_id}140"), one=True)
+    if comm_store:
+        data["store_id"] = comm_store["store_id"]
+        data["store_name"] = comm_store["store_name"]
     else:
-        lvl = q("SELECT level_name FROM sm_level WHERE cid=%s AND level_id=%s", (cid, area_id), one=True)
-        data["area_name"] = (lvl["level_name"] if lvl else "-") or "-"
+        data["store_id"] = f"{depot_id}140"
+        data["store_name"] = "Commercial"
 
     cat_id = (data.get("category_id") or "").strip()
     data["category_id"] = cat_id or "-"
@@ -630,24 +655,6 @@ def outlet_prepare(cid, data, existing=None, user=None):
     data["sub_category_id"] = sub_id or "-"
     data["sub_category_name"] = _cat_type_name(cid, OUTLET_SUBCAT_TYPE, sub_id) if sub_id else "-"
     data["customer_type"] = f"{data['category_id']}|{data['category_name']}" if cat_id else "-"
-
-    depot_id = (data.get("depot_id") or (existing.get("depot_id") if existing else "") or "").strip()
-    data["depot_id"] = depot_id or "-"
-    if depot_id and depot_id != "-":
-        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s",
-                  (cid, depot_id), one=True)
-        data["depot_name"] = (depot["name"] if depot else "-") or "-"
-    else:
-        data["depot_name"] = "-"
-
-    store_id = (data.get("store_id") or (existing.get("store_id") if existing else "") or "").strip()
-    data["store_id"] = store_id or "-"
-    if store_id and store_id != "-":
-        store = q("SELECT store_name FROM sm_depot_store WHERE cid=%s AND store_id=%s",
-                  (cid, store_id), one=True)
-        data["store_name"] = (store["store_name"] if store else "-") or "-"
-    else:
-        data["store_name"] = "-"
 
     old_id = (data.get("client_old_id") or (existing.get("client_old_id") if existing else "") or "").strip()
     data["client_old_id"] = old_id or "-"
@@ -854,8 +861,8 @@ def level_prepare(cid, data, existing=None, user=None):
             if dup:
                 return f"A field territory with this code or name already exists: {data['level_name']}."
             return None
-        elif depth == 1:
-            # Editing Town: distributor tagging is active
+        elif depth in (1, 2, 3):
+            # Editing Town, Route, or Beat: distributor tagging is supported
             data["level_name"] = name
             dup = q("""SELECT id FROM sm_level
                        WHERE cid=%s AND status='ACTIVE' AND level_name=%s
@@ -863,10 +870,7 @@ def level_prepare(cid, data, existing=None, user=None):
                     (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
             if dup:
                 return "A field level with this name already exists under the same parent."
-            if existing and "depot_id" not in data:
-                data["depot_id"] = existing.get("depot_id") or "-"
-                data["depot_name"] = existing.get("depot_name") or "-"
-            else:
+            if "depot_id" in data:
                 depot_id = (data.get("depot_id") or "").strip()
                 if depot_id and depot_id != "-":
                     depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s", (cid, depot_id), one=True)
@@ -875,19 +879,9 @@ def level_prepare(cid, data, existing=None, user=None):
                 else:
                     data["depot_id"] = existing.get("depot_id") or "-" if existing else "-"
                     data["depot_name"] = existing.get("depot_name") or "-" if existing else "-"
-            return None
-        else:
-            # Editing Route (depth 2) or Beat (depth 3): keep inherited distributor
-            data["level_name"] = name
-            dup = q("""SELECT id FROM sm_level
-                       WHERE cid=%s AND status='ACTIVE' AND level_name=%s
-                         AND parent_level_id=%s AND id<>%s LIMIT 1""",
-                    (cid, name, existing.get("parent_level_id") or "0", existing["id"]), one=True)
-            if dup:
-                return "A field level with this name already exists under the same parent."
-            if not data.get("depot_id") or data.get("depot_id") == "-":
-                data["depot_id"] = existing.get("depot_id") or "-"
-                data["depot_name"] = existing.get("depot_name") or "-"
+            else:
+                data["depot_id"] = existing.get("depot_id") or "-" if existing else "-"
+                data["depot_name"] = existing.get("depot_name") or "-" if existing else "-"
             return None
 
     # CREATE MODE
@@ -1025,14 +1019,15 @@ def level_after_update(cid, old, new, user=None):
         x(f"UPDATE sm_level SET level{depth}_name=%s WHERE cid=%s AND level{depth}=%s",
           (new["level_name"], cid, new["level_id"]))
 
-    # If Town (depth 1) updated distributor, cascade to child routes and beats
-    if int(new.get("depth") or 0) == 1:
+    # If Town (depth 1) or Route (depth 2) updated distributor, cascade to child routes and beats
+    depth = int(new.get("depth") or 0)
+    if depth in (1, 2):
         if (old.get("depot_id") or "-") != (new.get("depot_id") or "-"):
             new_depot_id = new.get("depot_id") or "-"
             new_depot_name = new.get("depot_name") or "-"
-            x("""UPDATE sm_level
+            x(f"""UPDATE sm_level
                  SET depot_id=%s, depot_name=%s
-                 WHERE cid=%s AND level1=%s""",
+                 WHERE cid=%s AND level{depth}=%s""",
               (new_depot_id, new_depot_name, cid, new["level_id"]))
 
     _recompute_level_is_leaf(cid, new.get("level_id"))

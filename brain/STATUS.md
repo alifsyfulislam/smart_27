@@ -19,6 +19,9 @@
 - Stock Modules Renaming & Filters verified (V-027 / T-046): Renamed `depot-stock-balance` title to "Item Stock" and added "All Distributor Store" (`store_id`) filter dropdown; renamed `depot-rack-stock-balance` title to "Rack Stock" and added "All Rack" (`rack_id`) filter dropdown.
 - Outlet Info Refinement verified (V-028 / T-047): Auto-incrementing numeric `client_id` starting at `1000001` (hidden on create with placeholder, readonly on edit), Beat selector with Route filter & auto `area_name` resolution, profile photo upload (`image_path`), and removal of `depot_id`, `store_id`, and `client_old_id` from forms (`in_form=False`).
 - Outlet Exceptional Visit Plan verified (V-029 / T-048): Area (Beat) positioned first in form with Route filter, dynamic cascading beat-to-outlet filter with count badge, and dynamic frequency from `sm_category_type` `FREQUENCY_TYPE` (category-type count 39 → 43).
+- Visit Plan Representative Searchable Alignment verified (V-030 / T-049): Representative input in `visit-plan` and `rep-area` aligned with Delivery Man (`searchable=True`, label "Representative", placeholder "Type to search Representative…", default `-- Select Representative --`).
+- Outlet Beat Distributor Validation & Default Commercial Store Tagging verified (V-031 / T-050): Outlet ID (`client_id`) follows Employee ID pattern (hidden on create, readonly on edit with tabindex -1); Beat (`area_id`) distributor validation rejects unassigned beats; auto-records `depot_id`, `depot_name`, and default commercial store (`store_id`, `store_name`) on `sm_client`; level distributor select supported on depths 1-3.
+- Beat & Distributor List Filters verified (V-032 / T-051): "All Beat" (`area_id`) and "All Distributor" (`depot_id`) dropdown filters on `/outlet` and `/client-visit-plan` list pages.
 
 ## Verified counts (re-run the checker, don't trust this list on drift)
 | What | Count | Canonical source |
