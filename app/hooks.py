@@ -1290,7 +1290,7 @@ def rep_area_after_create(cid, row, user=None):
                           (cid, row["rep_id"], b["level_id"]), one=True)
             if not vp_exists:
                 x("""INSERT INTO sm_visit_plan (cid, rep_id, rep_name, area_id, area_name, depot_id, depot_name, order_col_day, delivery_day, seq_no, status, created_on, created_by)
-                     VALUES (%s, %s, %s, %s, %s, %s, %s, 'Saturday', 'Sunday', 1, 'ACTIVE', NOW(), %s)""",
+                     VALUES (%s, %s, %s, %s, %s, %s, %s, '-', '-', 1, 'ACTIVE', NOW(), %s)""",
                   (cid, row["rep_id"], row["rep_name"], b["level_id"], b["level_name"],
                    b.get("depot_id") or "-", b.get("depot_name") or "-", user))
     elif depth == 3:  # Direct beat assigned
@@ -1298,7 +1298,7 @@ def rep_area_after_create(cid, row, user=None):
                       (cid, row["rep_id"], area_id), one=True)
         if not vp_exists:
             x("""INSERT INTO sm_visit_plan (cid, rep_id, rep_name, area_id, area_name, depot_id, depot_name, order_col_day, delivery_day, seq_no, status, created_on, created_by)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, 'Saturday', 'Sunday', 1, 'ACTIVE', NOW(), %s)""",
+                 VALUES (%s, %s, %s, %s, %s, %s, %s, '-', '-', 1, 'ACTIVE', NOW(), %s)""",
               (cid, row["rep_id"], row["rep_name"], area_id, row.get("area_name") or area_id,
                row.get("depot_id") or "-", row.get("depot_name") or "-", user))
 
@@ -1315,7 +1315,7 @@ def _sync_visit_plan_to_rep_area(cid, rep_id, area_id, status="ACTIVE", note="-"
     rep_name = rep.get("name") or "-"
     rep_cat = rep.get("user_type") or "rep"
 
-    area = q("SELECT level_id, level_name, depth, depot_id, depot_name FROM sm_level WHERE cid=%s AND level_id=%s",
+    area = q("SELECT level_id, level_name, depth, depot_id, depot_name, status FROM sm_level WHERE cid=%s AND level_id=%s",
              (cid, area_id), one=True)
     if not area:
         return
@@ -1324,29 +1324,49 @@ def _sync_visit_plan_to_rep_area(cid, rep_id, area_id, status="ACTIVE", note="-"
     area_depot_id = override_depot_id if (override_depot_id and override_depot_id != "-") else (area.get("depot_id") or "-")
     area_depot_name = override_depot_name if (override_depot_name and override_depot_name != "-") else (area.get("depot_name") or "-")
 
-    targets = [(area["level_id"], area["level_name"], area_depot_id, area_depot_name)]
+    targets = []
+    if depth == 3:
+        targets = [(area["level_id"], area["level_name"], area_depot_id, area_depot_name, area["status"], area["depth"])]
     if depth == 2:  # Route: also cascade child beats
-        beats = q("""SELECT level_id, level_name, depot_id, depot_name 
+        beats = q("""SELECT level_id, level_name, depot_id, depot_name, status, depth 
                      FROM sm_level 
-                     WHERE cid=%s AND parent_level_id=%s AND depth=3 AND status='ACTIVE'""",
+                     WHERE cid=%s AND parent_level_id=%s AND depth=3""",
                   (cid, area_id))
+        
         for b in beats:
             b_depot_id = override_depot_id if (override_depot_id and override_depot_id != "-") else (b.get("depot_id") or area_depot_id)
             b_depot_name = override_depot_name if (override_depot_name and override_depot_name != "-") else (b.get("depot_name") or area_depot_name)
-            targets.append((b["level_id"], b["level_name"], b_depot_id, b_depot_name))
+            targets.append((b["level_id"], b["level_name"], b_depot_id, b_depot_name, b["status"], b["depth"]))
 
-    for target_id, target_name, depot_id, depot_name in targets:
-        exists = q("SELECT id, status FROM sm_rep_area WHERE cid=%s AND rep_id=%s AND area_id=%s",
-                   (cid, rep_id, target_id), one=True)
+    seq_no = 1
+    for i, (target_id, target_name, depot_id, depot_name, area_status, area_depth) in enumerate(targets):
+        # exists = q("SELECT id, status FROM sm_rep_area WHERE cid=%s AND rep_id=%s AND area_id=%s",
+        #            (cid, rep_id, target_id), one=True)
+        seq_no = i+seq_no
+        
+        exists = q("SELECT id FROM sm_visit_plan WHERE cid=%s AND rep_id=%s AND area_id=%s",
+                                  (cid, rep_id, target_id), one=True)
+        
         if not exists:
-            x("""INSERT INTO sm_rep_area (cid, rep_id, rep_name, rep_category, area_id, area_name, depot_id, depot_name, status, note, created_on, created_by)
-                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)""",
-              (cid, rep_id, rep_name, rep_cat, target_id, target_name, depot_id, depot_name, status, note or "-", user))
+            # x("""INSERT INTO sm_rep_area (cid, rep_id, rep_name, rep_category, area_id, area_name, depot_id, depot_name, status, note, created_on, created_by)
+            #      VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)""",
+            #   (cid, rep_id, rep_name, rep_cat, target_id, target_name, depot_id, depot_name, status, note or "-", user))
+            
+            x("""INSERT INTO sm_visit_plan (cid, rep_id, rep_name, area_id, area_name, depot_id, depot_name, order_col_day, delivery_day, seq_no, status, field2, created_on, created_by)
+                                 VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, NOW(), %s)""",
+                              (cid, rep_id, rep_name, target_id, target_name,
+                               depot_id or "-", depot_name or "-", "-", "-", seq_no, area_status, area_depth, user))
+            
         else:
-            x("""UPDATE sm_rep_area 
-                 SET status=%s, rep_name=%s, area_name=%s, depot_id=%s, depot_name=%s, note=%s, updated_on=NOW(), updated_by=%s 
-                 WHERE id=%s""",
-              (status, rep_name, target_name, depot_id, depot_name, note or "-", user, exists["id"]))
+            # x("""UPDATE sm_rep_area 
+            #      SET status=%s, rep_name=%s, area_name=%s, depot_id=%s, depot_name=%s, note=%s, updated_on=NOW(), updated_by=%s 
+            #      WHERE id=%s""",
+            #   (status, rep_name, target_name, depot_id, depot_name, note or "-", user, exists["id"]))
+            
+            x("""UPDATE sm_visit_plan 
+                             SET status=%s, field2=%s, rep_id=%s, rep_name=%s, area_id=%s, area_name=%s, depot_id=%s, depot_name=%s, order_col_day=%s, delivery_day=%s, seq_no=%s, updated_on=NOW(), updated_by=%s 
+                             WHERE id=%s""",
+                          (area_status, area_depth, rep_id, rep_name, target_id, target_name, depot_id, depot_name, "-", "-", seq_no, user, exists["id"]))
 
 
 def visit_plan_prepare(cid, data, existing=None, user=None):
@@ -1385,24 +1405,24 @@ def visit_plan_prepare(cid, data, existing=None, user=None):
         data["depot_id"] = (area.get("depot_id") or "-") or "-"
         data["depot_name"] = (area.get("depot_name") or "-") or "-"
 
-    dm_id = (data.get("delivery_man_id") or "").strip()
+    dm_id = (data.get("d_man_id") or "").strip()
     if dm_id and dm_id != "-":
         dm = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s AND status='ACTIVE'", (cid, dm_id), one=True)
         if dm:
-            data["delivery_man_id"] = dm["rep_id"]
-            data["delivery_man_name"] = dm["name"]
+            data["d_man_id"] = dm["rep_id"]
+            data["d_man_name"] = dm["name"]
         else:
-            data["delivery_man_id"] = "-"
-            data["delivery_man_name"] = "-"
+            data["d_man_id"] = "-"
+            data["d_man_name"] = "-"
     else:
-        data["delivery_man_id"] = "-"
-        data["delivery_man_name"] = "-"
+        data["d_man_id"] = "-"
+        data["d_man_name"] = "-"
 
-    order_day = (data.get("order_col_day") or "Saturday").strip()
-    if order_day not in NEXT_DAY:
-        return f"Invalid order collection day '{order_day}'."
+    order_day = (data.get("order_col_day") or "-").strip()
+    # if order_day not in NEXT_DAY:
+    #     return f"Invalid order collection day '{order_day}'."
     data["order_col_day"] = order_day
-    data["delivery_day"] = NEXT_DAY[order_day]
+    data["delivery_day"] = NEXT_DAY[order_day] if order_day != "-" else "-"
 
     dup_where = "AND id<>%s" if existing else ""
     dup_params = (cid, data["rep_id"], data["area_id"], data["order_col_day"]) + ((existing["id"],) if existing else ())

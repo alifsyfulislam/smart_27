@@ -220,7 +220,7 @@
                 {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
               {% endif %}
             </div>
-            {% elif slug == 'visit-plan' and s.name == 'area_id' %}
+            {% elif slug in ['visit-plan','rep-area'] and s.name == 'area_id' %}
             <div class="field" id="field-wrap-visit_plan_tier">
               <label>Hierarchy Level Tier Filter</label>
               {% if a == 'View' %}
@@ -322,9 +322,9 @@
                 {% elif s.name == 'rep_id' %}
                   {% set rname = (data.get('rep_name') if data.get('rep_name') and data.get('rep_name') != '-' else (rep_map.get(data.get('rep_id')) if rep_map else '')) %}
                   <div>{{ data.get('rep_id') }}{% if rname and rname != '-' %} — {{ rname }}{% endif %}</div>
-                {% elif s.name == 'delivery_man_id' %}
-                  {% set dmname = (data.get('delivery_man_name') if data.get('delivery_man_name') and data.get('delivery_man_name') != '-' else (rep_map.get(data.get('delivery_man_id')) if rep_map else '')) %}
-                  <div>{{ data.get('delivery_man_id') }}{% if dmname and dmname != '-' %} — {{ dmname }}{% endif %}</div>
+                {% elif s.name == 'd_man_id' %}
+                  {% set dmname = (data.get('d_man_name') if data.get('d_man_name') and data.get('d_man_name') != '-' else (rep_map.get(data.get('d_man_id')) if rep_map else '')) %}
+                  <div>{{ data.get('d_man_id') }}{% if dmname and dmname != '-' %} — {{ dmname }}{% endif %}</div>
                 {% elif s.name == 'depot_id' %}
                   {% set dname = (data.get('depot_name') if data.get('depot_name') and data.get('depot_name') != '-' else (depot_map.get(data.get('depot_id')) if depot_map else '')) %}
                   <div>{{ data.get('depot_id') }}{% if dname and dname != '-' %} — {{ dname }}{% endif %}</div>
@@ -334,6 +334,7 @@
               {% else %}
               <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                       {% if s.searchable %}data-searchable data-search-placeholder="{{ s.placeholder or ('Type to search ' ~ s.label ~ '…') }}"{% endif %}>
+                <option value="">-- Select {{s.name}} --</option>
                 {% for o in (field_opts.get(s.name) or s.options or []) %}
                 <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
                 {% endfor %}
@@ -1035,7 +1036,7 @@
       updateDepthBadge();
     })();
     {% endif %}
-    {% if slug == 'visit-plan' %}
+    {% if slug in ['visit-plan','rep-area'] %}
     // visit-plan: hierarchy level tier filter (Route / Beat) + badge
     (function () {
       var tierSelect = document.getElementById("f-visit_plan_tier");

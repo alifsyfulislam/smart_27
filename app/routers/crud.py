@@ -151,6 +151,11 @@ def _access(request, slug, action):
 def _insert(m, data, user):
     allowed = table_cols(m)
     data = {k: v for k, v in data.items() if k in allowed and k != "id"}
+    print(data)
+    if m['table'] == 'sm_visit_plan':
+        # data['order_col_day'] = "-"
+        # data['delivery_day'] = "-"
+        data['field2'] = 2
     cols = list(data.keys())
     col_sql = ", ".join(f"`{c}`" for c in cols)
     val_sql = ", ".join("NOW()" if v == "NOW()" else "%s" for v in data.values())
@@ -554,20 +559,35 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
     elif slug == "rep-area":
         field_opts["rep_id"] = [("", "-- Select Representative --")] + [
             (r["rep_id"], f"{r['rep_id']} | {r['name']}")
-            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') AND status='ACTIVE' ORDER BY name", (config.CID,))
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') ORDER BY rep_id", (config.CID,))
         ]
-        field_opts["area_id"] = [(r["level_id"], f"{r['level_id']} | {r['level_name']} ({'Route' if r['depth']==2 else 'Beat'})")
-                                 for r in q("SELECT level_id, level_name, depth FROM sm_level WHERE cid=%s AND depth IN (2, 3) AND status='ACTIVE' ORDER BY depth, level_id", (config.CID,))]
+        
+        fld_rows = q("""SELECT level_id, level_name, depth, parent_level_id, parent_level_name, depot_id, depot_name 
+                                FROM sm_level 
+                                WHERE cid=%s AND depth IN (2, 3)
+                                ORDER BY depth, level_id""", (config.CID,))
+        opts = []
+        for r in fld_rows:
+            d = int(r.get("depth") or 0)
+            if d == 2:
+                depot_suffix = f" (Depot: {r['depot_name']})" if r.get("depot_name") and r["depot_name"] != "-" else ""
+                label = f"[Route] {r['level_id']} | {r['level_name']}{depot_suffix}"
+                opts.append((r["level_id"], label, "tier_route", 2, "Route (Depth 2)"))
+            elif d == 3:
+                parent_suffix = f" (Route: {r['parent_level_id']} - {r['parent_level_name']})" if r.get("parent_level_name") else f" (Route: {r['parent_level_id']})"
+                label = f"[Beat] {r['level_id']} | {r['level_name']}{parent_suffix}"
+                opts.append((r["level_id"], label, "tier_beat", 3, "Beat (Depth 3)"))
+        field_opts["area_id"] = opts
 
     elif slug == "visit-plan":
         field_opts["rep_id"] = [("", "-- Select Representative --")] + [
             (r["rep_id"], f"{r['rep_id']} | {r['name']}")
-            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') AND status='ACTIVE' ORDER BY name", (config.CID,))
+            for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='rep' OR designation_id='PSR') ORDER BY rep_id", (config.CID,))
         ]
         
         fld_rows = q("""SELECT level_id, level_name, depth, parent_level_id, parent_level_name, depot_id, depot_name 
                         FROM sm_level 
-                        WHERE cid=%s AND depth IN (2, 3) AND status='ACTIVE' 
+                        WHERE cid=%s AND depth IN (2, 3)
                         ORDER BY depth, level_id""", (config.CID,))
         opts = []
         for r in fld_rows:
@@ -582,7 +602,7 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
                 opts.append((r["level_id"], label, "tier_beat", 3, "Beat (Depth 3)"))
         field_opts["area_id"] = opts
 
-        field_opts["delivery_man_id"] = [("", "-- Select Delivery Man --")] + [
+        field_opts["d_man_id"] = [("", "-- Select Delivery Man --")] + [
             (r["rep_id"], f"{r['rep_id']} | {r['name']}")
             for r in q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND (user_type='dm' OR designation_id='DM') AND status='ACTIVE' ORDER BY name", (config.CID,))
         ]
@@ -658,7 +678,7 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
 
     rep_map = {}
     rid = (data or {}).get("rep_id")
-    dmid = (data or {}).get("delivery_man_id")
+    dmid = (data or {}).get("d_man_id")
     if rid and rid != "-":
         r_row = q("SELECT rep_id, name FROM sm_rep WHERE cid=%s AND rep_id=%s LIMIT 1", (config.CID, rid), one=True)
         if r_row:

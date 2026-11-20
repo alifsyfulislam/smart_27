@@ -18,19 +18,17 @@ def get_conn():
         autocommit=True,
         cursorclass=pymysql.cursors.DictCursor,
     )
-
-
+        
 def q(sql, params=(), one=False):
     """Run a SELECT; return list of dict rows or a single dict/None."""
     conn = get_conn()
     try:
-        with conn.cursor() as cur:
+        with conn.cursor(pymysql.cursors.DictCursor) as cur:
             cur.execute(sql, params)
             rows = cur.fetchall()
-        return (rows[0] if rows else None) if one else rows
+            return (rows[0] if rows else None) if one else rows
     finally:
         conn.close()
-
 
 def x(sql, params=()):
     """Run an INSERT/UPDATE/DELETE; return (lastrowid, rowcount)."""
@@ -38,7 +36,11 @@ def x(sql, params=()):
     try:
         with conn.cursor() as cur:
             cur.execute(sql, params)
+            conn.commit()
             return cur.lastrowid, cur.rowcount
+    except Exception:
+        conn.rollback()
+        raise
     finally:
         conn.close()
 
