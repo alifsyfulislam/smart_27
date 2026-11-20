@@ -83,9 +83,9 @@ MODULES = {
             ("unit_type", "Unit Type", "cat", "ITEM_UNIT"),
         ],
         "form_fields": [
+            f("detail_name", "Detail Name", "textarea", readonly=True, readonly_on_edit=True),
             f("item_id", "Item ID", "text", required=True, in_list=True, readonly_on_edit=True,
               help="Comes from integration or can be created manually here. Immutable on edit."),
-            f("detail_name", "Int. Name", "text", required=True, in_list=True),
             f("name", "Name", "text", required=True, in_list=True),
             f("name_bn", "Name (BN)", "text"),
             f("short_name", "Short Name", "text"),

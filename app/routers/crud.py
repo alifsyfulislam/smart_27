@@ -352,10 +352,10 @@ def key_col_of(m):
         "brand": "level_id", "item": "item_id", "item-batch": "batch_id",
         "rack": "rack_id", "depot_stock_balance": "id", "depot_rack_stock_balance": "id",
         "top_level": "level_id", "level": "level_id", "rep": "rep_id",
-        "supervisor_level": "id", "rep_area": "id", "visit_plan": "id",
-        "client_visit_plan": "id",
+        "supervisor_level": "sup_id", "rep_area": "rep_id", "visit_plan": "rep_id",
+        "client_visit_plan": "client_id",
         "distributor": "depot_id", "depot_store": "store_id",
-        "outlet": "client_id", "category_type": "id",
+        "outlet": "client_id", "category_type": "cat_type_id",
     }.get(m["perm"], "id")
 
 
