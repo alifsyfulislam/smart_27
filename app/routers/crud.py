@@ -324,11 +324,11 @@ def _filter_options(m):
 def _select_opts_for(slug):
     """Dropdown option rows needed by create/edit forms of a module."""
     item_opts, depot_opts = [], []
-    if slug in ("item-batch", "depot-stock-balance"):
-        item_opts = q("""SELECT item_id, name, brand_name FROM sm_item
+    if slug in ("item-batch", "depot-stock-balance", "promo-approved-rate"):
+        item_opts = q("""SELECT item_id, name, brand_name, weight, total_amt FROM sm_item
                          WHERE cid=%s AND status='ACTIVE' ORDER BY name LIMIT 300""",
                       (config.CID,))
-    if slug in ("distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+    if slug in ("distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
         depot_opts = q("""SELECT depot_id, name FROM sm_depot WHERE cid=%s AND status='ACTIVE'
                           ORDER BY name LIMIT 300""", (config.CID,))
     return item_opts, depot_opts
@@ -479,7 +479,7 @@ async def module_list(request: Request, slug: str, page: int = 1, qk: str = "",
         tree = _build_tree(rows)
     item_opts = None
     depot_opts = None
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
         item_opts, depot_opts = _select_opts_for(slug)
     item_opts = item_opts or []
     depot_opts = depot_opts or []
@@ -645,6 +645,16 @@ def _form_context(m, context, action, row=None, data=None, error=None, parent_op
         field_opts["area_id"] = [("", "-- Select Beat (Optional) --")] + [
             (b["level_id"], f"{b['level_id']} | {b['level_name']}") for b in beat_opts]
 
+    elif slug == "promo-approved-rate":
+        field_opts["cl_category_id"] = _cat_options("OUTLET_CATEGORY")
+        field_opts["client_id"] = [("", "-- ALL Outlet --")] + [
+            (c["client_id"], f"{c['client_id']} | {c['name']}") for c in q(
+                """SELECT client_id, name FROM sm_client WHERE cid=%s AND status='ACTIVE'
+                   ORDER BY name LIMIT 300""", (config.CID,))]
+        field_opts["brand_id"] = _brand_opts_from_items()
+        context["client_map"] = {c["client_id"]: c["name"] for c in q(
+            "SELECT client_id, name FROM sm_client WHERE cid=%s", (config.CID,))}
+
     elif slug == "level":
         context["top_level_terrs"] = q(
             """SELECT level_id, level_name, parent_level_id FROM sm_top_level
@@ -721,7 +731,7 @@ async def module_create_form(request: Request, slug: str):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
         item_opts, depot_opts = _select_opts_for(slug)
     if slug == "category-type":
         context["type_names"] = [r["type_name"] for r in
@@ -781,7 +791,7 @@ async def module_create(request: Request, slug: str):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(
@@ -814,7 +824,7 @@ async def module_view(request: Request, slug: str, rid: int):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
@@ -847,7 +857,7 @@ async def module_edit_form(request: Request, slug: str, rid: int):
         parent_opts = _top_level_parent_opts()
     elif slug == "level":
         parent_opts = _level_parent_opts()
-    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+    if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
         item_opts, depot_opts = _select_opts_for(slug)
     from ..main import templates
     return templates.TemplateResponse(
@@ -891,7 +901,7 @@ async def module_edit(request: Request, slug: str, rid: int):
             parent_opts = _top_level_parent_opts()
         elif slug == "level":
             parent_opts = _level_parent_opts()
-        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan"):
+        if slug in ("item-batch", "distributor-store", "outlet", "level", "rep", "depot-stock-balance", "depot-rack-stock-balance", "visit-plan", "promo-approved-rate"):
             item_opts, depot_opts = _select_opts_for(slug)
         from ..main import templates
         return templates.TemplateResponse(

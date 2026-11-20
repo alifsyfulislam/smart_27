@@ -18,6 +18,7 @@
 --   * rack master        : sm_rack (Rack module under Item Info, T-029)
 --   * stock balance      : sm_depot_stock_balance (Distributor Info, T-030)
 --   * depot rack stock   : sm_depot_rack_stock_balance (Distributor Info, T-045)
+--   * promo approved rate: sm_promo_approved_rate (Campaign Info, T-054)
 -- ============================================================================
 
 CREATE TABLE IF NOT EXISTS `smart_27`.`sm_item_hierarchy` (
@@ -736,3 +737,45 @@ CREATE TABLE IF NOT EXISTS `smart_27`.`sm_depot_rack_stock_balance` (
   KEY `cid_rack_code` (`rack_code`,`cid`)
 ) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+
+-- ==================================================================
+-- Campaign Info (T-054)
+-- ==================================================================
+
+-- ------------------------------------------------------------------
+-- Campaign Approved Rate (sm_promo_approved_rate): Campaign Info sub-module
+-- Circular promo rates per client-category / depot / client / brand / item
+-- with a date window. Edit restricted to from_date, to_date, status.
+-- ------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS `smart_27`.`sm_promo_approved_rate` (
+  `id` int NOT NULL AUTO_INCREMENT,
+  `cid` varchar(10) DEFAULT NULL,
+  `from_date` date DEFAULT NULL,
+  `to_date` date DEFAULT NULL,
+  `circular_number` varchar(200) DEFAULT NULL,
+  `cl_category_id` varchar(50) NOT NULL DEFAULT 'ALL',
+  `cl_category_name` varchar(200) NOT NULL DEFAULT 'ALL',
+  `depot_id` varchar(50) DEFAULT 'ALL',
+  `depot_name` varchar(200) DEFAULT NULL,
+  `client_id` varchar(50) DEFAULT 'ALL',
+  `client_name` varchar(200) DEFAULT NULL,
+  `brand_id` varchar(50) NOT NULL,
+  `brand_name` varchar(50) NOT NULL,
+  `item_id` varchar(50) DEFAULT 'ALL',
+  `item_name` varchar(100) DEFAULT NULL,
+  `weight` double NOT NULL,
+  `bonus_type` varchar(20) DEFAULT NULL,
+  `fixed_percent_rate` double DEFAULT NULL,
+  `status` varchar(20) DEFAULT NULL,
+  `field1` varchar(200) DEFAULT NULL,
+  `field2` int DEFAULT NULL,
+  `note` varchar(200) DEFAULT NULL,
+  `created_on` datetime DEFAULT NULL,
+  `created_by` varchar(50) DEFAULT NULL,
+  `updated_on` datetime DEFAULT NULL,
+  `updated_by` varchar(50) DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `id` (`id`,`cid`),
+  KEY `cid_clientid_itemid` (`cid`,`client_id`,`item_id`),
+  KEY `promo_apply` (`cid`,`from_date`,`to_date`,`cl_category_id`,`depot_id`,`client_id`,`item_id`,`brand_id`,`weight`,`status`)
+) ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb3;

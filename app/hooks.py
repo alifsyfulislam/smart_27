@@ -1553,6 +1553,121 @@ def client_visit_plan_prepare(cid, data, existing=None, user=None):
     return None
 
 
+# ------------------------------------------------- promo_approved_rate (Campaign Approved Rate)
+def promo_approved_rate_prepare(cid, data, existing=None, user=None):
+    """Create/edit an sm_promo_approved_rate row (Campaign Info > Approved Rate).
+
+    Resolution rules: client-category / depot / client / item names resolve
+    from their masters (sm_category_type OUTLET_CATEGORY, sm_depot, sm_client,
+    sm_item); empty client-category / depot / client / item scope defaults to
+    'ALL'; the item, when given, must belong to the selected brand; the window
+    must satisfy from_date <= to_date. Edit only allows from_date, to_date and
+    status to change — every other field keeps its stored value (enforced by
+    readonly_on_edit specs; the re-resolution below works from those values)."""
+    circ = (data.get("circular_number") or "").strip()
+    if not circ:
+        return "Circular Number is required."
+    data["circular_number"] = circ
+
+    from_date = (data.get("from_date") or "").strip()
+    if not from_date:
+        return "From Date is required."
+    to_date = (data.get("to_date") or "").strip()
+    if not to_date:
+        return "To Date is required."
+    data["from_date"], data["to_date"] = from_date, to_date
+    if to_date < from_date:
+        return "To Date must be on or after From Date."
+
+    cl_cat_id = (data.get("cl_category_id") or "").strip()
+    if cl_cat_id and cl_cat_id != "ALL":
+        cl_cat_name = _cat_type_name(cid, OUTLET_CAT_TYPE, cl_cat_id)
+        if cl_cat_name == "-":
+            return f"Client Category '{cl_cat_id}' was not found under OUTLET_CATEGORY."
+        data["cl_category_id"], data["cl_category_name"] = cl_cat_id, cl_cat_name
+    else:
+        data["cl_category_id"], data["cl_category_name"] = "ALL", "ALL"
+
+    depot_id = (data.get("depot_id") or "").strip()
+    if depot_id and depot_id != "ALL":
+        depot = q("SELECT name FROM sm_depot WHERE cid=%s AND depot_id=%s AND status='ACTIVE'",
+                  (cid, depot_id), one=True)
+        if not depot:
+            return f"Distributor '{depot_id}' was not found or is inactive."
+        data["depot_id"], data["depot_name"] = depot_id, depot["name"]
+    else:
+        data["depot_id"], data["depot_name"] = "ALL", "ALL"
+
+    client_id = (data.get("client_id") or "").strip()
+    if client_id and client_id != "ALL":
+        client = q("SELECT name FROM sm_client WHERE cid=%s AND client_id=%s", (cid, client_id), one=True)
+        if not client:
+            return f"Outlet '{client_id}' was not found."
+        data["client_id"], data["client_name"] = client_id, client["name"]
+    else:
+        data["client_id"], data["client_name"] = "ALL", "ALL"
+
+    brand_id = (data.get("brand_id") or "").strip()
+    if not brand_id:
+        return "Brand is required."
+    brand = q("""SELECT brand_name FROM sm_item WHERE cid=%s AND brand_id=%s
+                 AND status='ACTIVE' LIMIT 1""", (cid, brand_id), one=True)
+    if not brand:
+        return f"Brand '{brand_id}' was not found on active items."
+    data["brand_id"], data["brand_name"] = brand_id, brand["brand_name"]
+
+    item_id = (data.get("item_id") or "").strip()
+    if item_id and item_id != "ALL":
+        item = q("SELECT name, brand_id FROM sm_item WHERE cid=%s AND item_id=%s AND status='ACTIVE'",
+                 (cid, item_id), one=True)
+        if not item:
+            return f"Item '{item_id}' was not found or is inactive."
+        if (item["brand_id"] or "").strip() != brand_id:
+            return f"Item '{item_id}' does not belong to brand '{brand_id}'."
+        data["item_id"], data["item_name"] = item_id, item["name"]
+    else:
+        data["item_id"], data["item_name"] = "ALL", "ALL"
+
+    try:
+        weight = float(data.get("weight"))
+    except (TypeError, ValueError):
+        weight = 0.0
+    if weight <= 0:
+        return "Weight must be a number greater than zero."
+    data["weight"] = weight
+
+    bonus_type = (data.get("bonus_type") or "Fixed").strip()
+    if bonus_type not in ("Fixed", "Percentage"):
+        return "Bonus Type must be Fixed or Percentage."
+    data["bonus_type"] = bonus_type
+
+    rate = data.get("fixed_percent_rate")
+    try:
+        rate = float(rate) if rate not in (None, "") else None
+    except (TypeError, ValueError):
+        rate = None
+    if rate is not None and rate < 0:
+        return "Rate must be a non-negative number."
+    data["fixed_percent_rate"] = rate
+
+    dup_params = [cid, circ, from_date, to_date, data["cl_category_id"], data["depot_id"],
+                  data["client_id"], data["brand_id"], data["item_id"], data["weight"]]
+    dup_sql = """SELECT id FROM sm_promo_approved_rate
+                 WHERE cid=%s AND circular_number=%s AND from_date=%s AND to_date=%s
+                   AND cl_category_id=%s AND depot_id=%s AND client_id=%s
+                   AND brand_id=%s AND item_id=%s AND weight=%s AND status='ACTIVE' LIMIT 1"""
+    if existing is not None:
+        dup_sql += " AND id<>%s"
+        dup_params.append(existing["id"])
+    if q(dup_sql, dup_params, one=True):
+        return ("An approved rate with the same circular number, scope, weight and "
+                "date window already exists.")
+
+    if not (data.get("status") or "").strip():
+        data["status"] = "ACTIVE"
+    return None
+
+
 # ----------------------------------------------------------------- registry
 HOOKS = {
     "hierarchy": {
@@ -1617,6 +1732,7 @@ HOOKS = {
         "restore": visit_plan_restore,
     },
     "client_visit_plan": {"prepare": client_visit_plan_prepare},
+    "promo_approved_rate": {"prepare": promo_approved_rate_prepare},
 }
 
 

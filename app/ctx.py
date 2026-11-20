@@ -31,9 +31,10 @@ GROUP_META = [
     ("Fieldforce Info", "fa-people-group", 2),
     ("Distributor Info", "fa-truck-ramp-box", 3),
     ("Outlet Info", "fa-shop", 4),
-    ("Settings", "fa-cogs", 5),
-    ("Administration", "fa-gear", 6),
-    ("Records", "fa-clock-rotate-left", 7),
+    ("Campaign Info", "fa-bullhorn", 5),
+    ("Settings", "fa-cogs", 6),
+    ("Administration", "fa-gear", 7),
+    ("Records", "fa-clock-rotate-left", 8),
 ]
 
 

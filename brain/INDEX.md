@@ -1,4 +1,4 @@
-# INDEX — synced at commit f812cce · 2026-11-18
+# INDEX — synced at commit 1d11fd4 · 2026-11-21
 
 The retrieval layer. Read this + `brain/STATUS.md` first; load everything else **only** as
 directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` — verified by
@@ -18,7 +18,7 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | Permission catalogue | 81 seeded | `scripts/setup_database.py:17 (SEED_PERMISSIONS)` |
 | Category-type values | 43 seeded (incl. OUTLET_CATEGORY/OUTLET_SUB_CATEGORY, EMP_DESIGNATION, EMP_USER_TYPE, WEEK_DAYS, FREQUENCY_TYPE) | `scripts/setup_database.py (SEED_CATEGORY_TYPES)` |
 | Module registry | 17 master modules | `app/modules.py:34 (MODULES)` |
-| Hook registry | one entry per module | `app/hooks.py:1537 (HOOKS)` |
+| Hook registry | one entry per module | `app/hooks.py:1557 (HOOKS)` |
 | Frozen schema names | incl. typo `expiary_date` | `scripts/ddl.sql` (header = change-log) |
 | Run command + admin creds + DB coords | — | `AGENTS.md` (How to verify / nn5) |
 | UI palette values | — | `docs/PRD.md` §2.3 |
@@ -43,8 +43,8 @@ directed below. Re-index procedure: §4a. Anchor syntax `file:line (symbol)` —
 | rep | sm_rep | `app/modules.py:486 ("rep")` | `app/hooks.py:1090 (rep_prepare)` + HOOKS `rep` | rep | /rep | category-type, distributor | PRD §2.4, SRS §2 FR4.11 |
 | supervisor-level | sm_supervisor_level | `app/modules.py:538 ("supervisor-level")` | `app/hooks.py:1186 (supervisor_level_prepare)` + HOOKS `supervisor_level` | supervisor_level | /supervisor-level | rep, top-level, level | PRD §2.4, SRS §2 FR4.12 |
 | rep-area | sm_rep_area | `app/modules.py:566 ("rep-area")` | `app/hooks.py:1232 (rep_area_prepare)` + HOOKS `rep_area` | rep_area | /rep-area | rep, level | PRD §2.4, SRS §2 FR4.13 |
-| visit-plan | sm_visit_plan | `app/modules.py:590 ("visit-plan")` | `app/hooks.py:1352 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
-| client-visit-plan | sm_client_visit_plan | `app/modules.py:630 ("client-visit-plan")` | `app/hooks.py:1502 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
+| visit-plan | sm_visit_plan | `app/modules.py:590 ("visit-plan")` | `app/hooks.py:1372 (visit_plan_prepare)` + HOOKS `visit_plan` | visit_plan | /visit-plan | rep, level | PRD §2.4, SRS §2 FR4.14 |
+| client-visit-plan | sm_client_visit_plan | `app/modules.py:630 ("client-visit-plan")` | `app/hooks.py:1522 (client_visit_plan_prepare)` + HOOKS `client_visit_plan` | client_visit_plan | /client-visit-plan | outlet, level | PRD §2.4, SRS §2 FR4.15 |
 
 ACL screens: `app/routers/acl_admin.py` (users/roles/permissions — include BEFORE crud router).
 Engine: `app/routers/crud.py` (generic CRUD + Excel + `_access` gate). Sidebar/menu: `app/modules.py:677 (MODULE_ORDER)`.

@@ -1,9 +1,2 @@
-# MY_WATCHER — raw task inbox
-Write new tasks/requirements here in any format (paste DDL, specs, bugs — anything).
-At session start the AI drains this file into `brain/TASKS.md` (structured: id, status,
-deps, priority) and replaces the content with a new tombstone line. Raw history lives in
-`brain/archive/`. Nothing here needs formatting — plain text is fine.
+<!-- drained 2026-11-21: Task 1 (Campaign Info / Approved Rate, sm_promo_approved_rate) -> brain/TASKS.md T-054 -->
 
----
-Drained 2026-11-18 -> T-046..T-048 (see brain/TASKS.md). Raw original:
-brain/archive/MY_WATCHER_2026-11-18.md

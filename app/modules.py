@@ -18,7 +18,7 @@ STATUS_OPTIONS = [
 def f(name, label, type_="text", required=False, in_list=False, in_form=True,
       in_search=False, in_excel=True, options=None, cat=None, default=None,
       width=None, help=None, readonly_on_edit=False, readonly=False,
-      hidden_in_list_width=None, searchable=False, placeholder=None, hide_on_create=False):
+      hidden_in_list_width=None, searchable=False, placeholder=None, hide_on_create=False,min=None, max=None, step=None):
     """Build a field spec dict."""
     return {
         "name": name, "label": label, "type": type_, "required": required,
@@ -27,6 +27,7 @@ def f(name, label, type_="text", required=False, in_list=False, in_form=True,
         "default": default, "width": width, "help": help,
         "readonly_on_edit": readonly_on_edit, "readonly": readonly,
         "searchable": searchable, "placeholder": placeholder, "hide_on_create": hide_on_create,
+        "min": min, "max": max, "step": step,
     }
 
 
@@ -136,7 +137,7 @@ MODULES = {
             ("item_id", "Item", "item"),
         ],
         "form_fields": [
-            f("item_id", "Item", "item_select", required=True, in_list=True, readonly_on_edit=True,
+            f("item_id", "Item", "item_select", required=True, readonly_on_edit=True,
               help="Active items only — type to search by item id or name. Immutable on edit."),
             f("batch_id", "Batch ID", "text", required=True, in_list=True,
               help="When an item is created manually/integration, a default batch '1' valid till 2100-12-31 is generated automatically."),
@@ -674,13 +675,72 @@ MODULES = {
         "excel_cols": ["area_id", "client_id", "frequency", "w1", "w2", "w3", "w4", "w5", "sat", "sun", "mon", "tue", "wed", "thu", "fri", "seq_no", "note"],
         "unique_msg": "A visit plan for this outlet, area and frequency already exists.",
     },
+    # ================= CAMPAIGN INFO =================
+    "promo-approved-rate": {
+        "title": "Approved Rate",
+        "icon": "fa-calculator",
+        "perm": "promo_approved_rate",
+        "table": "sm_promo_approved_rate",
+        "group": "Campaign Info",
+        "order": "id DESC",
+        "list_cols": [
+            ("circular_number", "Circular No"), ("from_date", "From"),
+            ("to_date", "To"), ("cl_category_name", "Outlet Category"),
+            ("brand_name", "Brand"),("weight", "Weight"),
+            ("depot_name", "Distributor"), ("client_name", "Outlet"),
+            ("item_name", "Item"),
+            ("bonus_type", "Bonus Type"),
+            ("fixed_percent_rate", "Rate"), ("status", "Status"),
+        ],
+        "search_cols": ["circular_number", "cl_category_id", "cl_category_name",
+                        "depot_id", "depot_name", "client_id", "client_name",
+                        "brand_id", "brand_name", "item_id", "item_name", "note"],
+        "filters": [
+            ("status", "Status", "status"),
+            ("depot_id", "Distributor", "depot"),
+            ("brand_id", "Brand", "item_brand"),
+        ],
+        "form_fields": [
+            f("circular_number", "Circular Number", "text", required=True, readonly_on_edit=True,
+              help="Campaign circular reference. Immutable after creation."),
+            f("from_date", "From Date", "date", required=True,
+              help="Editable after creation (campaign window start)."),
+            f("to_date", "To Date", "date", required=True,
+              help="Editable after creation (campaign window end)."),
+            f("cl_category_id", "Outlet Category", "select", cat="OUTLET_CATEGORY", readonly_on_edit=True, required=True,
+              help="Outlet category from Settings › Category Type (OUTLET_CATEGORY). Leave empty for ALL. Immutable after creation."),
+            f("brand_id", "Brand", "select", required=True, readonly_on_edit=True,
+              help="Brand of active items (sm_item). Immutable after creation."),
+            f("weight", "Weight", "float", required=True, readonly_on_edit=True,
+              help="Purchase weight / quantity the rate applies to. Immutable after creation."),
+            f("bonus_type", "Bonus Type", "select", required=True, readonly_on_edit=True,
+              options=[("Fixed", "Fixed"), ("Percentage", "Percentage")], default="Fixed",
+              help="Two types: Fixed (amount) or Percentage. Immutable after creation."),
+            f("fixed_percent_rate", "Rate", "float", required=True, readonly_on_edit=True, min=1, step=1,
+              help="Fixed amount or percentage depending on Bonus Type. Immutable after creation."),
+            f("depot_id", "Distributor", "depot_select", readonly_on_edit=True,
+              help="Distributor (sm_depot). Leave empty for ALL. Immutable after creation."),
+            f("client_id", "Outlet", "select", readonly_on_edit=True,
+              help="Outlet (sm_client). Leave empty for ALL. Immutable after creation."),
+            f("item_id", "Item", "item_select", readonly_on_edit=True,
+              help="Item (sm_item) of the selected brand — validated on save. Leave empty for ALL. Immutable after creation."),
+            f("status", "Status", "select", options=STATUS_OPTIONS, default="ACTIVE",
+              help="Editable after creation."),
+            f("note", "Note", "textarea", readonly_on_edit=True),
+        ],
+        "create_hook": "promo_approved_rate",
+        "excel_cols": ["circular_number", "from_date", "to_date", "cl_category_id",
+                       "depot_id", "client_id", "brand_id", "item_id", "weight",
+                       "bonus_type", "fixed_percent_rate", "note"],
+        "unique_msg": "An approved rate with this circular number, brand, item, outlet, weight and date window already exists.",
+    },
 }
 
 MODULE_ORDER = [
     "brand", "item", "item-batch", "rack",
     "top-level", "level", "rep", "supervisor-level", "visit-plan",
     "distributor", "distributor-store", "depot-stock-balance", "depot-rack-stock-balance",
-    "outlet", "client-visit-plan", "category-type",
+    "outlet", "client-visit-plan", "promo-approved-rate", "category-type",
 ]
 
 PERM2SLUG = {
@@ -688,6 +748,7 @@ PERM2SLUG = {
     "top_level": "top-level", "level": "level", "rep": "rep",
     "supervisor_level": "supervisor-level", "rep_area": "rep-area",
     "visit_plan": "visit-plan", "client_visit_plan": "client-visit-plan",
+    "promo_approved_rate": "promo-approved-rate",
     "distributor": "distributor", "depot_store": "distributor-store",
     "depot_stock_balance": "depot-stock-balance",
     "depot_rack_stock_balance": "depot-rack-stock-balance",

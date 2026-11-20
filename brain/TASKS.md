@@ -5,7 +5,7 @@ Format: `- T-nnn | status | module | deps | prio | added | description`
 Statuses: `ready` · `needs-verification` (claimed done — verify against code, close or reopen) · `clarify` (ambiguous — ask user) · `blocked` (waiting on deps) · `done`.
 
 ## IN_PROGRESS (max 1)
-(none)
+- T-054 | in-progress | promo-approved-rate | - | P1 | 2026-11-21 | New sidebar section "Campaign Info" (under Outlet Info): master module "Approved Rate" `sm_promo_approved_rate` — circular promo rates with date window (from/to), client category (sm_category_type OUTLET_CATEGORY), depot/client/brand/item pickers, weight, bonus_type Fixed|Percentage, fixed_percent_rate; on edit only from_date, to_date, status are editable
 
 ## OPEN
 (none)

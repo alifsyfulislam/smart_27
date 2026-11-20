@@ -80,12 +80,12 @@
             {% set iname = (data.get('name') if data.get('name') and data.get('name') != '-' else (item_map.get(data.get('item_id')) if item_map else '')) %}
             <div>{{ data.get('item_id') }}{% if iname and iname != '-' %} — {{ iname }}{% endif %}</div>
             {% else %}
-            <select name="item_id" data-searchable data-search-placeholder="Type to search item (id / name / brand)…"
+            <select name="item_id" data-searchable data-search-placeholder="Type to search item (id / name / brand / weight / TP"
                     {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}
                     {{ 'required' if s.required and a == 'Create' }}>
               <option value="">-- Select item --</option>
               {% for o in item_opts %}
-              <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} | {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}){% endif %}</option>
+              <option value="{{ o['item_id'] }}" {{ 'selected' if data.get('item_id') == o['item_id'] }}>{{ o['item_id'] }} | {{ o['name'] }}{% if o['brand_name'] and o['brand_name'] != '-' %} ({{ o['brand_name'] }}, {{ o['weight'] }}, {{ o['total_amt'] }}){% endif %}</option>
               {% endfor %}
             </select>
             {% if a == 'Edit' and s.readonly_on_edit %}
@@ -291,7 +291,7 @@
                 {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
               {% endif %}
             </div>
-            {% elif slug == 'client-visit-plan' and s.name == 'client_id' %}
+            {% elif slug in ['client-visit-plan','promo-approved-rate'] and s.name == 'client_id' %}
             <div class="field" id="field-wrap-client_id">
               <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
               {% if a == 'View' %}
@@ -309,6 +309,25 @@
                   {% endfor %}
                 </select>
                 <div id="outlet-count-badge" class="hint" style="margin-top: 4px; font-weight: 600; color: #1e40af;"></div>
+                {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
+            {% endif %}
+          </div>
+            {% elif slug == 'promo-approved-rate' and s.name in ('cl_category_id', 'client_id', 'brand_id') %}
+            {% set cph = {'cl_category_id': '-- ALL Outlet Category --', 'client_id': '-- ALL Outlet --', 'brand_id': '-- Select Brand --'}[s.name] %}
+            {% set vname_col = {'cl_category_id': 'cl_category_name', 'client_id': 'client_name', 'brand_id': 'brand_name'}[s.name] %}
+            <div class="field" id="field-wrap-{{ s.name }}">
+              <label>{{ s.label }}{% if s.required %} <span class="req">*</span>{% endif %}</label>
+              {% if a == 'View' %}
+                <div>{{ data.get(s.name) }}{% if data.get(vname_col) and data.get(vname_col) != 'ALL' %} — {{ data.get(vname_col) }}{% endif %}</div>
+              {% else %}
+                <select name="{{ s.name }}" id="f-{{ s.name }}" {{ 'required' if s.required and a == 'Create' }}
+                        {{ 'disabled' if a == 'Edit' and s.readonly_on_edit }}>
+                  <option value="">{{ cph }}</option>
+                  {% for o in (field_opts.get(s.name) or s.options or []) %}
+                  <option value="{{ o[0] }}" {{ 'selected' if (data.get(s.name)|string)|upper == (o[0]|string)|upper }}>{{ o[1] }}</option>
+                  {% endfor %}
+                </select>
+                {% if a == 'Edit' and s.readonly_on_edit %}<input type="hidden" name="{{ s.name }}" value="{{ data.get(s.name) }}">{% endif %}
                 {% if s.help %}<div class="hint">{{ s.help }}</div>{% endif %}
               {% endif %}
             </div>
